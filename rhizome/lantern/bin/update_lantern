@@ -1,0 +1,39 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require 'yaml'
+require_relative "../../common/lib/util"
+require_relative "./common"
+
+$configure_hash = JSON.parse($stdin.read)
+
+
+pg_version = r"#{$pg_mount_path}/bin/pg_config --version | sed -rn 's/PostgreSQL (.*)\..*/\1/p' | tr -d '\n'"
+unless pg_version
+ raise "Could not detect Postgres Version"
+end
+
+version_tag="v#{configure_hash["version"]}"
+
+r "cd /tmp"
+r "rm -rf lantern || true"
+r "git clone https://github.com/lanterndata/lantern.git --recursive"
+r "cd lantern"
+r "git checkout $version_tag"
+r "git submodule update --recursive"
+r "sudo docker build --build-arg PG_VERSION=#{pg_version} . -t lantern"
+r "sudo docker create --name tc lantern"
+r "mkdir tmp-files"
+r "sudo docker cp tc:/usr/lib/postgresql/#{pg_version}/lib/lantern.so tmp-files"
+r "docker cp tc:/usr/share/postgresql/#{pg_version}/extension tmp-files"
+r "docker rm tc"
+r "docker rmi lantern"
+r "chown -R 1001:1001 tmp-files"
+r "cp tmp-files/lantern.so #{pg_mount_path}/lib/lantern.so"
+r "cp tmp-files/extension/lantern* #{pg_mount_path}/share/extension/"
+r "cd /tmp"
+r "rm -rf /tmp/lantern"
+
+update_extensions_in_sql
+

@@ -134,4 +134,7 @@ module Config
   optional :gcp_creds_walg_b64, string
   optional :prom_password, string
   override :gcr_image, "gcr.io/ringed-griffin-394922/lantern-bitnami"
+  optional :lantern_dns_token_tls, string
+  optional :lantern_dns_email_tls, string
+  optional :lantern_dns_token_domain, string
 end

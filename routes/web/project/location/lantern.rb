@@ -5,7 +5,9 @@ class CloverWeb
     @serializer = Serializers::Web::Postgres
 
     r.on String do |pg_name|
-      pg = @project.lantern_servers_dataset.where(location: @location).where { {Sequel[:lantern_server][:instance_id] => pg_name} }.first
+      puts "PG NAME:::::: %s " % [pg_name]
+      puts "PG NAME SQP:::::: %s " % [@project.lantern_servers_dataset.where(location: @location, instance_id: pg_name).sql]
+      pg = @project.lantern_servers_dataset.where(location: @location, instance_id: pg_name).first
 
       unless pg
         response.status = 404

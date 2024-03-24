@@ -19,7 +19,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
                     location: "us-central1", target_vm_size: nil, storage_size_gib: 50,
                     postgres_password: nil, master_host: nil, master_port: nil)
     DB.transaction do
-      unless (parent = Project[project_id])
+      unless (project = Project[project_id])
         fail "No existing parent"
       end
       ubid = LanternServer.generate_ubid
@@ -65,6 +65,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
         master_port: master_port,
         vm_id: vm_st.id
       ) { _1.id = ubid.to_uuid }
+      lantern_server.associate_with_project(project)
 
       Strand.create(prog: "Lantern::LanternServerNexus", label: "start") { _1.id = lantern_server.id }
     end
@@ -101,7 +102,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   end
 
   label def setup_docker_stack
-    # TODO:: This is not working correctly
     gcp_vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/configure' configure_lantern", stdin: JSON.generate({
       enable_coredumps: true,
       org_id: lantern_server.org_id,
@@ -120,6 +120,9 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
       gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
       gcp_creds_walg_b64: Config.gcp_creds_walg_b64,
+      dns_token: Config.lantern_dns_token_tls,
+      dns_email: Config.lantern_dns_email_tls,
+      domain: lantern_server.gcp_vm.domain,
       container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}"
     }))
     hop_wait
@@ -127,24 +130,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
 
   label def configure
     decr_configure
-
-    # case vm.sshable.cmd("common/bin/daemonizer --check configure_postgres")
-    # when "Succeeded"
-    #   vm.sshable.cmd("common/bin/daemonizer --clean configure_postgres")
-    #
-    #   when_initial_provisioning_set? do
-    #     hop_update_superuser_password if postgres_server.primary?
-    #     hop_wait_catch_up if postgres_server.standby?
-    #     hop_wait_recovery_completion
-    #   end
-    #
-    #   hop_wait_catch_up if postgres_server.standby? && postgres_server.synchronization_status != "ready"
-    #   hop_wait
-    # when "Failed", "NotStarted"
-    #   configure_hash = postgres_server.configure_hash
-    #   vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/configure' configure_postgres", stdin: JSON.generate(configure_hash))
-    # end
-
     nap 5
   end
 
@@ -270,14 +255,13 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     strand.children.each { _1.destroy }
     gcp_vm.incr_destroy
     lantern_server.destroy
-
     pop "postgres server is deleted"
   end
 
   label def restart
     decr_restart
     gcp_vm.sshable.cmd("sudo postgres/bin/restart")
-    pop "postgres server is restarted"
+    hop_wait
   end
 
   def available?
@@ -290,10 +274,10 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     end
 
     # Do not declare unavailability if Postgres is in crash recovery
-    begin
-      return true if gcp_vm.sshable.cmd("sudo tail -n 5 /dat/16/data/pg_log/postgresql.log").include?("redo in progress")
-    rescue
-    end
+    # begin
+    #   return true if gcp_vm.sshable.cmd("sudo tail -n 5 /dat/16/data/pg_log/postgresql.log").include?("redo in progress")
+    # rescue
+    # end
 
     false
   end

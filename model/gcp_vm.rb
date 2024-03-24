@@ -18,13 +18,13 @@ class GcpVm < Sequel::Model
   include Authorization::HyperTagMethods
 
   def hyper_tag_name(project)
-    "project/#{project.ubid}/location/#{location}/vm/#{name}"
+    "project/#{project.ubid}/location/#{location}/gcp_vm/#{name}"
   end
 
   include Authorization::TaggableMethods
 
   def path
-    "/location/#{location}/vm/#{name}"
+    "/location/#{location}/gcp_vm/#{name}"
   end
 
   def ip4

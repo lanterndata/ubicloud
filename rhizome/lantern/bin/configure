@@ -4,15 +4,9 @@
 require "json"
 require 'yaml'
 require_relative "../../common/lib/util"
+require_relative "./common"
 
 $configure_hash = JSON.parse($stdin.read)
-
-$workdir="/var/lib/lantern"
-$datadir="/var/lib/lantern-data"
-$compose_file="#{$workdir}/docker-compose.yaml"
-$env_file="#{$workdir}/.env"
-$pg_mount_path="#{$workdir}/pg"
-$container_name="lantern-postgresql-1"
 
 def install_dependencies()
   # Install dependencies
@@ -79,11 +73,6 @@ def setup_env()
   end
 end
 
-def configure_gcr()
-  r "echo #{$configure_hash["gcp_creds_gcr_b64"]} | base64 -d | sudo docker login -u _json_key --password-stdin https://gcr.io"
-  r "sudo docker pull #{$configure_hash["container_image"]}"
-end
-
 def setup_initial_compose_file()
   # setup_initial_compose_file
   # Get the total amount of RAM in kilobytes
@@ -134,43 +123,6 @@ def setup_initial_compose_file()
   end
 end
 
-def update_extensions_in_sql()
-  all_dbs=(r"docker compose -f #{$compose_file} exec postgresql psql -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'").strip!.split("\n")
-  for db in all_dbs do
-    r"docker compose -f #{$compose_file} exec postgresql psql -U postgres -f /lantern-init.sql #{db}"
-  end
-end
-
-def wait_for_pg()
- until r"docker exec #{$container_name} pg_isready -U postgres 2>/dev/null;" do
-   sleep 1
- end
-end
-
-def run_database()
-  # Run database
-  volume_mount="#{$pg_mount_path}:/opt/bitnami/postgresql"
-  # Copy postgres fs to host to mount
-  r "sudo rm -rf #{$pg_mount_path}"
-  data = YAML.load_file $compose_file
-  data["services"]["postgresql"]["volumes"] = data["services"]["postgresql"]["volumes"].select{ |i| i != volume_mount }
-  File.open($compose_file, 'w') { |f| YAML.dump(data, f) }
-  r "sudo docker rm -f tc 2>/dev/null || true"
-  r "sudo docker create --name tc #{$configure_hash["container_image"]}"
-  r "sudo docker cp tc:/opt/bitnami/postgresql #{$pg_mount_path}"
-  r "sudo docker rm tc"
-  r "sudo chown -R 1001:1001 #{$pg_mount_path}"
-  # Mount extension dir, so we can make automatic updates from host
-  data["services"]["postgresql"]["volumes"].push(volume_mount)
-  File.open($compose_file, 'w') { |f| YAML.dump(data, f) }
-  r "sudo docker compose -f #{$compose_file} up -d"
-  # Wait 10 seconds for initdb
-  sleep(10)
-  wait_for_pg
-  # Enable lantern extension
-  update_extensions_in_sql
-end
-
 install_dependencies
 puts "dependencies installed"
 setup_fs
@@ -179,7 +131,11 @@ setup_env
 puts ".env setted up"
 setup_initial_compose_file
 puts "docker-compose.yaml ready"
-configure_gcr
+configure_gcr($configure_hash["gcp_creds_gcr_b64"], $configure_hash["container_image"])
 puts "GCR repo ready"
-run_database
+run_database($configure_hash["container_image"])
 puts "database ready"
+
+if $configure_hash["dns_token"] && $configure_hash["domain"] do
+  configure_tls($configure_hash["domain"], $configure_hash["domain_email"], $configure_hash["dns_token"])
+end

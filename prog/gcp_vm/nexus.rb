@@ -8,11 +8,6 @@ require "base64"
 
 require_relative "../../lib/hosting/gcp_apis"
 
-# TODO
-# 1. Add migration for gcp_vm
-# 2. Add migration for lantern_server
-# 3. Fix run_query for lantern_server
-# 4. Add sidebar item for lantern_server
 # 5. Add view and routes for lantern_server
 # 6. Write tests for lantern_server
 
@@ -22,7 +17,7 @@ class Prog::GcpVm::Nexus < Prog::Base
 
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
                     unix_user: "lantern", location: "us-central1", boot_image: "ubuntu-2204-jammy-v20240319",
-                    storage_size_gib: nil, arch: "x64")
+                    storage_size_gib: nil, arch: "x64", domain: nil)
 
     unless (project = Project[project_id])
       Clog.emit("Project id") { {project_id: project_id} }
@@ -48,7 +43,7 @@ class Prog::GcpVm::Nexus < Prog::Base
 
       vm = GcpVm.create(name: name, public_key: public_key, unix_user: unix_user,
         family: vm_size.family, cores: cores, location: location,
-        boot_image: boot_image, arch: arch, storage_size_gib: storage_size_gib) { _1.id = ubid.to_uuid }
+        boot_image: boot_image, arch: arch, storage_size_gib: storage_size_gib, domain: domain) { _1.id = ubid.to_uuid }
 
       vm.associate_with_project(project)
 
@@ -103,7 +98,10 @@ class Prog::GcpVm::Nexus < Prog::Base
     ip4 = gcp_client.create_static_ip4(gcp_vm.name, gcp_vm.location)
     Clog.emit("IP4 GOT") {{ ip4: ip4 }}
     gcp_vm.sshable.update(host: ip4)
-    # TODO:: Create DNS record
+
+    if gcp_vm.domain
+      # TODO:: Create DNS record
+    end
     register_deadline(:wait, 10 * 60)
     # We don't need storage_volume info anymore, so delete it before
     # transitioning to the next state.

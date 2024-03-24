@@ -18,6 +18,10 @@ class LanternServer < Sequel::Model
   semaphore :initial_provisioning, :update_superuser_password, :checkup
   semaphore :restart, :configure, :take_over, :destroy
 
+  def hyper_tag_name(project)
+    "project/#{project.ubid}/location/#{location}/lantern/#{instance_id}"
+  end
+
   def path
     "/location/#{gcp_vm.location}/lantern/#{instance_id}"
   end
@@ -33,5 +37,9 @@ class LanternServer < Sequel::Model
       userinfo: "postgres:#{URI.encode_uri_component(postgres_password)}",
       host: gcp_vm.domain || gcp_vm.sshable.host
     ).to_s
+  end
+
+  def run_query(query)
+    gcp_vm.sshable.cmd("sudo lantern/bin/exec 'psql -U postgres #{query}'").chomp
   end
 end
