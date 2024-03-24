@@ -12,9 +12,7 @@ RSpec.describe Prog::GcpVm::Nexus do
 
   let(:st) { Strand.new }
   let(:gcp_vm) {
-    vm = GcpVm.new(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "us-central1", storage_size_gib: 50).tap {
-      _1.id = "2464de61-7501-8374-9ab0-416caebe31da"
-    }
+    vm = GcpVm.new_with_id(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "us-central1", storage_size_gib: 50)
     vm
   }
   let(:prj) { Project.create_with_id(name: "default", provider: "gcp").tap { _1.associate_with_project(_1) } }

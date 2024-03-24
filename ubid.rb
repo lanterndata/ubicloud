@@ -33,7 +33,7 @@ class UBID
   # types
   TYPE_VM = "vm"
   TYPE_GCP_VM = "gm"
-  TYPE_LANTERN_SERVER = "ls"
+  TYPE_LANTERN_SERVER = "1s"
   TYPE_VM_STORAGE_VOLUME = "v1"
   TYPE_VM_HOST = "vh"
   TYPE_STORAGE_KEY_ENCRYPTION_KEY = "ke"

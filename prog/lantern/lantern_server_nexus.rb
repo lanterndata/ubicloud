@@ -50,7 +50,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
 
       lantern_server = LanternServer.create(
         project_id: project_id,
-        lantern_version: lantern_server,
+        lantern_version: lantern_version,
         extras_version: extras_version,
         location: location,
         minor_version: minor_version,
@@ -90,7 +90,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   label def bootstrap_rhizome
     register_deadline(:wait, 10 * 60)
 
-    bud Prog::BootstrapRhizome, {"target_folder" => "postgres", "subject_id" => gcp_vm.id, "user" => "lantern"}
+    bud Prog::BootstrapRhizome, {"target_folder" => "lantern", "subject_id" => gcp_vm.id, "user" => "lantern"}
     hop_wait_bootstrap_rhizome
   end
 
@@ -115,14 +115,14 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       postgres_password: lantern_server.postgres_password,
       master_host: lantern_server.master_host,
       master_port: lantern_server.master_port,
-      enable_telemetry: Config.production,
+      enable_telemetry: Config.production?,
       prom_password: Config.prom_password,
       gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
       gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
       gcp_creds_walg_b64: Config.gcp_creds_walg_b64,
       container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}"
     }))
-    pop "complete"
+    hop_wait
   end
 
   label def configure
@@ -221,14 +221,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   label def wait
     decr_initial_provisioning
 
-    when_take_over_set? do
-      hop_wait_primary_destroy
-    end
-
-    when_refresh_certificates_set? do
-      hop_refresh_certificates
-    end
-
     when_update_superuser_password_set? do
       hop_update_superuser_password
     end
@@ -237,14 +229,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       hop_unavailable if !available?
     end
 
-    when_update_firewall_rules_set? do
-      decr_update_firewall_rules
-      hop_update_firewall_rules
-    end
-
-    when_configure_set? do
-      hop_configure
-    end
 
     when_restart_set? do
       push self.class, frame, "restart"

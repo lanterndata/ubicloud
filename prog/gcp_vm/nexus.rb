@@ -95,7 +95,7 @@ class Prog::GcpVm::Nexus < Prog::Base
 
     DB.transaction do
       Clog.emit("Create GCP VM") {{ name: gcp_vm.name, location: gcp_vm.location }}
-      gcp_response = gcp_client.create_vm(gcp_vm.name, gcp_vm.location, gcp_vm.boot_image, gcp_vm.public_key, gcp_vm.unix_user, "n1-#{gcp_vm.family}-#{gcp_vm.cores}", gcp_vm.storage_size_gib)
+      gcp_client.create_vm(gcp_vm.name, gcp_vm.location, gcp_vm.boot_image, gcp_vm.public_key, gcp_vm.unix_user, "n1-#{gcp_vm.family}-#{gcp_vm.cores}", gcp_vm.storage_size_gib)
       Clog.emit("Created GCP VM") {{ name: gcp_vm.name, location: gcp_vm.location }}
     end
 
@@ -137,7 +137,7 @@ class Prog::GcpVm::Nexus < Prog::Base
     end
 
     gcp_vm.update(display_state: "running")
-    pop "running"
+    hop_wait
   end
 
   label def create_billing_record
