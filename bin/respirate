@@ -17,7 +17,7 @@ if Config.github_app_id
 end
 
 # We always insert this strand using the same UBID ("stresolvee4block0dnsnamesz")
-Strand.dataset.insert_conflict.insert(id: "c3b200ed-ce22-c33a-0326-06d735551d9f", schedule: Time.now, prog: "ResolveGloballyBlockedDnsnames", label: "wait")
+# Strand.dataset.insert_conflict.insert(id: "c3b200ed-ce22-c33a-0326-06d735551d9f", schedule: Time.now, prog: "ResolveGloballyBlockedDnsnames", label: "wait")
 
 clover_freeze
 

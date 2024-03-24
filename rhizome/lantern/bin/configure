@@ -1,0 +1,185 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require 'yaml'
+require_relative "../../common/lib/util"
+
+$configure_hash = JSON.parse($stdin.read)
+
+$workdir="/var/lib/lantern"
+$datadir="/var/lib/lantern-data"
+$compose_file="#{$workdir}/docker-compose.yaml"
+$env_file="#{$workdir}/.env"
+$pg_mount_path="#{$workdir}/pg"
+$container_name="lantern-postgresql-1"
+
+def install_dependencies()
+  # Install dependencies
+  r "sudo apt update -qq && sudo apt install software-properties-common -y -qq >/dev/null"
+  r "curl -fsSL https://get.docker.com > /tmp/get-docker.sh"
+  r "chmod +x /tmp/get-docker.sh && /tmp/get-docker.sh"
+  # Fix /etc/init.d/docker: 62: ulimit: error setting limit (Invalid argument) error
+  r "sudo sed -i 's/ulimit -Hn/ulimit -n/' /etc/init.d/docker"
+  r "sudo service docker restart"
+end
+
+def setup_fs()
+  # Setup FS
+  r "sudo mkdir -p #{$datadir}"
+  r "sudo chown -R 1001:1001 #{$datadir}"
+  # Directory for configuration
+  r "sudo mkdir -p #{$workdir}"
+
+  # Setup core pattern
+  if $configure_hash["enable_coredumps"]
+    r "sudo su -c 'echo \"/bitnami/postgresql/data/core.%e.%p.%t\" > /proc/sys/kernel/core_pattern'"
+  end
+end
+
+def setup_env()
+  # Setup env file
+  unless File.file?($env_file)
+      File.open($env_file, 'a') do |f|
+        f.puts("ORGANIZATION_ID=#{$configure_hash["org_id"]}")
+        f.puts("INSTANCE_ID=#{$configure_hash["instance_id"]}")
+        f.puts("INSTANCE_TYPE=#{$configure_hash["instance_type"]}")
+        f.puts("APP_ENV=#{$configure_hash["app_env"]}")
+        f.puts("POSTGRESQL_REPLICATION_MODE=#{$configure_hash["replication_mode"]}")
+        f.puts("POSTGRESQL_REPLICATION_USER=#{$configure_hash["repl_user"]}")
+        f.puts("POSTGRESQL_REPLICATION_PASSWORD=#{$configure_hash["repl_password"]}")
+        f.puts("POSTGRESQL_MASTER_HOST=#{$configure_hash["master_host"]}")
+        f.puts("POSTGRESQL_MASTER_PORT_NUMBER=#{$configure_hash["master_port"]}")
+        f.puts("POSTGRESQL_LOG_HOSTNAME=true")
+        f.puts("GOOGLE_CLOUD_BUCKET_NAME=client-db-coredumps")
+        f.puts("POSTGRESQL_DATABASE=#{$configure_hash["db_name"]}")
+        f.puts("POSTGRESQL_POSTGRES_PASSWORD=#{$configure_hash["postgres_password"]}")
+        f.puts("POSTGRESQL_POSTGRES_PASSWORD=#{$configure_hash["db_user"]}")
+        f.puts("PROMETHEUS_WRITER_USERNAME=1296757")
+        f.puts("PROMETHEUS_WRITER_PASSWORD=#{$configure_hash["prom_password"]}")
+        f.puts("PROMETHEUS_WRITER_URL=https://prometheus.lantern.dev/api/v1/write")
+        f.puts("POSTGRESQL_ENABLE_COREDUMPS=#{$configure_hash["enable_coredumps"]}")
+        f.puts("ENABLE_TELEMETRY=#{$configure_hash["enable_telemetry"]}")
+        f.puts("GOOGLE_APPLICATION_CREDENTIALS_B64=#{$configure_hash["gcp_creds_coredumps_b64"]}")
+        f.puts("GOOGLE_APPLICATION_CREDENTIALS_WALG_B64=#{$configure_hash["gcp_creds_walg_b64"]}")
+        f.puts("POSTGRESQL_LOG_LINE_PREFIX=lantern-logline: app: %a user: %u time: %t proc_start: %s pid: %p linenumber: %l === ")
+        f.puts("POSTGRESQL_LOG_DURATION=true")
+        f.puts("POSTGRESQL_LOG_MIN_DURATION_STATEMENT=250ms")
+
+        if $configure_hash["enable_auditlogs"]
+          f.puts("POSTGRESQL_PGAUDIT_LOG=READ,WRITE")
+        end
+
+        if $configure_hash["db_user"] != "postgres"
+          f.puts("POSTGRESQL_PASSWORD=#{$configure_hash["db_user_password"]}")
+        else
+          f.puts("POSTGRESQL_PASSWORD=#{$configure_hash["postgres_password"]}")
+        end
+      end
+  end
+end
+
+def configure_gcr()
+  r "echo #{$configure_hash["gcp_creds_gcr_b64"]} | base64 -d | sudo docker login -u _json_key --password-stdin https://gcr.io"
+  r "sudo docker pull #{$configure_hash["container_image"]}"
+end
+
+def setup_initial_compose_file()
+  # setup_initial_compose_file
+  # Get the total amount of RAM in kilobytes
+  total_ram=(r"free -tk | awk 'NR == 2 {print $2}'")
+  # Calculate 95% of the total RAM in kilobytes
+  mem_mb=(total_ram.to_i * 0.95/1024).round
+  mem_limit="#{mem_mb}MB"
+
+  map = {
+    "version" => "3",
+    "services" => {
+      "postgresql" => {
+          "image" => $configure_hash["container_image"],
+          "ports" => ["5432:5432", "6432:6432"],
+          "volumes" => ["/var/lib/lantern-data:/bitnami/postgresql"],
+          "deploy" => {
+            "restart_policy" => { "condition" => "unless-stopped" },
+            "resources" => { "limits" => { "memory" => mem_limit } }
+          },
+          "env_file" => $env_file
+      }
+    }
+  }
+
+  if $configure_hash["gcp_creds_logging_b64"]
+    r "echo #{$configure_hash["gcp_creds_logging_b64"]} | base64 -d > #{$workdir}/logging_creds.json"
+    gcp_project = r "cat #{$workdir}/logging_creds.json | jq -r '.project_id'"
+    r "sudo sed -i \"/\[Service\]/a Environment=\"GOOGLE_APPLICATION_CREDENTIALS=#{$workdir}/logging_creds.json\"\" /usr/lib/systemd/system/docker.service"
+    r "sudo sed -i \"/BASE=docker/a export GOOGLE_APPLICATION_CREDENTIALS=#{$workdir}/logging_creds.json\" /etc/init.d/docker"
+    r "sudo systemctl daemon-reload 2>/dev/null || echo 'No systemctl in host'"
+
+    gcp_meta_name="#{$configure_hash["instance_id"]}-#{$configure_hash["instance_type"]}"
+    map["services"]["postgresql"]["logging"] = {
+      "driver" => "gcplogs",
+      "options" => {
+        "gcp-project" => gcp_project,
+        "gcp-meta-name" => gcp_meta_name,
+        "gcp-meta-id" => gcp_meta_name,
+        "labels" => "self-hosted"
+      }
+    }
+  end
+
+  unless File.file?($compose_file)
+    File.open($compose_file, 'w') do |f|
+      f.write(map.to_yaml)
+    end
+  end
+end
+
+def update_extensions_in_sql()
+  all_dbs=(r"docker compose -f #{$compose_file} exec postgresql psql -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'").strip!.split("\n")
+  for db in all_dbs do
+    r"docker compose -f #{$compose_file} exec postgresql psql -U postgres -f /lantern-init.sql #{db}"
+  end
+end
+
+def wait_for_pg()
+ until r"docker exec #{$container_name} pg_isready -U postgres 2>/dev/null;" do
+   sleep 1
+ end
+end
+
+def run_database()
+  # Run database
+  volume_mount="#{$pg_mount_path}:/opt/bitnami/postgresql"
+  # Copy postgres fs to host to mount
+  r "sudo rm -rf #{$pg_mount_path}"
+  data = YAML.load_file $compose_file
+  data["services"]["postgresql"]["volumes"] = data["services"]["postgresql"]["volumes"].select{ |i| i != volume_mount }
+  File.open($compose_file, 'w') { |f| YAML.dump(data, f) }
+  r "sudo docker rm -f tc 2>/dev/null || true"
+  r "sudo docker create --name tc #{$configure_hash["container_image"]}"
+  r "sudo docker cp tc:/opt/bitnami/postgresql #{$pg_mount_path}"
+  r "sudo docker rm tc"
+  r "sudo chown -R 1001:1001 #{$pg_mount_path}"
+  # Mount extension dir, so we can make automatic updates from host
+  data["services"]["postgresql"]["volumes"].push(volume_mount)
+  File.open($compose_file, 'w') { |f| YAML.dump(data, f) }
+  r "sudo docker compose -f #{$compose_file} up -d"
+  # Wait 10 seconds for initdb
+  sleep(10)
+  wait_for_pg
+  # Enable lantern extension
+  update_extensions_in_sql
+end
+
+install_dependencies
+puts "dependencies installed"
+setup_fs
+puts "filesystem ready"
+setup_env
+puts ".env setted up"
+setup_initial_compose_file
+puts "docker-compose.yaml ready"
+configure_gcr
+puts "GCR repo ready"
+run_database
+puts "database ready"

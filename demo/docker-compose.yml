@@ -26,8 +26,10 @@ services:
     command: rake dev_up
 
   app:
-    image: ubicloud/ubicloud:latest
     container_name: ubicloud-app
+    build:
+      dockerfile: ./Dockerfile
+      context: ../
     depends_on:
       db-migrator:
         condition: service_completed_successfully

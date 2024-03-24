@@ -89,6 +89,13 @@ module Validation
     postgres_size
   end
 
+  def self.validate_lantern_size(size)
+    unless (postgres_size = Option::LanternSizes.find { _1.name == size })
+      fail ValidationFailed.new({size: "\"#{size}\" is not a valid Lantern database size. Available sizes: #{Option::LanternSizes.map(&:name)}"})
+    end
+    postgres_size
+  end
+
   def self.validate_date(date, param = "date")
     # I use DateTime.parse instead of Time.parse because it uses UTC as default
     # timezone but Time.parse uses local timezone
