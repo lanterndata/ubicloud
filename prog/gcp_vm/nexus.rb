@@ -16,8 +16,8 @@ class Prog::GcpVm::Nexus < Prog::Base
   semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules
 
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
-                    unix_user: "lantern", location: "us-central1", boot_image: "ubuntu-2204-jammy-v20240319",
-                    storage_size_gib: nil, arch: "x64", domain: nil)
+    unix_user: "lantern", location: "us-central1", boot_image: "ubuntu-2204-jammy-v20240319",
+    storage_size_gib: nil, arch: "x64", domain: nil)
 
     unless (project = Project[project_id])
       Clog.emit("Project id") { {project_id: project_id} }
@@ -26,7 +26,6 @@ class Prog::GcpVm::Nexus < Prog::Base
 
     Validation.validate_location(location, project.provider)
     vm_size = Validation.validate_vm_size(size)
-
 
     ubid = GcpVm.generate_ubid
     name ||= GcpVm.ubid_to_name(ubid)
@@ -81,27 +80,30 @@ class Prog::GcpVm::Nexus < Prog::Base
   end
 
   label def start
-    # Call to GCP to create VM with info from vm
-    # As VM is created Allocate Static IP for VM
-    # As Soon as static ip is assigned create DNS record for that IP
-    Clog.emit("Creating client") {{ name: gcp_vm.name, location: gcp_vm.location }}
+    Clog.emit("Creating client") { {name: gcp_vm.name, location: gcp_vm.location} }
     gcp_client = Hosting::GcpApis::new
-    Clog.emit("Client created") {{ name: gcp_vm.name, location: gcp_vm.location }}
+    Clog.emit("Client created") { {name: gcp_vm.name, location: gcp_vm.location} }
 
     DB.transaction do
-      Clog.emit("Create GCP VM") {{ name: gcp_vm.name, location: gcp_vm.location }}
+      Clog.emit("Create GCP VM") { {name: gcp_vm.name, location: gcp_vm.location} }
       gcp_client.create_vm(gcp_vm.name, gcp_vm.location, gcp_vm.boot_image, gcp_vm.public_key, gcp_vm.unix_user, "n1-#{gcp_vm.family}-#{gcp_vm.cores}", gcp_vm.storage_size_gib)
-      Clog.emit("Created GCP VM") {{ name: gcp_vm.name, location: gcp_vm.location }}
+      Clog.emit("Created GCP VM") { {name: gcp_vm.name, location: gcp_vm.location} }
     end
 
-    Clog.emit("Getting ip4") {{ name: gcp_vm.name, location: gcp_vm.location }}
-    ip4 = gcp_client.create_static_ip4(gcp_vm.name, gcp_vm.location)
-    Clog.emit("IP4 GOT") {{ ip4: ip4 }}
+    Clog.emit("Getting ip4") { {name: gcp_vm.name, location: gcp_vm.location} }
+    ip4 = gcp_client.create_static_ipv4(gcp_vm.name, gcp_vm.location)
+    Clog.emit("IP4 GOT") { {ip4: ip4} }
+
+    Clog.emit("Assign IP4") { {ip4: ip4} }
+    gcp_client.assign_static_ipv4(gcp_vm.name, ip4, gcp_vm.location)
+    Clog.emit("Assigned IP4") { {ip4: ip4} }
+    gcp_vm.update(has_static_ipv4: true)
     gcp_vm.sshable.update(host: ip4)
 
-    if gcp_vm.domain
+    # if gcp_vm.domain
       # TODO:: Create DNS record
-    end
+    # end
+    Clog.emit("REGISTRING DEADLINE")
     register_deadline(:wait, 10 * 60)
     # We don't need storage_volume info anymore, so delete it before
     # transitioning to the next state.
@@ -110,8 +112,7 @@ class Prog::GcpVm::Nexus < Prog::Base
 
   label def run
     gcp_client = Hosting::GcpApis::new
-    # TODO
-    # gcp_client.start_vm(gcp_vm.name, gcp_vm.location)
+    gcp_client.start_vm(gcp_vm.name, gcp_vm.location)
     hop_wait_sshable
   end
 
@@ -128,7 +129,7 @@ class Prog::GcpVm::Nexus < Prog::Base
     # hop_create_billing_record unless addr
 
     begin
-      Clog.emit("Trying to ssh to addr") {{ addr: addr.to_s }}
+      Clog.emit("Trying to ssh to addr") { {addr: addr.to_s} }
       Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
     rescue SystemCallError
       nap 1
@@ -170,6 +171,11 @@ class Prog::GcpVm::Nexus < Prog::Base
       register_deadline(:wait, 5 * 60)
       hop_start_after_host_reboot
     end
+
+    when_destroy_set? do
+      hop_destroy
+    end
+
     nap 30
   end
 
@@ -189,6 +195,9 @@ class Prog::GcpVm::Nexus < Prog::Base
   label def destroy
     gcp_client = Hosting::GcpApis::new
     gcp_client.delete_vm(gcp_vm.name, gcp_vm.location)
+    if gcp_vm.has_static_ipv4
+      gcp_client.release_ipv4(gcp_vm.name, gcp_vm.location)
+    end
     pop "vm deleted"
   end
 end

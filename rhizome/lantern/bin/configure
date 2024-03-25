@@ -4,9 +4,12 @@
 require "json"
 require 'yaml'
 require_relative "../../common/lib/util"
-require_relative "./common"
+require_relative "../lib/common"
 
 $configure_hash = JSON.parse($stdin.read)
+File.open("test.json", 'a') do |f|
+  f.puts($configure_hash.to_s)
+end
 
 def install_dependencies()
   # Install dependencies
@@ -136,6 +139,6 @@ puts "GCR repo ready"
 run_database($configure_hash["container_image"])
 puts "database ready"
 
-if $configure_hash["dns_token"] && $configure_hash["domain"] do
+if $configure_hash["dns_token"] && $configure_hash["domain"]
   configure_tls($configure_hash["domain"], $configure_hash["domain_email"], $configure_hash["dns_token"])
 end

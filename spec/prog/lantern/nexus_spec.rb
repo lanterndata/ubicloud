@@ -33,7 +33,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
         extras_version: "0.1.3",
         minor_version: "2",
         org_id: 0,
-        instance_id: "instance-test",
+        name: "instance-test",
         instance_type: "writer",
         db_name: "testdb",
         target_vm_size: "standard-2",
@@ -48,7 +48,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.extras_version).to eq("0.1.3")
       expect(lantern_server.minor_version).to eq("2")
       expect(lantern_server.org_id).to eq(0)
-      expect(lantern_server.instance_id).to eq("instance-test")
+      expect(lantern_server.name).to eq("instance-test")
       expect(lantern_server.instance_type).to eq("writer")
       expect(lantern_server.db_name).to eq("testdb")
       expect(lantern_server.db_user).to eq("test")
@@ -90,6 +90,40 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
         expect { nx.wait_bootstrap_rhizome }.to nap(0)
       end
+    end
+  end
+
+  describe "#update_lantern_extension" do
+    it "should update lantern extension" do
+      allow(lantern_server).to receive(:update)
+      allow(lantern_server).to receive(:incr_update_lantern_extension)
+      lantern_server.update(lantern_version: "0.2.0")
+      nx.incr_update_lantern_extension
+      expect { nx.wait }.to hop("update_lantern_extension")
+    end
+
+    it "should update lantern_extras extension" do
+      allow(lantern_server).to receive(:update)
+      allow(lantern_server).to receive(:incr_update_extras_extension)
+      lantern_server.update(lantern_version: "0.1.1")
+      nx.incr_update_extras_extension
+      expect { nx.wait }.to hop("update_extras_extension")
+    end
+
+    it "should update container image" do
+      allow(lantern_server).to receive(:update)
+      allow(lantern_server).to receive(:incr_update_image)
+      lantern_server.update(lantern_version: "0.1.1", minor_version: "2")
+      nx.incr_update_image
+      expect { nx.wait }.to hop("update_image")
+    end
+
+    it "should setup ssl" do
+      allow(lantern_server).to receive(:update)
+      allow(lantern_server).to receive(:incr_setup_ssl)
+      lantern_server.update(domain: "test.lantern.dev")
+      nx.incr_setup_ssl
+      expect { nx.wait }.to hop("setup_ssl")
     end
   end
 end

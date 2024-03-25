@@ -1,4 +1,3 @@
-#!/bin/env ruby
 # frozen_string_literal: true
 
 require "json"
@@ -55,11 +54,11 @@ def run_database(container_image)
 end
 
 def restart_if_needed()
-  r"docker compose -f #{compose_file} up -d"
+  r"docker compose -f #{$compose_file} up -d"
 end
 
 def force_restart()
-  r"docker compose -f #{compose_file} restart postgresql"
+  r"docker compose -f #{$compose_file} restart postgresql"
 end
 
 def append_env(env_arr)
@@ -73,14 +72,13 @@ end
 
 def configure_tls(domain, email, dns_token)
   puts "Configuring TLS for domain #{domain}"
-  export GOOGLEDOMAINS_ACCESS_TOKEN="#{dns_token}"
   r "curl -s https://get.acme.sh | sh -s email=#{email}"
-  r "GOOGLEDOMAINS_ACCESS_TOKEN='#{dns_token}' $HOME/.acme.sh/acme.sh --server letsencrypt --issue --dns dns_googledomains -d #{domain}"
-  reload_cmd="docker compose -f #{compose_file} exec postgresql psql -U postgres -c 'SELECT pg_reload_conf()' && docker compose -f #{compose_file} exec postgresql psql -p6432 -U postgres pgbouncer -c RELOAD"
-  r "$HOME/.acme.sh/acme.sh --install-cert -d #{domain} --key-file #{datadir}/server.key  --fullchain-file #{datadir}/server.crt --reloadcmd #{reload_cmd}"
-  r "sudo chown 1001:1001 #{datadir}/server.key"
-  r "sudo chown 1001:1001 #{datadir}/server.crt"
-  r "sudo chmod 600 #{datadir}/server.key"
+  r "GOOGLEDOMAINS_ACCESS_TOKEN='#{dns_token}' /root/.acme.sh/acme.sh --server letsencrypt --issue --dns dns_googledomains -d #{domain}"
+  reload_cmd="sudo docker compose -f #{$compose_file} exec postgresql psql -U postgres -c 'SELECT pg_reload_conf()' && sudo docker compose -f #{$compose_file} exec postgresql psql -p6432 -U postgres pgbouncer -c RELOAD"
+  r "/root/.acme.sh/acme.sh --install-cert -d #{domain} --key-file #{$datadir}/server.key  --fullchain-file #{$datadir}/server.crt --reloadcmd \"#{reload_cmd}\""
+  r "sudo chown 1001:1001 #{$datadir}/server.key"
+  r "sudo chown 1001:1001 #{$datadir}/server.crt"
+  r "sudo chmod 600 #{$datadir}/server.key"
 
   append_env([
     ["POSTGRESQL_ENABLE_TLS", "yes"],

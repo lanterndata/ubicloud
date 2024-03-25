@@ -14,6 +14,7 @@ Sequel.migration do
       column :cores, Integer
       column :storage_size_gib, Integer
       column :domain, :text
+      column :has_static_ipv4, :bool, default: false
       column :display_state, :vm_display_state, default: "creating", null: false
       column :created_at, :timestamptz, null: false, default: Sequel.lit("now()")
     end

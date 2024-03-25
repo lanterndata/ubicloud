@@ -46,6 +46,19 @@
                 <%== render(
                   "components/form/text",
                   locals: {
+                    name: "org_id",
+                    label: "Org Id",
+                    attributes: {
+                      required: true,
+                      value: 0
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="sm:col-span-3">
+                <%== render(
+                  "components/form/text",
+                  locals: {
                     name: "lantern_version",
                     label: "Lantern Version",
                     attributes: {

@@ -9,8 +9,13 @@ class Serializers::Web::Lantern < Serializers::Base
       name: pg.name,
       state: pg.display_state,
       location: pg.location,
+      lantern_version: pg.lantern_version,
+      extras_version: pg.extras_version,
+      minor_version: pg.minor_version,
+      org_id: pg.org_id,
       vm_size: pg.target_vm_size,
-      storage_size_gib: pg.target_storage_size_gib
+      storage_size_gib: pg.target_storage_size_gib,
+      domain: pg.gcp_vm.domain
     }
   end
 

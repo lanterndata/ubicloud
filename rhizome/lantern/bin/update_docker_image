@@ -4,12 +4,12 @@
 require "json"
 require 'yaml'
 require_relative "../../common/lib/util"
-require_relative "./common"
+require_relative "../lib/common"
 
 $configure_hash = JSON.parse($stdin.read)
 
-container_image = configure_hash["container_image"]
-gcp_creds_gcr_b64 = configure_hash["gcp_creds_gcr_b64"]
+container_image = $configure_hash["container_image"]
+gcp_creds_gcr_b64 = $configure_hash["gcp_creds_gcr_b64"]
 puts "Updating database"
 configure_gcp_registry(gcp_creds_gcr_b64, container_image)
 map = yaml.read $compose_file

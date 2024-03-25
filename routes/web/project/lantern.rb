@@ -18,7 +18,9 @@ class CloverWeb
       st = Prog::Lantern::LanternServerNexus.assemble(
         project_id: @project.id,
         location: r.params["location"],
-        instance_id: r.params["name"],
+        name: r.params["name"],
+        org_id: r.params["org_id"],
+        instance_type: "writer",
         target_vm_size: parsed_size.vm_size,
         storage_size_gib: parsed_size.storage_size_gib,
         lantern_version: r.params["lantern_version"],

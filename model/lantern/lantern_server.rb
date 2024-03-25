@@ -15,15 +15,15 @@ class LanternServer < Sequel::Model
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
 
-  semaphore :initial_provisioning, :update_superuser_password, :checkup
+  semaphore :initial_provisioning, :update_superuser_password, :update_lantern_extension, :update_extras_extension, :update_image, :setup_ssl, :checkup
   semaphore :restart, :configure, :take_over, :destroy
 
   def hyper_tag_name(project)
-    "project/#{project.ubid}/location/#{location}/lantern/#{instance_id}"
+    "project/#{project.ubid}/location/#{location}/lantern/#{name}"
   end
 
   def path
-    "/location/#{gcp_vm.location}/lantern/#{instance_id}"
+    "/location/#{gcp_vm.location}/lantern/#{name}"
   end
 
   def self.ubid_to_name(id)
@@ -31,15 +31,22 @@ class LanternServer < Sequel::Model
   end
 
   def connection_string
-    return nil unless (hn = hostname)
+    return nil unless (gcp_vm.sshable.host && !gcp_vm.sshable.host.start_with?("temp"))
     URI::Generic.build2(
       scheme: "postgres",
       userinfo: "postgres:#{URI.encode_uri_component(postgres_password)}",
-      host: gcp_vm.domain || gcp_vm.sshable.host
+      host: gcp_vm.domain || gcp_vm.sshable.host,
+      port: 6432
     ).to_s
   end
 
   def run_query(query)
-    gcp_vm.sshable.cmd("sudo lantern/bin/exec 'psql -U postgres #{query}'").chomp
+    gcp_vm.sshable.cmd("sudo lantern/bin/exec \"psql -U postgres -c '#{query}'\"").chomp
+  end
+
+  def display_state
+    return "running" if ["wait"].include?(strand.label)
+    return "deleting" if destroy_set? || strand.label == "destroy"
+    "creating"
   end
 end

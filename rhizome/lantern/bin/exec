@@ -4,6 +4,6 @@
 require "json"
 require 'yaml'
 require_relative "../../common/lib/util"
-require_relative "./common"
+require_relative "../lib/common"
 
-$stdout.puts r"docker compose -f #{$compose_file} exec #{ARGV[0]}"
+$stdout.puts r "docker compose -f #{$compose_file} exec postgresql #{ARGV[0]}"

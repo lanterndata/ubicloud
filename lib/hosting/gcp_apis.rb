@@ -16,8 +16,8 @@ class Hosting::GcpApis
     zone = "#{region}-a"
 
     begin
-      instance = client.get({ project: @project, zone: zone, instance: name })
-      Clog.emit("gcp instance already exists") {{ name: name }}
+      instance = client.get({project: @project, zone: zone, instance: name})
+      Clog.emit("gcp instance already exists") { {name: name} }
       return instance
     rescue ::Google::Cloud::NotFoundError => e
       Clog.emit("creating gcp instance")
@@ -102,38 +102,46 @@ class Hosting::GcpApis
       },
       "zone": "projects/#{@project}/zones/#{zone}"
     }
-    op = client.insert({ project: @project, zone: zone, instance_resource: instance })
+    op = client.insert({project: @project, zone: zone, instance_resource: instance})
     op.wait_until_done!
-    instance = client.get({ project: @project, zone: zone, instance: name })
+    instance = client.get({project: @project, zone: zone, instance: name})
     instance.to_h
   end
 
-  def create_static_ip4(vm_name, region)
+  def create_static_ipv4(vm_name, region)
     zone = "#{region}-a"
-    addresses_client =  Google::Cloud::Compute::V1::Addresses::Rest::Client::new
+    addresses_client = ::Google::Cloud::Compute::V1::Addresses::Rest::Client.new
+    Clog.emit("addresses_client created")
     address_name = "#{vm_name}-addr"
 
     begin
-      Clog.emit("calling get address") {{ address_name: address_name }}
-      addr = addresses_client.get({ project: @project, region: region, address: address_name })
-      Clog.emit("gcp static ip4 already exists") {{ address_name: address_name }}
+      Clog.emit("calling get address") { {address_name: address_name} }
+      addr = addresses_client.get({project: @project, region: region, address: address_name})
+      Clog.emit("gcp static ip4 already exists") { {address_name: address_name} }
       return addr.to_h[:address]
     rescue ::Google::Cloud::NotFoundError => e
       Clog.emit("creating gcp static ipv4")
     end
 
-    op = addresses_client.insert({ address_resource: { name: address_name, network_tier: "PREMIUM", region: "projects/#{@project}/regions/#{region}" }, "project": @project, "region": region })
+    op = addresses_client.insert({address_resource: {name: address_name, network_tier: "PREMIUM", region: "projects/#{@project}/regions/#{region}"}, "project": @project, "region": region})
     op.wait_until_done!
-    addr = addresses_client.get({ address: address_name, project: @project, "region": region })
-    Clog.emit("Addr is::::::::::::::::::::::; ") {{ addr: addr }}
+    addr = addresses_client.get({address: address_name, project: @project, "region": region})
+    Clog.emit("Addr is::::::::::::::::::::::; ") { {addr: addr} }
     addr = addr.to_h[:address]
-    Clog.emit("Address is::::::::::::::::::::::; ") {{ addr: addr }}
+    Clog.emit("Address is::::::::::::::::::::::; ") { {addr: addr} }
 
+    addr
+  end
+
+  def assign_static_ipv4(vm_name, addr, region)
+    zone = "#{region}-a"
     instances_client = ::Google::Cloud::Compute::V1::Instances::Rest::Client.new
-
-    op = instances_client.delete_access_config({ project: @project, zone: zone, instance: vm_name, network_interface: "nic0", access_config: "External NAT" })
+    Clog.emit("instances_client created")
+    Clog.emit("delete_access_config ")
+    op = instances_client.delete_access_config({project: @project, zone: zone, instance: vm_name, network_interface: "nic0", access_config: "External NAT"})
     op.wait_until_done!
 
+    Clog.emit("add_access_config ")
     op = instances_client.add_access_config({
       access_config_resource: {
         name: "External NAT",
@@ -148,29 +156,34 @@ class Hosting::GcpApis
     })
 
     op.wait_until_done!
+    Clog.emit("add_access_config done")
+  end
 
-    addr
+  def release_ipv4(vm_name, region)
+    addresses_client = Google::Cloud::Compute::V1::Addresses::Rest::Client::new
+    address_name = "#{vm_name}-addr"
+    op = addresses_client.delete({project: @project, region: region, address: address_name})
+    op.wait_until_done!
   end
 
   def delete_vm(vm_name, region)
     zone = "#{region}-a"
     instances_client = ::Google::Cloud::Compute::V1::Instances::Rest::Client.new
-    op = instances_client.delete({ project: @project, instance: vm_name, zone: zone })
-    op.wait_until_done
+    op = instances_client.delete({project: @project, instance: vm_name, zone: zone})
+    op.wait_until_done!
   end
 
   def start_vm(vm_name, region)
     zone = "#{region}-a"
     instances_client = ::Google::Cloud::Compute::V1::Instances::Rest::Client.new
-    op = instances_client.start({ project: @project, instance: vm_name, zone: zone })
-    op.wait_until_done
+    op = instances_client.start({project: @project, instance: vm_name, zone: zone})
+    op.wait_until_done!
   end
 
   def stop_vm(vm_name, region)
     zone = "#{region}-a"
     instances_client = ::Google::Cloud::Compute::V1::Instances::Rest::Client.new
-    op = instances_client.stop({ project: @project, instance: vm_name, zone: zone })
-    op.wait_until_done
+    op = instances_client.stop({project: @project, instance: vm_name, zone: zone})
+    op.wait_until_done!
   end
-
 end

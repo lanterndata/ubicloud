@@ -10,22 +10,23 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   extend Forwardable
   def_delegators :lantern_server, :gcp_vm
 
-  semaphore :initial_provisioning, :update_superuser_password, :checkup
+  semaphore :initial_provisioning, :update_superuser_password, :update_lantern_extension, :update_extras_extension, :update_image, :setup_ssl, :checkup
   semaphore :restart, :configure, :take_over, :destroy
 
+  # TODO:: Test ssl setup, test updates
   def self.assemble(project_id: nil, lantern_version: "0.2.1", extras_version: "0.1.4", minor_version: "1",
-                    org_id: nil, instance_id: nil, instance_type: "writer",
-                    db_name: "postgres", db_user: "postgres", db_user_password: nil,
-                    location: "us-central1", target_vm_size: nil, storage_size_gib: 50,
-                    postgres_password: nil, master_host: nil, master_port: nil)
+    org_id: nil, name: nil, instance_type: "writer",
+    db_name: "postgres", db_user: "postgres", db_user_password: nil,
+    location: "us-central1", target_vm_size: nil, storage_size_gib: 50,
+    postgres_password: nil, master_host: nil, master_port: nil)
     DB.transaction do
       unless (project = Project[project_id])
         fail "No existing parent"
       end
       ubid = LanternServer.generate_ubid
-      instance_id ||= LanternServer.ubid_to_name(ubid)
+      name ||= LanternServer.ubid_to_name(ubid)
 
-      Validation::validate_name(instance_id)
+      Validation::validate_name(name)
       Validation::validate_name(db_user)
       Validation::validate_name(db_name)
 
@@ -37,12 +38,11 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
         db_user_password = SecureRandom.urlsafe_base64(15)
       end
 
-
       vm_st = Prog::GcpVm::Nexus.assemble_with_sshable(
         "lantern",
         project_id,
         location: location,
-        name: instance_id,
+        name: name,
         size: target_vm_size,
         storage_size_gib: storage_size_gib,
         boot_image: "ubuntu-2204-jammy-v20240319"
@@ -55,7 +55,9 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
         location: location,
         minor_version: minor_version,
         org_id: org_id,
-        instance_id: instance_id,
+        name: name,
+        target_vm_size: target_vm_size,
+        target_storage_size_gib: storage_size_gib,
         instance_type: instance_type,
         db_name: db_name,
         db_user: db_user,
@@ -102,10 +104,14 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   end
 
   label def setup_docker_stack
+    if !Config.gcp_creds_gcr_b64
+      raise "GCP_CREDS_GCR_B64 is required to setup docker stack for Lantern"
+    end
+
     gcp_vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/configure' configure_lantern", stdin: JSON.generate({
       enable_coredumps: true,
       org_id: lantern_server.org_id,
-      instance_id: lantern_server.instance_id,
+      instance_id: lantern_server.name,
       instance_type: lantern_server.instance_type,
       app_env: Config.rack_env,
       replication_mode: lantern_server.instance_type == "writer" ? "master" : "slave",
@@ -125,7 +131,16 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       domain: lantern_server.gcp_vm.domain,
       container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}"
     }))
-    hop_wait
+
+    hop_wait_db_available
+  end
+
+  label def wait_db_available
+    if available?
+      hop_wait
+    end
+
+    nap 10
   end
 
   label def configure
@@ -133,75 +148,68 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     nap 5
   end
 
+  label def update_lantern_extension
+    gcp_vm.sshable.cmd("sudo lantern/bin/update_lantern", stdin: JSON.generate({
+      version: lantern_server.lantern_version
+    }))
+    decr_update_lantern_extension
+    hop_wait
+  end
+
+  label def update_extras_extension
+    gcp_vm.sshable.cmd("sudo lantern/bin/update_extras", stdin: JSON.generate({
+      version: lantern_server.extras_version
+    }))
+    decr_update_extras_extension
+    hop_wait
+  end
+
+  label def update_image
+    gcp_vm.sshable.cmd("sudo lantern/bin/update_docker_image", stdin: JSON.generate({
+      gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
+      container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}"
+    }))
+    decr_update_image
+    hop_wait
+  end
+
+  label def setup_ssl
+    if lantern_server.gcp_vm.domain && Config.lantern_dns_token_tls
+      gcp_vm.sshable.cmd("sudo lantern/bin/setup_ssl", stdin: JSON.generate({
+        dns_token: Config.lantern_dns_token_tls,
+        dns_email: Config.lantern_dns_email_tls,
+        domain: lantern_server.gcp_vm.domain,
+      }))
+    end
+    decr_setup_ssl
+    hop_wait
+  end
+
   label def update_superuser_password
     decr_update_superuser_password
 
-#     encrypted_password = DB.synchronize do |conn|
-#       # This uses PostgreSQL's PQencryptPasswordConn function, but it needs a connection, because
-#       # the encryption is made by PostgreSQL, not by control plane. We use our own control plane
-#       # database to do the encryption.
-#       conn.encrypt_password(postgres_server.resource.superuser_password, "postgres", "scram-sha-256")
-#     end
-#     commands = <<SQL
-# BEGIN;
-# SET LOCAL log_statement = 'none';
-# ALTER ROLE postgres WITH PASSWORD #{DB.literal(encrypted_password)};
-# COMMIT;
-# SQL
-#     postgres_server.run_query(commands)
-#
-#     when_initial_provisioning_set? do
-#       hop_wait if retval&.dig("msg") == "postgres server is restarted"
-#       push self.class, frame, "restart"
-#     end
+    #     encrypted_password = DB.synchronize do |conn|
+    #       # This uses PostgreSQL's PQencryptPasswordConn function, but it needs a connection, because
+    #       # the encryption is made by PostgreSQL, not by control plane. We use our own control plane
+    #       # database to do the encryption.
+    #       conn.encrypt_password(postgres_server.resource.superuser_password, "postgres", "scram-sha-256")
+    #     end
+    #     commands = <<SQL
+    # BEGIN;
+    # SET LOCAL log_statement = 'none';
+    # ALTER ROLE postgres WITH PASSWORD #{DB.literal(encrypted_password)};
+    # COMMIT;
+    # SQL
+    #     postgres_server.run_query(commands)
+    #
+    #     when_initial_provisioning_set? do
+    #       hop_wait if retval&.dig("msg") == "postgres server is restarted"
+    #       push self.class, frame, "restart"
+    #     end
 
     hop_wait
   end
 
-  label def wait_catch_up
-    # query = "SELECT pg_current_wal_lsn() - replay_lsn FROM pg_stat_replication WHERE application_name = '#{postgres_server.ubid}'"
-    # lag = postgres_server.resource.representative_server.run_query(query).chomp
-    #
-    # nap 30 if lag.empty? || lag.to_i > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
-    #
-    # postgres_server.update(synchronization_status: "ready")
-    # postgres_server.resource.representative_server.incr_configure
-    # hop_wait_synchronization if postgres_server.resource.ha_type == PostgresResource::HaType::SYNC
-    hop_wait
-  end
-
-  label def wait_synchronization
-    # query = "SELECT sync_state FROM pg_stat_replication WHERE application_name = '#{postgres_server.ubid}'"
-    # sync_state = postgres_server.resource.representative_server.run_query(query).chomp
-    # hop_wait if ["quorum", "sync"].include?(sync_state)
-
-    nap 30
-  end
-
-  label def wait_recovery_completion
-    # is_in_recovery = postgres_server.run_query("SELECT pg_is_in_recovery()").chomp == "t"
-    #
-    # if is_in_recovery
-    #   is_wal_replay_paused = postgres_server.run_query("SELECT pg_get_wal_replay_pause_state()").chomp == "paused"
-    #   if is_wal_replay_paused
-    #     postgres_server.run_query("SELECT pg_wal_replay_resume()")
-    #     is_in_recovery = false
-    #   end
-    # end
-    #
-    # if !is_in_recovery
-    #   timeline_id = Prog::Postgres::PostgresTimelineNexus.assemble(parent_id: postgres_server.timeline.id).id
-    #   postgres_server.timeline_id = timeline_id
-    #   postgres_server.timeline_access = "push"
-    #   postgres_server.save_changes
-    #
-    #   refresh_walg_credentials
-    #
-    #   hop_configure
-    # end
-
-    nap 5
-  end
 
   label def wait
     decr_initial_provisioning
@@ -214,9 +222,24 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       hop_unavailable if !available?
     end
 
-
     when_restart_set? do
       push self.class, frame, "restart"
+    end
+
+    when_update_lantern_extension_set? do
+      hop_update_lantern_extension
+    end
+
+    when_update_extras_extension_set? do
+      hop_update_extras_extension
+    end
+
+    when_update_image_set? do
+      hop_update_image
+    end
+
+    when_setup_ssl_set? do
+      hop_setup_ssl
     end
 
     nap 30

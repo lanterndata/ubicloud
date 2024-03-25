@@ -4,17 +4,16 @@
 require "json"
 require 'yaml'
 require_relative "../../common/lib/util"
-require_relative "./common"
+require_relative "../lib/common"
 
 $configure_hash = JSON.parse($stdin.read)
 
-
-pg_version = r"#{$pg_mount_path}/bin/pg_config --version | sed -rn 's/PostgreSQL (.*)\..*/\1/p' | tr -d '\n'"
+pg_version = r "#{$pg_mount_path}/bin/pg_config --version | sed -rn 's/PostgreSQL (.*)\..*/\1/p' | tr -d '\n'"
 unless pg_version
- raise "Could not detect Postgres Version"
+  raise "Could not detect Postgres Version"
 end
 
-version_tag="v#{configure_hash["version"]}"
+version_tag = "v#{$configure_hash["version"]}"
 
 r "cd /tmp"
 r "rm -rf lantern || true"
@@ -36,4 +35,3 @@ r "cd /tmp"
 r "rm -rf /tmp/lantern"
 
 update_extensions_in_sql
-

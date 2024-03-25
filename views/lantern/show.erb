@@ -27,7 +27,6 @@
     ["ID", @pg[:ubid]],
     ["Name", @pg[:name]],
     ["Org Id", @pg[:org_id]],
-    ["Instance Id", @pg[:instance_id]],
     ["Instance Type", @pg[:instance_type]],
     ["Lantern Version", @pg[:lantern_version]],
     ["Extras Version", @pg[:extras_version]],
@@ -42,6 +41,7 @@
   else
     data.push(["Connection String", @pg[:connection_string], { copieble: true, revealable: true }])
   end %>
+  <%== render("components/kv_data_card", locals: { data: data }) %>
   <!-- Reset password -->
   <% if @pg[:primary?] %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
@@ -103,7 +103,7 @@
                     connections will be dropped.</p>
                 </div>
               </div>
-              <div id="postgres-restart-<%=@pg[:ubid]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+              <div id="lantern-restart-<%=@pg[:ubid]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
                 <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
                   <%== render("components/form/submit_button", locals: { text: "Restart", extra_class: "restart-btn" }) %>
                 </div>
@@ -111,6 +111,146 @@
             </div>
           </form>
         </div>
+        <div class="px-4 py-5 sm:p-6">
+          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/update_extension" %>" role="form" method="POST">
+            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/update_extension") %>
+            <div class="sm:flex sm:items-center sm:justify-between">
+              <div>
+                <h3 class="text-base font-semibold leading-6 text-gray-900">Update Lantern/Extras extensions</h3>
+                <div class="mt-2 text-sm text-gray-500">
+                  <p>This action will update the extensions, it will not restart the database</p>
+                </div>
+              </div>
+              <div class="col-span-12 sm:col-span-5">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    label: "Lantern version",
+                    name: "lantern_version",
+                    type: "text",
+                    attributes: {
+                      required: true,
+                      value: @pg[:lantern_version]
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="col-span-12 sm:col-span-5">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    label: "Lantern Extras version",
+                    name: "extras_version",
+                    type: "text",
+                    attributes: {
+                      required: true,
+                      value: @pg[:extras_version]
+                    }
+                  }
+                ) %>
+              </div>
+              <div id="lantern-extension-update-<%=@pg[:ubid]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+                <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                  <%== render("components/form/submit_button", locals: { text: "Update", extra_class: "update-btn" }) %>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="px-4 py-5 sm:p-6">
+          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/update_image" %>" role="form" method="POST">
+            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/update_image") %>
+            <div class="sm:flex sm:items-center sm:justify-between">
+              <div>
+                <h3 class="text-base font-semibold leading-6 text-gray-900">Update Container Image</h3>
+                <div class="mt-2 text-sm text-gray-500">
+                  <p>This action will update the extensions, it will restart the database</p>
+                </div>
+              </div>
+              <div class="col-span-12 sm:col-span-5">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    label: "Lantern version",
+                    name: "lantern_version",
+                    type: "text",
+                    attributes: {
+                      required: true,
+                      placeholder: @pg[:lantern_version]
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="col-span-12 sm:col-span-5">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    label: "Lantern Extras version",
+                    name: "extras_version",
+                    type: "text",
+                    attributes: {
+                      required: true,
+                      value: @pg[:extras_version]
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="col-span-12 sm:col-span-5">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    label: "Minor version",
+                    name: "minor_version",
+                    type: "text",
+                    attributes: {
+                      required: true,
+                      value: @pg[:minor_version]
+                    }
+                  }
+                ) %>
+              </div>
+              <div id="lantern-image-update-<%=@pg[:ubid]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+                <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                  <%== render("components/form/submit_button", locals: { text: "Update", extra_class: "restart-btn" }) %>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <% if !@pg[:domain?] %>
+        <div class="px-4 py-5 sm:p-6">
+          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/setup_ssl" %>" role="form" method="POST">
+            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/setup_ssl") %>
+            <div class="sm:flex sm:items-center sm:justify-between">
+              <div>
+                <h3 class="text-base font-semibold leading-6 text-gray-900">Update Container Image</h3>
+                <div class="mt-2 text-sm text-gray-500">
+                  <p>This action will obtain SSL certificate via acme, you should have A record in the specified domain with server's ip address </p>
+                </div>
+              </div>
+              <div class="col-span-12 sm:col-span-5">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    label: "Domain",
+                    name: "domain",
+                    type: "text",
+                    attributes: {
+                      required: true,
+                      placeholder: "#{@pg[:name]}-org.db.lantern.dev"
+                    }
+                  }
+                ) %>
+              </div>
+              <div id="lantern-ssl-<%=@pg[:ubid]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+                <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                  <%== render("components/form/submit_button", locals: { text: "Setup ssl", extra_class: "update-btn" }) %>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <% end %>
       <% end %>
       <!-- Delete Card -->
       <% if Authorization.has_permission?(@current_user.id, "Postgres:delete", @pg[:id]) %>
