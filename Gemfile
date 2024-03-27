@@ -31,7 +31,7 @@ gem "stripe"
 gem "countries"
 gem "octokit"
 gem "argon2-kdf"
-gem "google-cloud-compute-v1"
+gem "googleauth"
 
 group :development do
   gem "brakeman"

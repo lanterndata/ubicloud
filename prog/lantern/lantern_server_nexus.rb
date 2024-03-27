@@ -10,15 +10,14 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   extend Forwardable
   def_delegators :lantern_server, :gcp_vm
 
-  semaphore :initial_provisioning, :update_superuser_password, :update_lantern_extension, :update_extras_extension, :update_image, :setup_ssl, :checkup
+  semaphore :initial_provisioning, :update_superuser_password, :update_lantern_extension, :update_extras_extension, :update_image, :setup_ssl, :add_domain, :update_rhizome, :checkup
   semaphore :restart, :configure, :take_over, :destroy
 
-  # TODO:: Test ssl setup, test updates
   def self.assemble(project_id: nil, lantern_version: "0.2.1", extras_version: "0.1.4", minor_version: "1",
     org_id: nil, name: nil, instance_type: "writer",
     db_name: "postgres", db_user: "postgres", db_user_password: nil,
     location: "us-central1", target_vm_size: nil, storage_size_gib: 50,
-    postgres_password: nil, master_host: nil, master_port: nil)
+    postgres_password: nil, master_host: nil, master_port: nil, domain: nil)
     DB.transaction do
       unless (project = Project[project_id])
         fail "No existing parent"
@@ -45,7 +44,8 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
         name: name,
         size: target_vm_size,
         storage_size_gib: storage_size_gib,
-        boot_image: "ubuntu-2204-jammy-v20240319"
+        boot_image: "ubuntu-2204-jammy-v20240319",
+        domain: domain
       )
 
       lantern_server = LanternServer.create(
@@ -87,7 +87,26 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     nap 5 unless gcp_vm.strand.label == "wait"
 
     lantern_server.incr_initial_provisioning
+
+    if gcp_vm.domain
+      lantern_server.incr_add_domain
+    end
+
     hop_bootstrap_rhizome
+  end
+
+  label def update_rhizome
+    register_deadline(:wait, 10 * 60)
+
+    decr_update_rhizome
+    bud Prog::UpdateRhizome, {"target_folder" => "lantern", "subject_id" => gcp_vm.id, "user" => "lantern"}
+    hop_wait_update_rhizome
+  end
+
+  label def wait_update_rhizome
+    reap
+    hop_wait if leaf?
+    donate
   end
 
   label def bootstrap_rhizome
@@ -126,8 +145,8 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
       gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
       gcp_creds_walg_b64: Config.gcp_creds_walg_b64,
-      dns_token: Config.lantern_dns_token_tls,
-      dns_email: Config.lantern_dns_email_tls,
+      dns_token: Config.cf_token,
+      dns_email: Config.cf_email,
       domain: lantern_server.gcp_vm.domain,
       container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}"
     }))
@@ -173,10 +192,34 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     hop_wait
   end
 
+  label def add_domain
+    cf_client = Dns::Cloudflare::new
+    begin
+      puts "upsert_dns_record"
+      cf_client.upsert_dns_record(lantern_server.gcp_vm.domain, lantern_server.gcp_vm.sshable.host)
+      puts "upserted_dns_record"
+    rescue => e
+      Clog.emit("Error while adding domain") {{ error: e }}
+      gcp_vm.update(domain: nil)
+      decr_add_domain
+      hop_wait
+    end
+
+    decr_add_domain
+    hop_setup_ssl
+  end
+
+  def destroy_domain
+    cf_client = Dns::Cloudflare::new
+    cf_client.delete_dns_record(lantern_server.gcp_vm.domain)
+  end
+
+  # TODO::Test
   label def setup_ssl
     if lantern_server.gcp_vm.domain && Config.lantern_dns_token_tls
       gcp_vm.sshable.cmd("sudo lantern/bin/setup_ssl", stdin: JSON.generate({
-        dns_token: Config.lantern_dns_token_tls,
+        dns_token: Config.cf_token,
+        dns_zone_id: Config.cf_zone_id,
         dns_email: Config.lantern_dns_email_tls,
         domain: lantern_server.gcp_vm.domain,
       }))
@@ -238,8 +281,16 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       hop_update_image
     end
 
+    when_add_domain_set? do
+      hop_add_domain
+    end
+
     when_setup_ssl_set? do
       hop_setup_ssl
+    end
+
+    when_update_rhizome_set? do
+      hop_update_rhizome
     end
 
     nap 30
@@ -276,6 +327,11 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     decr_destroy
 
     strand.children.each { _1.destroy }
+
+    if gcp_vm.domain != nil
+      destroy_domain(gcp_vm.domain)
+    end
+
     gcp_vm.incr_destroy
     lantern_server.destroy
     pop "postgres server is deleted"

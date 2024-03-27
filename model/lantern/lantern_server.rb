@@ -15,7 +15,7 @@ class LanternServer < Sequel::Model
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
 
-  semaphore :initial_provisioning, :update_superuser_password, :update_lantern_extension, :update_extras_extension, :update_image, :setup_ssl, :checkup
+  semaphore :initial_provisioning, :update_superuser_password, :update_lantern_extension, :update_extras_extension, :update_image, :setup_ssl, :add_domain, :update_rhizome, :checkup
   semaphore :restart, :configure, :take_over, :destroy
 
   def hyper_tag_name(project)

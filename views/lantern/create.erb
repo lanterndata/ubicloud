@@ -120,6 +120,20 @@
                   }
                 ) %>
               </div>
+              <div class="sm:col-span-3">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    label: "Domain",
+                    name: "domain",
+                    type: "text",
+                    attributes: {
+                      required: true,
+                      value: "#{@pg[:name]}-#{@pg[:org_id]}.#{Config.lantern_top_domain}"
+                    }
+                  }
+                ) %>
+              </div>
               <div class="col-span-full">
                 <% locations = Option
                     .lantern_locations_for_provider(@project_data.dig(:provider, :name))

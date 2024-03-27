@@ -14,7 +14,8 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       gcp_vm: instance_double(
         GcpVm,
         id: "104b0033-b3f6-8214-ae27-0cd3cef18ce4",
-        sshable: sshable
+        sshable: sshable,
+        domain: nil
       )
     )
   }
@@ -118,12 +119,25 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect { nx.wait }.to hop("update_image")
     end
 
-    it "should setup ssl" do
+    it "should add domain and setup ssl" do
       allow(lantern_server).to receive(:update)
-      allow(lantern_server).to receive(:incr_setup_ssl)
+      allow(lantern_server).to receive(:incr_add_domain)
       lantern_server.update(domain: "test.lantern.dev")
-      nx.incr_setup_ssl
-      expect { nx.wait }.to hop("setup_ssl")
+      nx.incr_add_domain
+      expect { nx.wait }.to hop("add_domain")
+      expect(lantern_server.gcp_vm.sshable).to receive(:host).and_return("1.1.1.1")
+      stub_request(:get, "https://api.cloudflare.com/client/v4/zones/test/dns_records?name").to_return(status: 200, body: JSON.dump({ :result => [] }), headers: {})
+      stub_request(:post, "https://api.cloudflare.com/client/v4/zones/test/dns_records").
+       with(
+         body: "{\"content\":\"1.1.1.1\",\"name\":null,\"proxied\":false,\"type\":\"A\",\"comment\":\"dns record for lantern cloud db\",\"ttl\":60}",
+         headers: {
+        'Content-Type'=>'application/json',
+        'Host'=>'api.cloudflare.com:443',
+        'X-Auth-Email'=>'test@lantern.dev',
+        'X-Auth-Key'=>'test-token'
+         }).
+       to_return(status: 200, body: "", headers: {})
+      expect { nx.add_domain }.to hop("setup_ssl")
     end
   end
 end

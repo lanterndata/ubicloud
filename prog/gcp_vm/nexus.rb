@@ -79,35 +79,36 @@ class Prog::GcpVm::Nexus < Prog::Base
     @host ||= gcp_vm.vm_host
   end
 
-  label def start
-    Clog.emit("Creating client") { {name: gcp_vm.name, location: gcp_vm.location} }
+  label def wait_ipv4
     gcp_client = Hosting::GcpApis::new
-    Clog.emit("Client created") { {name: gcp_vm.name, location: gcp_vm.location} }
-
-    DB.transaction do
-      Clog.emit("Create GCP VM") { {name: gcp_vm.name, location: gcp_vm.location} }
-      gcp_client.create_vm(gcp_vm.name, gcp_vm.location, gcp_vm.boot_image, gcp_vm.public_key, gcp_vm.unix_user, "n1-#{gcp_vm.family}-#{gcp_vm.cores}", gcp_vm.storage_size_gib)
-      Clog.emit("Created GCP VM") { {name: gcp_vm.name, location: gcp_vm.location} }
+    addr_info = gcp_client.get_static_ipv4(gcp_vm.name, gcp_vm.location)
+    if addr_info["status"] == "RESERVED"
+      gcp_client.delete_ephermal_ipv4(gcp_vm.name,"#{gcp_vm.location}-a")
+      gcp_client.assign_static_ipv4(gcp_vm.name,addr_info["address"], "#{gcp_vm.location}-a")
+      gcp_vm.update(has_static_ipv4: true)
+      gcp_vm.sshable.update(host: addr_info["address"])
+      hop_wait_sshable
     end
+    nap 10
+  end
 
-    Clog.emit("Getting ip4") { {name: gcp_vm.name, location: gcp_vm.location} }
-    ip4 = gcp_client.create_static_ipv4(gcp_vm.name, gcp_vm.location)
-    Clog.emit("IP4 GOT") { {ip4: ip4} }
+  label def wait_create_vm
+    gcp_client = Hosting::GcpApis::new
+    vm = gcp_client.get_vm(gcp_vm.name, "#{gcp_vm.location}-a")
+    if vm["status"] == "RUNNING"
+      gcp_client.create_static_ipv4(gcp_vm.name, gcp_vm.location)
+      register_deadline(:wait, 5 * 60)
+      hop_wait_ipv4
+    else
+      nap 10
+    end
+  end
 
-    Clog.emit("Assign IP4") { {ip4: ip4} }
-    gcp_client.assign_static_ipv4(gcp_vm.name, ip4, gcp_vm.location)
-    Clog.emit("Assigned IP4") { {ip4: ip4} }
-    gcp_vm.update(has_static_ipv4: true)
-    gcp_vm.sshable.update(host: ip4)
-
-    # if gcp_vm.domain
-      # TODO:: Create DNS record
-    # end
-    Clog.emit("REGISTRING DEADLINE")
+  label def start
+    gcp_client = Hosting::GcpApis::new
+    gcp_client.create_vm(gcp_vm.name, "#{gcp_vm.location}-a", gcp_vm.boot_image, gcp_vm.public_key, gcp_vm.unix_user, "n1-#{gcp_vm.family}-#{gcp_vm.cores}", gcp_vm.storage_size_gib)
     register_deadline(:wait, 10 * 60)
-    # We don't need storage_volume info anymore, so delete it before
-    # transitioning to the next state.
-    hop_wait_sshable
+    hop_wait_create_vm
   end
 
   label def run

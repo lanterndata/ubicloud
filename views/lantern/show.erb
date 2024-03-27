@@ -219,13 +219,13 @@
         </div>
         <% if !@pg[:domain?] %>
         <div class="px-4 py-5 sm:p-6">
-          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/setup_ssl" %>" role="form" method="POST">
-            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/setup_ssl") %>
+          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/add_domain" %>" role="form" method="POST">
+            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/add_domain") %>
             <div class="sm:flex sm:items-center sm:justify-between">
               <div>
-                <h3 class="text-base font-semibold leading-6 text-gray-900">Update Container Image</h3>
+                <h3 class="text-base font-semibold leading-6 text-gray-900">Add Domain</h3>
                 <div class="mt-2 text-sm text-gray-500">
-                  <p>This action will obtain SSL certificate via acme, you should have A record in the specified domain with server's ip address </p>
+                  <p>This action will create DNS record and obtain SSL certificate via acme</p>
                 </div>
               </div>
               <div class="col-span-12 sm:col-span-5">
@@ -237,20 +237,38 @@
                     type: "text",
                     attributes: {
                       required: true,
-                      placeholder: "#{@pg[:name]}-org.db.lantern.dev"
+                      value: @pg[:domain] || "#{@pg[:name]}-#{@pg[:org_id]}.#{Config.lantern_top_domain}"
                     }
                   }
                 ) %>
               </div>
               <div id="lantern-ssl-<%=@pg[:ubid]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
                 <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
-                  <%== render("components/form/submit_button", locals: { text: "Setup ssl", extra_class: "update-btn" }) %>
+                  <%== render("components/form/submit_button", locals: { text: "Add domain", extra_class: "update-btn" }) %>
                 </div>
               </div>
             </div>
           </form>
         </div>
         <% end %>
+        <div class="px-4 py-5 sm:p-6">
+          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/update_rhizome" %>" role="form" method="POST">
+            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/update_rhizome") %>
+            <div class="sm:flex sm:items-center sm:justify-between">
+              <div>
+                <h3 class="text-base font-semibold leading-6 text-gray-900">Update Rhizome</h3>
+                <div class="mt-2 text-sm text-gray-500">
+                  <p>This action will update setup scripts in target VM</p>
+                </div>
+              </div>
+              <div id="lantern-rhizome-<%=@pg[:ubid]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+                <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                  <%== render("components/form/submit_button", locals: { text: "Update", extra_class: "update-btn" }) %>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
       <% end %>
       <!-- Delete Card -->
       <% if Authorization.has_permission?(@current_user.id, "Postgres:delete", @pg[:id]) %>

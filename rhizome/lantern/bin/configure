@@ -92,7 +92,7 @@ def setup_initial_compose_file()
           "ports" => ["5432:5432", "6432:6432"],
           "volumes" => ["/var/lib/lantern-data:/bitnami/postgresql"],
           "deploy" => {
-            "restart_policy" => { "condition" => "unless-stopped" },
+            "restart_policy" => { "condition" => "always" },
             "resources" => { "limits" => { "memory" => mem_limit } }
           },
           "env_file" => $env_file

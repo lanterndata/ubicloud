@@ -10,4 +10,4 @@ $configure_hash = JSON.parse($stdin.read)
 
 version_tag = "v#{$configure_hash["version"]}"
 
-configure_tls($configure_hash["domain"], $configure_hash["dns_email"], $configure_hash["dns_token"])
+configure_tls($configure_hash["domain"], $configure_hash["dns_email"], $configure_hash["dns_token"], $configure_hash["dns_zone_id"], "dns_cf")

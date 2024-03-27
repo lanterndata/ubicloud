@@ -1,58 +1,66 @@
 # frozen_string_literal: true
 
-require "google/cloud/compute/v1"
+require "googleauth"
 require_relative "../../config"
 class Hosting::GcpApis
-  def initialize()
+  def initialize
     @project = Config.gcp_project_id
 
-    unless (@project)
+    unless @project
       fail "Please set GCP_PROJECT_ID env variable"
     end
-  end
 
-  def create_vm(name, region, image, ssh_key, user, machine_type, disk_size_gb)
-    client = ::Google::Cloud::Compute::V1::Instances::Rest::Client.new
-    zone = "#{region}-a"
-
+    scopes = ['https://www.googleapis.com/auth/cloud-platform', 'https://www.googleapis.com/auth/compute']
     begin
-      instance = client.get({project: @project, zone: zone, instance: name})
-      Clog.emit("gcp instance already exists") { {name: name} }
-      return instance
-    rescue ::Google::Cloud::NotFoundError => e
-      Clog.emit("creating gcp instance")
+     @authorization = Google::Auth.get_application_default(scopes)
+    rescue => e
+      Clog.emit("Error while doing google auth") {{ error: e }}
+      fail "Google Auth failed, try setting 'GOOGLE_APPLICATION_CREDENTIALS' env varialbe"
     end
 
+    @host = {
+      :connection_string => "https://compute.googleapis.com",
+      :headers => @authorization.apply({ :"Content-Type" => "application/json" })
+    }
+  end
+
+  def get_region_from_zone(zone)
+    zone[..-3]
+  end
+
+  def create_vm(name, zone, image, ssh_key, user, machine_type, disk_size_gb)
+    region = get_region_from_zone(zone)
+    connection = Excon.new(@host[:connection_string], headers: @host[:headers])
     instance = {
       name: name,
-      can_ip_forward: false,
-      confidential_instance_config: {
-        enable_confidential_compute: false
+      canIpForward: false,
+      confidentialInstanceConfig: {
+        enableConfidentialCompute: false
       },
-      deletion_protection: false,
+      deletionProtection: false,
       description: '',
       disks: [
         {
-          auto_delete: true,
+          autoDelete: true,
           boot: true,
-          device_name: "#{name}-boot",
-          initialize_params: {
-            disk_size_gb: disk_size_gb,
-            disk_type: "projects/#{@project}/zones/#{zone}/diskTypes/pd-ssd",
-            source_image: "projects/ubuntu-os-cloud/global/images/#{image}"
+          deviceName: "#{name}-boot",
+          initializeParams: {
+            diskSizeGb: disk_size_gb,
+            diskType: "projects/#{@project}/zones/#{zone}/diskTypes/pd-ssd",
+            sourceImage: "projects/ubuntu-os-cloud/global/images/#{image}"
           },
           mode: 'READ_WRITE',
           type: 'PERSISTENT'
         }
       ],
-      display_device: {
-        enable_display: false
+      displayDevice: {
+        enableDisplay: false
       },
-      key_revocation_action_type: 'NONE',
+      keyRevocationActionType: 'NONE',
       labels: {
-        'goog-ec-src': 'vm_add-rest'
+        'lantern-self-hosted': '1'
       },
-      machine_type: "projects/#{@project}/zones/#{zone}/machineTypes/#{machine_type}",
+      machineType: "projects/#{@project}/zones/#{zone}/machineTypes/#{machine_type}",
       metadata: {
         items: [
           {
@@ -62,27 +70,27 @@ class Hosting::GcpApis
         ]
       },
       # Set network interfaces
-      network_interfaces: [
+      networkInterfaces: [
         {
-          access_configs: [
+          accessConfigs: [
             {
               name: 'External NAT',
-              network_tier: 'PREMIUM'
+              networkTier: 'PREMIUM'
             }
           ],
-          stack_type: 'IPV4_ONLY',
+          stackType: 'IPV4_ONLY',
           subnetwork: "projects/#{@project}/regions/#{region}/subnetworks/default"
         }
       ],
-      reservation_affinity: {
-        consume_reservation_type: 'ANY_RESERVATION'
+      reservationAffinity: {
+        consumeReservationType: 'ANY_RESERVATION'
       },
       scheduling: {
-        automatic_restart: true,
-        on_host_maintenance: 'MIGRATE',
-        provisioning_model: 'STANDARD'
+        automaticRestart: true,
+        onHostMaintenance: 'MIGRATE',
+        provisioningModel: 'STANDARD'
       },
-      service_accounts: [
+      serviceAccounts: [
         {
           email: '511682212298-compute@developer.gserviceaccount.com',
           scopes: [
@@ -100,90 +108,77 @@ class Hosting::GcpApis
           "pg"
         ]
       },
-      "zone": "projects/#{@project}/zones/#{zone}"
+      zone: "projects/#{@project}/zones/#{zone}"
     }
-    op = client.insert({project: @project, zone: zone, instance_resource: instance})
-    op.wait_until_done!
-    instance = client.get({project: @project, zone: zone, instance: name})
-    instance.to_h
+
+    connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances", body: JSON.dump(instance), expects: [200, 400])
+
+  end
+
+  def get_vm(vm_name, zone)
+    connection = Excon.new(@host[:connection_string], headers: @host[:headers])
+    response = connection.get(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}", expects: 200)
+
+    JSON.parse(response.body)
   end
 
   def create_static_ipv4(vm_name, region)
-    zone = "#{region}-a"
-    addresses_client = ::Google::Cloud::Compute::V1::Addresses::Rest::Client.new
-    Clog.emit("addresses_client created")
+    connection = Excon.new(@host[:connection_string], headers: @host[:headers])
     address_name = "#{vm_name}-addr"
-
-    begin
-      Clog.emit("calling get address") { {address_name: address_name} }
-      addr = addresses_client.get({project: @project, region: region, address: address_name})
-      Clog.emit("gcp static ip4 already exists") { {address_name: address_name} }
-      return addr.to_h[:address]
-    rescue ::Google::Cloud::NotFoundError => e
-      Clog.emit("creating gcp static ipv4")
-    end
-
-    op = addresses_client.insert({address_resource: {name: address_name, network_tier: "PREMIUM", region: "projects/#{@project}/regions/#{region}"}, "project": @project, "region": region})
-    op.wait_until_done!
-    addr = addresses_client.get({address: address_name, project: @project, "region": region})
-    Clog.emit("Addr is::::::::::::::::::::::; ") { {addr: addr} }
-    addr = addr.to_h[:address]
-    Clog.emit("Address is::::::::::::::::::::::; ") { {addr: addr} }
-
-    addr
+    body = {
+      "name": address_name,
+      "networkTier": "PREMIUM",
+      "region": "projects/#{@project}/regions/#{region}"
+    }
+    connection.post(path: "/compute/v1/projects/#{@project}/regions/#{region}/addresses", body: JSON.dump(body), expects: 200)
   end
 
-  def assign_static_ipv4(vm_name, addr, region)
-    zone = "#{region}-a"
-    instances_client = ::Google::Cloud::Compute::V1::Instances::Rest::Client.new
-    Clog.emit("instances_client created")
-    Clog.emit("delete_access_config ")
-    op = instances_client.delete_access_config({project: @project, zone: zone, instance: vm_name, network_interface: "nic0", access_config: "External NAT"})
-    op.wait_until_done!
+  def get_static_ipv4(vm_name, region)
+    connection = Excon.new(@host[:connection_string], headers: @host[:headers])
+    address_name = "#{vm_name}-addr"
+    response = connection.get(path: "/compute/v1/projects/#{@project}/regions/#{region}/addresses/#{address_name}", expects: 200)
+    JSON.parse(response.body)
+  end
 
-    Clog.emit("add_access_config ")
-    op = instances_client.add_access_config({
-      access_config_resource: {
+  def delete_ephermal_ipv4(vm_name, zone)
+    connection = Excon.new(@host[:connection_string], headers: @host[:headers])
+    query = { accessConfig: "External NAT", networkInterface: "nic0" }
+    connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/deleteAccessConfig", query: query, expects: [200,404])
+  end
+
+  def assign_static_ipv4(vm_name, addr, zone)
+    connection = Excon.new(@host[:connection_string], headers: @host[:headers])
+    region = get_region_from_zone(zone)
+    query = { networkInterface: "nic0" }
+
+    body = {
         name: "External NAT",
-        nat_i_p: addr,
-        network_tier: "PREMIUM",
+        natIP: addr,
+        networkTier: "PREMIUM",
         type: "ONE_TO_ONE_NAT"
-      },
-      project: @project,
-      zone: zone,
-      network_interface: "nic0",
-      instance: vm_name
-    })
+    }
 
-    op.wait_until_done!
-    Clog.emit("add_access_config done")
+    connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/addAccessConfig", body: JSON.dump(body), query: query, expects: 200)
   end
 
   def release_ipv4(vm_name, region)
-    addresses_client = Google::Cloud::Compute::V1::Addresses::Rest::Client::new
+    connection = Excon.new(@host[:connection_string], headers: @host[:headers])
     address_name = "#{vm_name}-addr"
-    op = addresses_client.delete({project: @project, region: region, address: address_name})
-    op.wait_until_done!
+    connection.delete(path: "/compute/v1/projects/#{@project}/regions/#{region}/addresses/#{address_name}", expects: [200, 404])
   end
 
-  def delete_vm(vm_name, region)
-    zone = "#{region}-a"
-    instances_client = ::Google::Cloud::Compute::V1::Instances::Rest::Client.new
-    op = instances_client.delete({project: @project, instance: vm_name, zone: zone})
-    op.wait_until_done!
+  def delete_vm(vm_name, zone)
+    connection = Excon.new(@host[:connection_string], headers: @host[:headers])
+    connection.get(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}", expects: [200, 404])
   end
 
   def start_vm(vm_name, region)
-    zone = "#{region}-a"
-    instances_client = ::Google::Cloud::Compute::V1::Instances::Rest::Client.new
-    op = instances_client.start({project: @project, instance: vm_name, zone: zone})
-    op.wait_until_done!
+    connection = Excon.new(@host[:connection_string], headers: @host[:headers])
+    connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/start", expects: 200)
   end
 
   def stop_vm(vm_name, region)
-    zone = "#{region}-a"
-    instances_client = ::Google::Cloud::Compute::V1::Instances::Rest::Client.new
-    op = instances_client.stop({project: @project, instance: vm_name, zone: zone})
-    op.wait_until_done!
+    connection = Excon.new(@host[:connection_string], headers: @host[:headers])
+    connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/stop", expects: 200)
   end
 end

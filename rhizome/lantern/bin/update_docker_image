@@ -10,11 +10,13 @@ $configure_hash = JSON.parse($stdin.read)
 
 container_image = $configure_hash["container_image"]
 gcp_creds_gcr_b64 = $configure_hash["gcp_creds_gcr_b64"]
-puts "Updating database"
+
 configure_gcp_registry(gcp_creds_gcr_b64, container_image)
 map = yaml.read $compose_file
 map["services"]["postgresql"]["image"] = container_image
+
 File.open($compose_file, 'w') do |f|
   f.write(map.to_yaml)
 end
+
 run_database(container_image)

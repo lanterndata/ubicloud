@@ -70,10 +70,18 @@ def append_env(env_arr)
   end
 end
 
-def configure_tls(domain, email, dns_token)
+def configure_tls(domain, email, dns_token, dns_zone_id, provider)
   puts "Configuring TLS for domain #{domain}"
   r "curl -s https://get.acme.sh | sh -s email=#{email}"
-  r "GOOGLEDOMAINS_ACCESS_TOKEN='#{dns_token}' /root/.acme.sh/acme.sh --server letsencrypt --issue --dns dns_googledomains -d #{domain}"
+
+  env = ""
+  if provider == "dns_cf"
+    env = "CF_Token='#{dns_token}' CF_Zone_ID='#{dns_zone_id}'"
+  else
+    env = "GOOGLEDOMAINS_ACCESS_TOKEN='#{dns_token}'"
+  end
+
+  r "#{env} /root/.acme.sh/acme.sh --server letsencrypt --issue --dns #{provider} -d #{domain}"
   reload_cmd="sudo docker compose -f #{$compose_file} exec postgresql psql -U postgres -c 'SELECT pg_reload_conf()' && sudo docker compose -f #{$compose_file} exec postgresql psql -p6432 -U postgres pgbouncer -c RELOAD"
   r "/root/.acme.sh/acme.sh --install-cert -d #{domain} --key-file #{$datadir}/server.key  --fullchain-file #{$datadir}/server.crt --reloadcmd \"#{reload_cmd}\""
   r "sudo chown 1001:1001 #{$datadir}/server.key"

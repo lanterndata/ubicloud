@@ -44,7 +44,7 @@ class CloverWeb
       end
 
       r.post "update_extension" do
-        Authorization.authorize(@current_user.id, "postgres:edit", pg.id)
+        Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
 
         if r.params["lantern_version"]
            pg.update(lantern_version: r.params["lantern_version"])
@@ -58,18 +58,27 @@ class CloverWeb
       end
 
       r.post "update_image" do
-        Authorization.authorize(@current_user.id, "postgres:edit", pg.id)
+        Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
 
         pg.update(lantern_version: r.params["lantern_version"] || pg.lantern_version, extras_version: r.params["extras_version"] || pg.extras_version, minor_version: r.params["minor_version"] || pg.minor_version)
         pg.incr_update_image
         r.redirect "#{@project.path}#{pg.path}"
       end
 
-      r.post "setup_ssl" do
-        Authorization.authorize(@current_user.id, "postgres:edit", pg.id)
+      r.post "add_domain" do
+        Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
+          DB.transaction do
+            GcpVm.dataset.where(id: pg.vm_id).update(domain: r.params["domain"])
+            pg.incr_add_domain
+          end
+        r.redirect "#{@project.path}#{pg.path}"
+      end
 
-        pg.gcp_vm.update(domain: r.params["domin"])
-        pg.incr_setup_ssl
+      r.post "update_rhizome" do
+        Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
+          DB.transaction do
+            pg.incr_update_rhizome
+          end
         r.redirect "#{@project.path}#{pg.path}"
       end
 
