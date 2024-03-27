@@ -45,6 +45,9 @@ class LanternServer < Sequel::Model
   end
 
   def display_state
+    return "domain setup" if strand.label.include?("domain")
+    return "ssl setup" if strand.label.include?("setup_ssl")
+    return "updating" if strand.label.include?("update")
     return "running" if ["wait"].include?(strand.label)
     return "deleting" if destroy_set? || strand.label == "destroy"
     "creating"

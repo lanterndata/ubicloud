@@ -111,7 +111,7 @@ class Hosting::GcpApis
       zone: "projects/#{@project}/zones/#{zone}"
     }
 
-    connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances", body: JSON.dump(instance), expects: [200, 400])
+    connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances", body: JSON.dump(instance), expects: 200)
 
   end
 
@@ -169,7 +169,7 @@ class Hosting::GcpApis
 
   def delete_vm(vm_name, zone)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
-    connection.get(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}", expects: [200, 404])
+    connection.delete(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}", expects: [200, 404])
   end
 
   def start_vm(vm_name, region)

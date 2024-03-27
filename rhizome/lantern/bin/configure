@@ -13,7 +13,7 @@ end
 
 def install_dependencies()
   # Install dependencies
-  r "sudo apt update -qq && sudo apt install software-properties-common -y -qq >/dev/null"
+  r "sudo apt update -qq && sudo apt install software-properties-common make -y -qq >/dev/null"
   r "curl -fsSL https://get.docker.com > /tmp/get-docker.sh"
   r "chmod +x /tmp/get-docker.sh && /tmp/get-docker.sh"
   # Fix /etc/init.d/docker: 62: ulimit: error setting limit (Invalid argument) error

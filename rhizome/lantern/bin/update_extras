@@ -8,19 +8,17 @@ require_relative "../lib/common"
 
 $configure_hash = JSON.parse($stdin.read)
 
-pg_version = r "#{$pg_mount_path}/bin/pg_config --version | sed -rn 's/PostgreSQL (.*)\..*/\1/p' | tr -d '\n'"
+pg_version = r "#{$pg_mount_path}/bin/pg_config --version | sed -rn 's/PostgreSQL (.*)\\..*/\\1/p' | tr -d '\\n'"
 unless pg_version
   raise "Could not detect Postgres Version"
 end
 
 version = $configure_hash["version"]
 
-r "cd /tmp"
-r "rm -rf lantern-extras* || true"
-r "wget https://github.com/lanterndata/lantern_extras/releases/download/#{version}/lantern-extras-#{version}.tar -O lantern-extras.tar"
-r "tar xf lantern-extras.tar"
-r "cd lantern-extras-#{version}"
-r "PG_CONFIG=#{pg_mount_path}/bin/pg_config make install"
+r "rm -rf /tmp/lantern-extras* || true"
+r "wget https://github.com/lanterndata/lantern_extras/releases/download/#{version}/lantern-extras-#{version}.tar -O /tmp/lantern-extras.tar"
+r "cd /tmp && tar xf lantern-extras.tar"
+r "cd /tmp/lantern-extras-#{version} && PG_CONFIG=#{$pg_mount_path}/bin/pg_config make install"
 r "rm -rf /tmp/lantern-extras*"
 
 update_extensions_in_sql

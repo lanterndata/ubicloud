@@ -88,6 +88,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
 
     lantern_server.incr_initial_provisioning
 
+    #TODO:: this is not working
     if gcp_vm.domain
       lantern_server.incr_add_domain
     end
@@ -146,7 +147,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
       gcp_creds_walg_b64: Config.gcp_creds_walg_b64,
       dns_token: Config.cf_token,
-      dns_email: Config.cf_email,
+      dns_email: Config.lantern_dns_email,
       domain: lantern_server.gcp_vm.domain,
       container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}"
     }))
@@ -214,16 +215,13 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     cf_client.delete_dns_record(lantern_server.gcp_vm.domain)
   end
 
-  # TODO::Test
   label def setup_ssl
-    if lantern_server.gcp_vm.domain && Config.lantern_dns_token_tls
-      gcp_vm.sshable.cmd("sudo lantern/bin/setup_ssl", stdin: JSON.generate({
-        dns_token: Config.cf_token,
-        dns_zone_id: Config.cf_zone_id,
-        dns_email: Config.lantern_dns_email_tls,
-        domain: lantern_server.gcp_vm.domain,
-      }))
-    end
+    gcp_vm.sshable.cmd("sudo lantern/bin/setup_ssl", stdin: JSON.generate({
+      dns_token: Config.cf_token,
+      dns_zone_id: Config.cf_zone_id,
+      dns_email: Config.lantern_dns_email,
+      domain: lantern_server.gcp_vm.domain,
+    }))
     decr_setup_ssl
     hop_wait
   end
@@ -329,7 +327,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     strand.children.each { _1.destroy }
 
     if gcp_vm.domain != nil
-      destroy_domain(gcp_vm.domain)
+      destroy_domain
     end
 
     gcp_vm.incr_destroy

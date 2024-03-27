@@ -128,8 +128,8 @@
                     name: "domain",
                     type: "text",
                     attributes: {
-                      required: true,
-                      value: "#{@pg[:name]}-#{@pg[:org_id]}.#{Config.lantern_top_domain}"
+                      required: false,
+                      placeholder: "name-org_id.#{Config.lantern_top_domain}"
                     }
                   }
                 ) %>

@@ -8,6 +8,7 @@ class Serializers::Web::Lantern < Serializers::Base
       path: pg.path,
       name: pg.name,
       state: pg.display_state,
+      instance_type: pg.instance_type,
       location: pg.location,
       lantern_version: pg.lantern_version,
       extras_version: pg.extras_version,

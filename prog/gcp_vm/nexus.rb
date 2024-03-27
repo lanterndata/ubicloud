@@ -195,7 +195,7 @@ class Prog::GcpVm::Nexus < Prog::Base
 
   label def destroy
     gcp_client = Hosting::GcpApis::new
-    gcp_client.delete_vm(gcp_vm.name, gcp_vm.location)
+    gcp_client.delete_vm(gcp_vm.name, "#{gcp_vm.location}-a")
     if gcp_vm.has_static_ipv4
       gcp_client.release_ipv4(gcp_vm.name, gcp_vm.location)
     end

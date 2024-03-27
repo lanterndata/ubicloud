@@ -46,11 +46,11 @@ class CloverWeb
       r.post "update_extension" do
         Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
 
-        if r.params["lantern_version"]
+        if r.params["lantern_version"] != pg.lantern_version
            pg.update(lantern_version: r.params["lantern_version"])
            pg.incr_update_lantern_extension
         end
-        if r.params["extras_version"]
+        if r.params["extras_version"] != pg.extras_version
            pg.update(extras_version: r.params["extras_version"])
            pg.incr_update_extras_extension
         end

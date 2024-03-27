@@ -8,7 +8,7 @@ require_relative "../lib/common"
 
 $configure_hash = JSON.parse($stdin.read)
 
-pg_version = r "#{$pg_mount_path}/bin/pg_config --version | sed -rn 's/PostgreSQL (.*)\..*/\1/p' | tr -d '\n'"
+pg_version = r "#{$pg_mount_path}/bin/pg_config --version | sed -rn 's/PostgreSQL (.*)\\..*/\\1/p' | tr -d '\\n'"
 unless pg_version
   raise "Could not detect Postgres Version"
 end
