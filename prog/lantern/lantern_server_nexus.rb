@@ -88,11 +88,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
 
     lantern_server.incr_initial_provisioning
 
-    #TODO:: this is not working
-    if gcp_vm.domain
-      lantern_server.incr_add_domain
-    end
-
     hop_bootstrap_rhizome
   end
 
@@ -146,12 +141,12 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
       gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
       gcp_creds_walg_b64: Config.gcp_creds_walg_b64,
-      dns_token: Config.cf_token,
-      dns_email: Config.lantern_dns_email,
-      domain: lantern_server.gcp_vm.domain,
       container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}"
     }))
 
+    if gcp_vm.domain != nil
+      lantern_server.incr_add_domain
+    end
     hop_wait_db_available
   end
 
@@ -173,7 +168,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       version: lantern_server.lantern_version
     }))
     decr_update_lantern_extension
-    hop_wait
+    hop_wait_db_available
   end
 
   label def update_extras_extension
@@ -181,7 +176,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       version: lantern_server.extras_version
     }))
     decr_update_extras_extension
-    hop_wait
+    hop_wait_db_available
   end
 
   label def update_image
@@ -190,17 +185,15 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}"
     }))
     decr_update_image
-    hop_wait
+    hop_wait_db_available
   end
 
   label def add_domain
     cf_client = Dns::Cloudflare::new
     begin
-      puts "upsert_dns_record"
       cf_client.upsert_dns_record(lantern_server.gcp_vm.domain, lantern_server.gcp_vm.sshable.host)
-      puts "upserted_dns_record"
     rescue => e
-      Clog.emit("Error while adding domain") {{ error: e }}
+      Clog.emit("Error while adding domain") { {error: e} }
       gcp_vm.update(domain: nil)
       decr_add_domain
       hop_wait
@@ -250,7 +243,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
 
     hop_wait
   end
-
 
   label def wait
     decr_initial_provisioning

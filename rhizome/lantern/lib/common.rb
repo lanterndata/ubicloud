@@ -4,12 +4,12 @@ require "json"
 require 'yaml'
 require_relative "../../common/lib/util"
 
-$workdir="/var/lib/lantern"
-$datadir="/var/lib/lantern-data"
-$compose_file="#{$workdir}/docker-compose.yaml"
-$env_file="#{$workdir}/.env"
-$pg_mount_path="#{$workdir}/pg"
-$container_name="lantern-postgresql-1"
+$workdir = "/var/lib/lantern"
+$datadir = "/var/lib/lantern-data"
+$compose_file = "#{$workdir}/docker-compose.yaml"
+$env_file = "#{$workdir}/.env"
+$pg_mount_path = "#{$workdir}/pg"
+$container_name = "lantern-postgresql-1"
 
 def configure_gcr(gcp_creds_gcr_b64, container_image)
   r "echo #{gcp_creds_gcr_b64} | base64 -d | sudo docker login -u _json_key --password-stdin https://gcr.io"
@@ -17,25 +17,25 @@ def configure_gcr(gcp_creds_gcr_b64, container_image)
 end
 
 def update_extensions_in_sql()
-  all_dbs=(r"docker compose -f #{$compose_file} exec postgresql psql -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'").strip!.split("\n")
+  all_dbs = (r "docker compose -f #{$compose_file} exec postgresql psql -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'").strip!.split("\n")
   for db in all_dbs do
-    r"docker compose -f #{$compose_file} exec postgresql psql -U postgres -f /lantern-init.sql #{db}"
+    r "docker compose -f #{$compose_file} exec postgresql psql -U postgres -f /lantern-init.sql #{db}"
   end
 end
 
 def wait_for_pg()
- until r"docker exec #{$container_name} pg_isready -U postgres 2>/dev/null;" do
-   sleep 1
- end
+  until r "docker exec #{$container_name} pg_isready -U postgres 2>/dev/null;" do
+    sleep 1
+  end
 end
 
 def run_database(container_image)
   # Run database
-  volume_mount="#{$pg_mount_path}:/opt/bitnami/postgresql"
+  volume_mount = "#{$pg_mount_path}:/opt/bitnami/postgresql"
   # Copy postgres fs to host to mount
   r "sudo rm -rf #{$pg_mount_path}"
   data = YAML.load_file $compose_file
-  data["services"]["postgresql"]["volumes"] = data["services"]["postgresql"]["volumes"].select{ |i| i != volume_mount }
+  data["services"]["postgresql"]["volumes"] = data["services"]["postgresql"]["volumes"].select { |i| i != volume_mount }
   File.open($compose_file, 'w') { |f| YAML.dump(data, f) }
   r "sudo docker rm -f tc 2>/dev/null || true"
   r "sudo docker create --name tc #{container_image}"
@@ -54,11 +54,11 @@ def run_database(container_image)
 end
 
 def restart_if_needed()
-  r"docker compose -f #{$compose_file} up -d"
+  r "docker compose -f #{$compose_file} up -d"
 end
 
 def force_restart()
-  r"docker compose -f #{$compose_file} restart postgresql"
+  r "docker compose -f #{$compose_file} restart postgresql"
 end
 
 def append_env(env_arr)
@@ -82,7 +82,7 @@ def configure_tls(domain, email, dns_token, dns_zone_id, provider)
   end
 
   r "#{env} /root/.acme.sh/acme.sh --server letsencrypt --issue --dns #{provider} -d #{domain}"
-  reload_cmd="sudo docker compose -f #{$compose_file} exec postgresql psql -U postgres -c 'SELECT pg_reload_conf()' && sudo docker compose -f #{$compose_file} exec postgresql psql -p6432 -U postgres pgbouncer -c RELOAD"
+  reload_cmd = "sudo docker compose -f #{$compose_file} exec postgresql psql -U postgres -c 'SELECT pg_reload_conf()' && sudo docker compose -f #{$compose_file} exec postgresql psql -p6432 -U postgres pgbouncer -c RELOAD"
   r "/root/.acme.sh/acme.sh --install-cert -d #{domain} --key-file #{$datadir}/server.key  --fullchain-file #{$datadir}/server.crt --reloadcmd \"#{reload_cmd}\""
   r "sudo chown 1001:1001 #{$datadir}/server.key"
   r "sudo chown 1001:1001 #{$datadir}/server.crt"

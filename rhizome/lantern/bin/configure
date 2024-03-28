@@ -37,65 +37,65 @@ end
 def setup_env()
   # Setup env file
   unless File.file?($env_file)
-      File.open($env_file, 'a') do |f|
-        f.puts("ORGANIZATION_ID=#{$configure_hash["org_id"]}")
-        f.puts("INSTANCE_ID=#{$configure_hash["instance_id"]}")
-        f.puts("INSTANCE_TYPE=#{$configure_hash["instance_type"]}")
-        f.puts("APP_ENV=#{$configure_hash["app_env"]}")
-        f.puts("POSTGRESQL_REPLICATION_MODE=#{$configure_hash["replication_mode"]}")
-        f.puts("POSTGRESQL_REPLICATION_USER=#{$configure_hash["repl_user"]}")
-        f.puts("POSTGRESQL_REPLICATION_PASSWORD=#{$configure_hash["repl_password"]}")
-        f.puts("POSTGRESQL_MASTER_HOST=#{$configure_hash["master_host"]}")
-        f.puts("POSTGRESQL_MASTER_PORT_NUMBER=#{$configure_hash["master_port"]}")
-        f.puts("POSTGRESQL_LOG_HOSTNAME=true")
-        f.puts("GOOGLE_CLOUD_BUCKET_NAME=client-db-coredumps")
-        f.puts("POSTGRESQL_DATABASE=#{$configure_hash["db_name"]}")
-        f.puts("POSTGRESQL_POSTGRES_PASSWORD=#{$configure_hash["postgres_password"]}")
-        f.puts("POSTGRESQL_POSTGRES_PASSWORD=#{$configure_hash["db_user"]}")
-        f.puts("PROMETHEUS_WRITER_USERNAME=1296757")
-        f.puts("PROMETHEUS_WRITER_PASSWORD=#{$configure_hash["prom_password"]}")
-        f.puts("PROMETHEUS_WRITER_URL=https://prometheus.lantern.dev/api/v1/write")
-        f.puts("POSTGRESQL_ENABLE_COREDUMPS=#{$configure_hash["enable_coredumps"]}")
-        f.puts("ENABLE_TELEMETRY=#{$configure_hash["enable_telemetry"]}")
-        f.puts("GOOGLE_APPLICATION_CREDENTIALS_B64=#{$configure_hash["gcp_creds_coredumps_b64"]}")
-        f.puts("GOOGLE_APPLICATION_CREDENTIALS_WALG_B64=#{$configure_hash["gcp_creds_walg_b64"]}")
-        f.puts("POSTGRESQL_LOG_LINE_PREFIX=lantern-logline: app: %a user: %u time: %t proc_start: %s pid: %p linenumber: %l === ")
-        f.puts("POSTGRESQL_LOG_DURATION=true")
-        f.puts("POSTGRESQL_LOG_MIN_DURATION_STATEMENT=250ms")
+    File.open($env_file, 'a') do |f|
+      f.puts("ORGANIZATION_ID=#{$configure_hash["org_id"]}")
+      f.puts("INSTANCE_ID=#{$configure_hash["instance_id"]}")
+      f.puts("INSTANCE_TYPE=#{$configure_hash["instance_type"]}")
+      f.puts("APP_ENV=#{$configure_hash["app_env"]}")
+      f.puts("POSTGRESQL_REPLICATION_MODE=#{$configure_hash["replication_mode"]}")
+      f.puts("POSTGRESQL_REPLICATION_USER=#{$configure_hash["repl_user"]}")
+      f.puts("POSTGRESQL_REPLICATION_PASSWORD=#{$configure_hash["repl_password"]}")
+      f.puts("POSTGRESQL_MASTER_HOST=#{$configure_hash["master_host"]}")
+      f.puts("POSTGRESQL_MASTER_PORT_NUMBER=#{$configure_hash["master_port"]}")
+      f.puts("POSTGRESQL_LOG_HOSTNAME=true")
+      f.puts("GOOGLE_CLOUD_BUCKET_NAME=client-db-coredumps")
+      f.puts("POSTGRESQL_DATABASE=#{$configure_hash["db_name"]}")
+      f.puts("POSTGRESQL_POSTGRES_PASSWORD=#{$configure_hash["postgres_password"]}")
+      f.puts("POSTGRESQL_POSTGRES_PASSWORD=#{$configure_hash["db_user"]}")
+      f.puts("PROMETHEUS_WRITER_USERNAME=1296757")
+      f.puts("PROMETHEUS_WRITER_PASSWORD=#{$configure_hash["prom_password"]}")
+      f.puts("PROMETHEUS_WRITER_URL=https://prometheus.lantern.dev/api/v1/write")
+      f.puts("POSTGRESQL_ENABLE_COREDUMPS=#{$configure_hash["enable_coredumps"]}")
+      f.puts("ENABLE_TELEMETRY=#{$configure_hash["enable_telemetry"]}")
+      f.puts("GOOGLE_APPLICATION_CREDENTIALS_B64=#{$configure_hash["gcp_creds_coredumps_b64"]}")
+      f.puts("GOOGLE_APPLICATION_CREDENTIALS_WALG_B64=#{$configure_hash["gcp_creds_walg_b64"]}")
+      f.puts("POSTGRESQL_LOG_LINE_PREFIX=lantern-logline: app: %a user: %u time: %t proc_start: %s pid: %p linenumber: %l === ")
+      f.puts("POSTGRESQL_LOG_DURATION=true")
+      f.puts("POSTGRESQL_LOG_MIN_DURATION_STATEMENT=250ms")
 
-        if $configure_hash["enable_auditlogs"]
-          f.puts("POSTGRESQL_PGAUDIT_LOG=READ,WRITE")
-        end
-
-        if $configure_hash["db_user"] != "postgres"
-          f.puts("POSTGRESQL_PASSWORD=#{$configure_hash["db_user_password"]}")
-        else
-          f.puts("POSTGRESQL_PASSWORD=#{$configure_hash["postgres_password"]}")
-        end
+      if $configure_hash["enable_auditlogs"]
+        f.puts("POSTGRESQL_PGAUDIT_LOG=READ,WRITE")
       end
+
+      if $configure_hash["db_user"] != "postgres"
+        f.puts("POSTGRESQL_PASSWORD=#{$configure_hash["db_user_password"]}")
+      else
+        f.puts("POSTGRESQL_PASSWORD=#{$configure_hash["postgres_password"]}")
+      end
+    end
   end
 end
 
 def setup_initial_compose_file()
   # setup_initial_compose_file
   # Get the total amount of RAM in kilobytes
-  total_ram=(r"free -tk | awk 'NR == 2 {print $2}'")
+  total_ram = (r "free -tk | awk 'NR == 2 {print $2}'")
   # Calculate 95% of the total RAM in kilobytes
-  mem_mb=(total_ram.to_i * 0.95/1024).round
-  mem_limit="#{mem_mb}MB"
+  mem_mb = (total_ram.to_i * 0.95 / 1024).round
+  mem_limit = "#{mem_mb}MB"
 
   map = {
     "version" => "3",
     "services" => {
       "postgresql" => {
-          "image" => $configure_hash["container_image"],
-          "ports" => ["5432:5432", "6432:6432"],
-          "volumes" => ["/var/lib/lantern-data:/bitnami/postgresql"],
-          "deploy" => {
-            "restart_policy" => { "condition" => "always" },
-            "resources" => { "limits" => { "memory" => mem_limit } }
-          },
-          "env_file" => $env_file
+        "image" => $configure_hash["container_image"],
+        "ports" => ["5432:5432", "6432:6432"],
+        "volumes" => ["/var/lib/lantern-data:/bitnami/postgresql"],
+        "deploy" => {
+          "restart_policy" => {"condition" => "always"},
+          "resources" => {"limits" => {"memory" => mem_limit}}
+        },
+        "env_file" => $env_file
       }
     }
   }
@@ -107,7 +107,7 @@ def setup_initial_compose_file()
     r "sudo sed -i \"/BASE=docker/a export GOOGLE_APPLICATION_CREDENTIALS=#{$workdir}/logging_creds.json\" /etc/init.d/docker"
     r "sudo systemctl daemon-reload 2>/dev/null || echo 'No systemctl in host'"
 
-    gcp_meta_name="#{$configure_hash["instance_id"]}-#{$configure_hash["instance_type"]}"
+    gcp_meta_name = "#{$configure_hash["instance_id"]}-#{$configure_hash["instance_type"]}"
     map["services"]["postgresql"]["logging"] = {
       "driver" => "gcplogs",
       "options" => {
@@ -138,7 +138,3 @@ configure_gcr($configure_hash["gcp_creds_gcr_b64"], $configure_hash["container_i
 puts "GCR repo ready"
 run_database($configure_hash["container_image"])
 puts "database ready"
-
-if $configure_hash["dns_token"] && $configure_hash["domain"]
-  configure_tls($configure_hash["domain"], $configure_hash["domain_email"], $configure_hash["dns_token"])
-end

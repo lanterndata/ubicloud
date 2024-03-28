@@ -12,13 +12,13 @@ class Dns::Cloudflare
 
     @host = {
       :connection_string => "https://api.cloudflare.com",
-      :headers => { :'Authorization' => "Bearer #{@token}", :'Content-Type' => 'application/json' }
+      :headers => {:'Authorization' => "Bearer #{@token}", :'Content-Type' => 'application/json'}
     }
   end
 
   def get_dns_record(domain)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
-    response = connection.get(path: "/client/v4/zones/#{@zone_id}/dns_records", query: { :name => domain }, expects: 200)
+    response = connection.get(path: "/client/v4/zones/#{@zone_id}/dns_records", query: {:name => domain}, expects: 200)
 
     body = JSON.parse(response.body)
 
@@ -71,9 +71,8 @@ class Dns::Cloudflare
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
     record = get_dns_record(domain)
     if record == nil
-        return
+      return
     end
     connection.delete(path: "/client/v4/zones/#{@zone_id}/dns_records/#{record["id"]}", expects: 200)
   end
-
 end

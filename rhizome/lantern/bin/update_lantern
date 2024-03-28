@@ -15,13 +15,13 @@ end
 
 version_tag = "v#{$configure_hash["version"]}"
 
-r"sudo docker exec -u root #{$container_name} bash -c 'apt update && apt install -y build-essential cmake postgresql-server-dev-#{pg_version}'"
-r"sudo docker exec -u root #{$container_name} bash -c 'cd /tmp && rm -rf lantern || true'"
-r"sudo docker exec -u root #{$container_name} bash -c 'cd /tmp && git clone https://github.com/lanterndata/lantern.git --recursive'"
-r"sudo docker exec -u root #{$container_name} bash -c 'cd /tmp/lantern && git checkout #{version_tag}'"
-r"sudo docker exec -u root #{$container_name} bash -c 'cd /tmp/lantern && git submodule update --recursive && mkdir build'"
-r"sudo docker exec -u root #{$container_name} bash -c 'cd /tmp/lantern/build && cmake -DBUILD_FOR_DISTRIBUTING=YES -DMARCH_NATIVE=YES ..'"
-r"sudo docker exec -u root #{$container_name} bash -c 'cd /tmp/lantern/build && make install'"
-r"sudo docker exec -u root #{$container_name} bash -c 'rm -rf /tmp/lantern'"
+r "sudo docker exec -u root #{$container_name} bash -c 'apt update && apt install -y build-essential cmake postgresql-server-dev-#{pg_version}'"
+r "sudo docker exec -u root #{$container_name} bash -c 'cd /tmp && rm -rf lantern || true'"
+r "sudo docker exec -u root #{$container_name} bash -c 'cd /tmp && git clone https://github.com/lanterndata/lantern.git --recursive'"
+r "sudo docker exec -u root #{$container_name} bash -c 'cd /tmp/lantern && git checkout #{version_tag}'"
+r "sudo docker exec -u root #{$container_name} bash -c 'cd /tmp/lantern && git submodule update --recursive && mkdir build'"
+r "sudo docker exec -u root #{$container_name} bash -c 'cd /tmp/lantern/build && cmake -DBUILD_FOR_DISTRIBUTING=YES -DMARCH_NATIVE=YES ..'"
+r "sudo docker exec -u root #{$container_name} bash -c 'cd /tmp/lantern/build && make install'"
+r "sudo docker exec -u root #{$container_name} bash -c 'rm -rf /tmp/lantern'"
 
 update_extensions_in_sql

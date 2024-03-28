@@ -47,12 +47,12 @@ class CloverWeb
         Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
 
         if r.params["lantern_version"] != pg.lantern_version
-           pg.update(lantern_version: r.params["lantern_version"])
-           pg.incr_update_lantern_extension
+          pg.update(lantern_version: r.params["lantern_version"])
+          pg.incr_update_lantern_extension
         end
         if r.params["extras_version"] != pg.extras_version
-           pg.update(extras_version: r.params["extras_version"])
-           pg.incr_update_extras_extension
+          pg.update(extras_version: r.params["extras_version"])
+          pg.incr_update_extras_extension
         end
         r.redirect "#{@project.path}#{pg.path}"
       end
@@ -67,18 +67,18 @@ class CloverWeb
 
       r.post "add_domain" do
         Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
-          DB.transaction do
-            GcpVm.dataset.where(id: pg.vm_id).update(domain: r.params["domain"])
-            pg.incr_add_domain
-          end
+        DB.transaction do
+          GcpVm.dataset.where(id: pg.vm_id).update(domain: r.params["domain"])
+          pg.incr_add_domain
+        end
         r.redirect "#{@project.path}#{pg.path}"
       end
 
       r.post "update_rhizome" do
         Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
-          DB.transaction do
-            pg.incr_update_rhizome
-          end
+        DB.transaction do
+          pg.incr_update_rhizome
+        end
         r.redirect "#{@project.path}#{pg.path}"
       end
 

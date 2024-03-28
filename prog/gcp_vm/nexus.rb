@@ -20,7 +20,6 @@ class Prog::GcpVm::Nexus < Prog::Base
     storage_size_gib: nil, arch: "x64", domain: nil)
 
     unless (project = Project[project_id])
-      Clog.emit("Project id") { {project_id: project_id} }
       fail "No existing project"
     end
 
@@ -83,8 +82,8 @@ class Prog::GcpVm::Nexus < Prog::Base
     gcp_client = Hosting::GcpApis::new
     addr_info = gcp_client.get_static_ipv4(gcp_vm.name, gcp_vm.location)
     if addr_info["status"] == "RESERVED"
-      gcp_client.delete_ephermal_ipv4(gcp_vm.name,"#{gcp_vm.location}-a")
-      gcp_client.assign_static_ipv4(gcp_vm.name,addr_info["address"], "#{gcp_vm.location}-a")
+      gcp_client.delete_ephermal_ipv4(gcp_vm.name, "#{gcp_vm.location}-a")
+      gcp_client.assign_static_ipv4(gcp_vm.name, addr_info["address"], "#{gcp_vm.location}-a")
       gcp_vm.update(has_static_ipv4: true)
       gcp_vm.sshable.update(host: addr_info["address"])
       hop_wait_sshable

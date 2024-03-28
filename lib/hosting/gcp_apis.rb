@@ -12,15 +12,15 @@ class Hosting::GcpApis
 
     scopes = ['https://www.googleapis.com/auth/cloud-platform', 'https://www.googleapis.com/auth/compute']
     begin
-     @authorization = Google::Auth.get_application_default(scopes)
+      @authorization = Google::Auth.get_application_default(scopes)
     rescue => e
-      Clog.emit("Error while doing google auth") {{ error: e }}
+      Clog.emit("Error while doing google auth") { {error: e} }
       fail "Google Auth failed, try setting 'GOOGLE_APPLICATION_CREDENTIALS' env varialbe"
     end
 
     @host = {
       :connection_string => "https://compute.googleapis.com",
-      :headers => @authorization.apply({ :"Content-Type" => "application/json" })
+      :headers => @authorization.apply({:"Content-Type" => "application/json"})
     }
   end
 
@@ -112,7 +112,6 @@ class Hosting::GcpApis
     }
 
     connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances", body: JSON.dump(instance), expects: 200)
-
   end
 
   def get_vm(vm_name, zone)
@@ -142,20 +141,19 @@ class Hosting::GcpApis
 
   def delete_ephermal_ipv4(vm_name, zone)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
-    query = { accessConfig: "External NAT", networkInterface: "nic0" }
-    connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/deleteAccessConfig", query: query, expects: [200,404])
+    query = {accessConfig: "External NAT", networkInterface: "nic0"}
+    connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/deleteAccessConfig", query: query, expects: [200, 404])
   end
 
   def assign_static_ipv4(vm_name, addr, zone)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
-    region = get_region_from_zone(zone)
-    query = { networkInterface: "nic0" }
+    query = {networkInterface: "nic0"}
 
     body = {
-        name: "External NAT",
-        natIP: addr,
-        networkTier: "PREMIUM",
-        type: "ONE_TO_ONE_NAT"
+      name: "External NAT",
+      natIP: addr,
+      networkTier: "PREMIUM",
+      type: "ONE_TO_ONE_NAT"
     }
 
     connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/addAccessConfig", body: JSON.dump(body), query: query, expects: 200)

@@ -26,6 +26,7 @@ class CloverWeb
         lantern_version: r.params["lantern_version"],
         extras_version: r.params["extras_version"],
         minor_version: r.params["minor_version"],
+        domain: r.params["domain"],
         db_name: r.params["db_name"],
         db_user: r.params["db_user"]
       )

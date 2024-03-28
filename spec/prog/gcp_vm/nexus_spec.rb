@@ -61,35 +61,35 @@ RSpec.describe Prog::GcpVm::Nexus do
       expect(Config).to receive(:gcp_project_id).and_return("test-project")
     end
     it "Hops to wait_create_vm on start" do
-      stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: { "Content-Type" => "application/json"})
-      stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances").to_return(status: 200, body: JSON.dump({}), headers: { "Content-Type" => "application/json"})
+      stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+      stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
       expect { nx.start }.to hop("wait_create_vm")
     end
 
     it "Naps 10 seconds if vm is not running" do
-      stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: { "Content-Type" => "application/json"})
-      stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm").to_return(status: 200, body: JSON.dump({ "status" => "PROVISIONING" }), headers: { "Content-Type" => "application/json"})
+      stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+      stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm").to_return(status: 200, body: JSON.dump({"status" => "PROVISIONING"}), headers: {"Content-Type" => "application/json"})
       expect { nx.wait_create_vm }.to nap(10)
     end
 
     it "hops to create_static_ipv4" do
-      stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: { "Content-Type" => "application/json"})
-      stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm").to_return(status: 200, body: JSON.dump({ "status" => "RUNNING" }), headers: { "Content-Type" => "application/json"})
-      stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/regions/us-central1/addresses").to_return(status: 200, body: JSON.dump({}), headers: { "Content-Type" => "application/json"})
+      stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+      stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm").to_return(status: 200, body: JSON.dump({"status" => "RUNNING"}), headers: {"Content-Type" => "application/json"})
+      stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/regions/us-central1/addresses").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
       expect { nx.wait_create_vm }.to hop("wait_ipv4")
     end
 
     it "hops to wait_sshable after assigning ipv4" do
       sshable = instance_double(Sshable)
       expect(gcp_vm).to receive(:sshable).and_return(sshable)
-      stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: { "Content-Type" => "application/json"})
-      stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm").to_return(status: 200, body: JSON.dump({ "status" => "RUNNING" }), headers: { "Content-Type" => "application/json"})
-      stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/regions/us-central1/addresses").to_return(status: 200, body: JSON.dump({}), headers: { "Content-Type" => "application/json"})
-      stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/test-project/regions/us-central1/addresses/dummy-vm-addr").to_return(status: 200, body: JSON.dump({ status: "RESERVED", address: "1.1.1.1" }), headers: { "Content-Type" => "application/json"})
-      stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm/deleteAccessConfig?accessConfig=External%20NAT&networkInterface=nic0").to_return(status: 200, body: JSON.dump({}), headers: { "Content-Type" => "application/json"})
-      stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm/addAccessConfig?networkInterface=nic0").with(body: JSON.dump({name:"External NAT",natIP:"1.1.1.1",networkTier:"PREMIUM",type:"ONE_TO_ONE_NAT"})).to_return(status: 200, body: JSON.dump({}), headers: { "Content-Type" => "application/json"})
-      expect(gcp_vm).to receive(:update).with({ :has_static_ipv4 => true })
-      expect(sshable).to receive(:update).with({ :host => "1.1.1.1" })
+      stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+      stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm").to_return(status: 200, body: JSON.dump({"status" => "RUNNING"}), headers: {"Content-Type" => "application/json"})
+      stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/regions/us-central1/addresses").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+      stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/test-project/regions/us-central1/addresses/dummy-vm-addr").to_return(status: 200, body: JSON.dump({status: "RESERVED", address: "1.1.1.1"}), headers: {"Content-Type" => "application/json"})
+      stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm/deleteAccessConfig?accessConfig=External%20NAT&networkInterface=nic0").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+      stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm/addAccessConfig?networkInterface=nic0").with(body: JSON.dump({name: "External NAT", natIP: "1.1.1.1", networkTier: "PREMIUM", type: "ONE_TO_ONE_NAT"})).to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+      expect(gcp_vm).to receive(:update).with({:has_static_ipv4 => true})
+      expect(sshable).to receive(:update).with({:host => "1.1.1.1"})
       expect { nx.wait_ipv4 }.to hop("wait_sshable")
     end
   end

@@ -92,6 +92,30 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
         expect { nx.wait_bootstrap_rhizome }.to nap(0)
       end
     end
+
+    describe "#setup_docker_stack" do
+      it "Calls add_domain if gcp_vm has domain after setup_docker_stack" do
+        allow(lantern_server).to receive(:org_id)
+        allow(lantern_server).to receive(:name)
+        allow(lantern_server).to receive(:instance_type)
+        allow(lantern_server).to receive(:db_name)
+        allow(lantern_server).to receive(:db_user)
+        allow(lantern_server).to receive(:db_user_password)
+        allow(lantern_server).to receive(:postgres_password)
+        allow(lantern_server).to receive(:master_host)
+        allow(lantern_server).to receive(:master_port)
+        allow(lantern_server).to receive(:lantern_version)
+        allow(lantern_server).to receive(:extras_version)
+        allow(lantern_server).to receive(:minor_version)
+        allow(lantern_server.gcp_vm.sshable).to receive(:cmd).and_return(nil)
+        expect(lantern_server.gcp_vm).to receive(:domain).and_return "test.lantern.dev"
+        expect(lantern_server).to receive(:incr_add_domain) do || nx.incr_add_domain end
+        expect { nx.setup_docker_stack }.to hop("wait_db_available")
+        expect(nx).to receive(:available?).and_return(true)
+        expect { nx.wait_db_available }.to hop("wait")
+        expect { nx.wait }.to hop("add_domain")
+      end
+    end
   end
 
   describe "#update_lantern_extension" do
@@ -126,17 +150,17 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       nx.incr_add_domain
       expect { nx.wait }.to hop("add_domain")
       expect(lantern_server.gcp_vm.sshable).to receive(:host).and_return("1.1.1.1")
-      stub_request(:get, "https://api.cloudflare.com/client/v4/zones/test/dns_records?name").to_return(status: 200, body: JSON.dump({ :result => [] }), headers: {})
-      stub_request(:post, "https://api.cloudflare.com/client/v4/zones/test/dns_records").
-       with(
-         body: "{\"content\":\"1.1.1.1\",\"name\":null,\"proxied\":false,\"type\":\"A\",\"comment\":\"dns record for lantern cloud db\",\"ttl\":60}",
-         headers: {
-        'Content-Type'=>'application/json',
-        'Host'=>'api.cloudflare.com:443',
-        'X-Auth-Email'=>'test@lantern.dev',
-        'X-Auth-Key'=>'test-token'
-         }).
-       to_return(status: 200, body: "", headers: {})
+      stub_request(:get, "https://api.cloudflare.com/client/v4/zones/test/dns_records?name").to_return(status: 200, body: JSON.dump({:result => []}), headers: {})
+      stub_request(:post, "https://api.cloudflare.com/client/v4/zones/test/dns_records")
+        .with(
+          body: "{\"content\":\"1.1.1.1\",\"name\":null,\"proxied\":false,\"type\":\"A\",\"comment\":\"dns record for lantern cloud db\",\"ttl\":60}",
+          headers: {
+            'Authorization' => 'Bearer test-token',
+            'Content-Type' => 'application/json',
+            'Host' => 'api.cloudflare.com:443'
+          }
+        )
+        .to_return(status: 200, body: "", headers: {})
       expect { nx.add_domain }.to hop("setup_ssl")
     end
   end
