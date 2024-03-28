@@ -38,13 +38,26 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
         instance_type: "writer",
         db_name: "testdb",
         target_vm_size: "standard-2",
-        db_user: "test"
+        db_user: "test",
+        app_env: "test",
+        db_user_password: "test-pass",
+        postgres_password: "test-pg-pass",
+        repl_password: "test-repl-pass",
+        enable_telemetry: true,
+        enable_debug: true,
       )
       lantern_server = LanternServer[st.id]
       expect(lantern_server).not_to be_nil
       expect(lantern_server.gcp_vm).not_to be_nil
       expect(lantern_server.gcp_vm.sshable).not_to be_nil
 
+      expect(lantern_server.app_env).to eq("test")
+      expect(lantern_server.db_user).to eq("test")
+      expect(lantern_server.db_user_password).to eq("test-pass")
+      expect(lantern_server.postgres_password).to eq("test-pg-pass")
+      expect(lantern_server.repl_password).to eq("test-repl-pass")
+      expect(lantern_server.enable_telemetry).to eq(true)
+      expect(lantern_server.debug).to eq(true)
       expect(lantern_server.lantern_version).to eq("0.2.0")
       expect(lantern_server.extras_version).to eq("0.1.3")
       expect(lantern_server.minor_version).to eq("2")
@@ -107,6 +120,11 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
         allow(lantern_server).to receive(:lantern_version)
         allow(lantern_server).to receive(:extras_version)
         allow(lantern_server).to receive(:minor_version)
+        allow(lantern_server).to receive(:app_env)
+        allow(lantern_server).to receive(:debug)
+        allow(lantern_server).to receive(:enable_telemetry)
+        allow(lantern_server).to receive(:repl_password)
+        allow(lantern_server).to receive(:repl_user)
         allow(lantern_server.gcp_vm.sshable).to receive(:cmd).and_return(nil)
         expect(lantern_server.gcp_vm).to receive(:domain).and_return "test.lantern.dev"
         expect(lantern_server).to receive(:incr_add_domain) do || nx.incr_add_domain end
@@ -123,24 +141,30 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       allow(lantern_server).to receive(:update)
       allow(lantern_server).to receive(:incr_update_lantern_extension)
       lantern_server.update(lantern_version: "0.2.0")
+      nx.incr_update_rhizome
       nx.incr_update_lantern_extension
-      expect { nx.wait }.to hop("update_lantern_extension")
+      expect { nx.wait }.to hop("update_rhizome")
+      expect { nx.wait_update_rhizome }.to hop("update_lantern_extension")
     end
 
     it "should update lantern_extras extension" do
       allow(lantern_server).to receive(:update)
       allow(lantern_server).to receive(:incr_update_extras_extension)
       lantern_server.update(lantern_version: "0.1.1")
+      nx.incr_update_rhizome
       nx.incr_update_extras_extension
-      expect { nx.wait }.to hop("update_extras_extension")
+      expect { nx.wait }.to hop("update_rhizome")
+      expect { nx.wait_update_rhizome }.to hop("update_extras_extension")
     end
 
     it "should update container image" do
       allow(lantern_server).to receive(:update)
       allow(lantern_server).to receive(:incr_update_image)
       lantern_server.update(lantern_version: "0.1.1", minor_version: "2")
+      nx.incr_update_rhizome
       nx.incr_update_image
-      expect { nx.wait }.to hop("update_image")
+      expect { nx.wait }.to hop("update_rhizome")
+      expect { nx.wait_update_rhizome }.to hop("update_image")
     end
 
     it "should add domain and setup ssl" do

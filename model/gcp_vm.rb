@@ -13,7 +13,7 @@ class GcpVm < Sequel::Model
 
   include ResourceMethods
   include SemaphoreMethods
-  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules
+  semaphore :destroy, :start_vm, :stop_vm
 
   include Authorization::HyperTagMethods
 

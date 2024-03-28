@@ -43,7 +43,7 @@ RSpec.describe Clover, "lantern" do
 
   describe "authenticated" do
     before do
-      lantern_project = Project.create_with_id(name: "default", provider: "gcp").tap { _1.associate_with_project(_1) }
+      Project.create_with_id(name: "default", provider: "gcp").tap { _1.associate_with_project(_1) }
       login(user.email)
     end
 

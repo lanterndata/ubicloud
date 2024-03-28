@@ -12,12 +12,15 @@ Sequel.migration do
       column :lantern_version, :text, collate: '"C"'
       column :extras_version, :text, collate: '"C"'
       column :minor_version, :text, collate: '"C"'
-      column :target_vm_size, :text, collate: '"C"', null: false
-      column :target_storage_size_gib, :bigint, null: false
       column :instance_type, :instance_type, null: false, default: "writer"
       column :db_name, :text, collate: '"C"', null: false, default: "postgres"
       column :db_user, :text, collate: '"C"', null: false, default: "postgres"
       column :db_user_password, :text, collate: '"C"'
+      column :repl_user, :text, collate: '"C"', null: false, default: "repl_user"
+      column :repl_password, :text, collate: '"C"', null: false
+      column :app_env, :text, collate: '"C"', null: false, default: "production"
+      column :debug, :bool, null: false, default: false
+      column :enable_telemetry, :bool, null: false, default: true
       column :postgres_password, :text, collate: '"C"', null: false
       column :master_host, :text, collate: '"C"'
       column :master_port, Integer

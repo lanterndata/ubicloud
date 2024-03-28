@@ -15,8 +15,8 @@ class LanternServer < Sequel::Model
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
 
-  semaphore :initial_provisioning, :update_superuser_password, :update_lantern_extension, :update_extras_extension, :update_image, :setup_ssl, :add_domain, :update_rhizome, :checkup
-  semaphore :restart, :configure, :take_over, :destroy
+  semaphore :initial_provisioning, :update_user_password, :update_lantern_extension, :update_extras_extension, :update_image, :setup_ssl, :add_domain, :update_rhizome, :checkup
+  semaphore :start_server, :stop_server, :restart_server, :configure, :take_over, :destroy
 
   def hyper_tag_name(project)
     "project/#{project.ubid}/location/#{location}/lantern/#{name}"
@@ -41,7 +41,7 @@ class LanternServer < Sequel::Model
   end
 
   def run_query(query)
-    gcp_vm.sshable.cmd("sudo lantern/bin/exec \"psql -U postgres -c '#{query}'\"").chomp
+    gcp_vm.sshable.cmd("sudo lantern/bin/exec", stdin: query).chomp
   end
 
   def display_state

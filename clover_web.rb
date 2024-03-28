@@ -93,7 +93,7 @@ class CloverWeb < Roda
   autoload_routes("web")
 
   plugin :rodauth do
-    enable :argon2, :change_login, :change_password, :close_account, :create_account,
+    enable :argon2, :change_login, :change_password, :close_account,
       :lockout, :login, :logout, :remember, :reset_password,
       :disallow_password_reuse, :password_grace_period, :active_sessions,
       :verify_login_change, :change_password_notify, :confirm_password,
@@ -145,17 +145,17 @@ class CloverWeb < Roda
       end
     end
 
-    create_account_view { view "auth/create_account", "Create Account" }
-    create_account_redirect { login_route }
-    create_account_set_password? true
+    # create_account_view { view "auth/create_account", "Create Account" }
+    # create_account_redirect { login_route }
+    # create_account_set_password? true
     password_confirm_label "Password Confirmation"
-    before_create_account do
-      account[:id] = Account.generate_uuid
-      account[:name] = param("name")
-    end
-    after_create_account do
-      Account[account_id].create_project_with_default_policy("Default")
-    end
+    # before_create_account do
+    #   account[:id] = Account.generate_uuid
+    #   account[:name] = param("name")
+    # end
+    # after_create_account do
+    #   Account[account_id].create_project_with_default_policy("Default")
+    # end
 
     reset_password_view { view "auth/reset_password", "Request Password" }
     reset_password_request_view { view "auth/reset_password_request", "Request Password Reset" }

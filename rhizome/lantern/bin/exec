@@ -6,4 +6,4 @@ require 'yaml'
 require_relative "../../common/lib/util"
 require_relative "../lib/common"
 
-$stdout.puts r "docker compose -f #{$compose_file} exec postgresql #{ARGV[0]}"
+$stdout.puts r"docker compose -f #{$compose_file} exec -T postgresql psql -U postgres -t --csv", stdin: STDIN

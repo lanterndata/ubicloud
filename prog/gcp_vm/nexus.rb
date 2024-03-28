@@ -8,12 +8,9 @@ require "base64"
 
 require_relative "../../lib/hosting/gcp_apis"
 
-# 5. Add view and routes for lantern_server
-# 6. Write tests for lantern_server
-
 class Prog::GcpVm::Nexus < Prog::Base
   subject_is :gcp_vm
-  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules
+  semaphore :destroy, :start_vm, :stop_vm
 
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "lantern", location: "us-central1", boot_image: "ubuntu-2204-jammy-v20240319",
@@ -33,12 +30,7 @@ class Prog::GcpVm::Nexus < Prog::Base
     Validation.validate_os_user_name(unix_user)
 
     DB.transaction do
-      cores = if arch == "arm64"
-        vm_size.vcpu
-      else
-        vm_size.vcpu / 2
-      end
-
+      cores = vm_size.vcpu
       vm = GcpVm.create(name: name, public_key: public_key, unix_user: unix_user,
         family: vm_size.family, cores: cores, location: location,
         boot_image: boot_image, arch: arch, storage_size_gib: storage_size_gib, domain: domain) { _1.id = ubid.to_uuid }
@@ -126,7 +118,6 @@ class Prog::GcpVm::Nexus < Prog::Base
     # I considered removing wait_sshable altogether, but (very)
     # occasionally helps us glean interesting information about boot
     # problems.
-    # hop_create_billing_record unless addr
 
     begin
       Clog.emit("Trying to ssh to addr") { {addr: addr.to_s} }
@@ -139,37 +130,15 @@ class Prog::GcpVm::Nexus < Prog::Base
     hop_wait
   end
 
-  label def create_billing_record
-    gcp_vm.update(display_state: "running")
-    # Clog.emit("vm provisioned") { {vm: gcp_vm.values, provision: {vm_id: gcp_vm.id, duration: Time.now - gcp_vm.created_at}} }
-    # project = gcp_vm.projects.first
-    # hop_wait unless project.billable
-    #
-    # BillingRecord.create_with_id(
-    #   project_id: project.id,
-    #   resource_id: gcp_vm.id,
-    #   resource_name: gcp_vm.name,
-    #   billing_rate_id: BillingRate.from_resource_properties("VmCores", gcp_vm.family, gcp_vm.location)["id"],
-    #   amount: gcp_vm.cores
-    # )
-    #
-    # if gcp_vm.ip4_enabled
-    #   BillingRecord.create_with_id(
-    #     project_id: project.id,
-    #     resource_id: gcp_vm.assigned_vm_address.id,
-    #     resource_name: gcp_vm.assigned_vm_address.ip,
-    #     billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", gcp_vm.location)["id"],
-    #     amount: 1
-    #   )
-    # end
-
-    # hop_wait
-  end
-
   label def wait
-    when_start_after_host_reboot_set? do
+    when_stop_vm_set? do
       register_deadline(:wait, 5 * 60)
-      hop_start_after_host_reboot
+      hop_stop_vm
+    end
+
+    when_start_vm_set? do
+      register_deadline(:wait, 5 * 60)
+      hop_start_vm
     end
 
     when_destroy_set? do
@@ -179,7 +148,20 @@ class Prog::GcpVm::Nexus < Prog::Base
     nap 30
   end
 
-  label def start_after_host_reboot
+  label def stop_vm
+    gcp_vm.update(display_state: "stopping")
+
+    gcp_client = Hosting::GcpApis::new
+    gcp_client.stop_vm(gcp_vm.name, gcp_vm.location)
+
+    gcp_vm.update(display_state: "stopped")
+
+    decr_stop_vm
+
+    hop_wait_sshable
+  end
+
+  label def start_vm
     gcp_vm.update(display_state: "starting")
 
     gcp_client = Hosting::GcpApis::new
@@ -187,17 +169,23 @@ class Prog::GcpVm::Nexus < Prog::Base
 
     gcp_vm.update(display_state: "running")
 
-    decr_start_after_host_reboot
+    decr_start_vm
 
-    hop_wait
+    hop_wait_sshable
   end
 
   label def destroy
-    gcp_client = Hosting::GcpApis::new
-    gcp_client.delete_vm(gcp_vm.name, "#{gcp_vm.location}-a")
-    if gcp_vm.has_static_ipv4
-      gcp_client.release_ipv4(gcp_vm.name, gcp_vm.location)
+    DB.transaction do
+      gcp_vm.update(display_state: "deleting")
+      gcp_client = Hosting::GcpApis::new
+      gcp_client.delete_vm(gcp_vm.name, "#{gcp_vm.location}-a")
+      if gcp_vm.has_static_ipv4
+        gcp_client.release_ipv4(gcp_vm.name, gcp_vm.location)
+      end
+      strand.children.each { _1.destroy }
+      gcp_vm.projects.map { gcp_vm.dissociate_with_project(_1) }
+      gcp_vm.destroy
     end
-    pop "vm deleted"
+    pop "gcp vm deleted"
   end
 end

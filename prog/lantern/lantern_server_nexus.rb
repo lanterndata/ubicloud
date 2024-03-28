@@ -10,24 +10,40 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   extend Forwardable
   def_delegators :lantern_server, :gcp_vm
 
-  semaphore :initial_provisioning, :update_superuser_password, :update_lantern_extension, :update_extras_extension, :update_image, :setup_ssl, :add_domain, :update_rhizome, :checkup
-  semaphore :restart, :configure, :take_over, :destroy
+  semaphore :initial_provisioning, :update_user_password, :update_lantern_extension, :update_extras_extension, :update_image, :setup_ssl, :add_domain, :update_rhizome, :checkup
+  semaphore :start_server, :stop_server, :restart_server, :configure, :take_over, :destroy
 
-  def self.assemble(project_id: nil, lantern_version: "0.2.1", extras_version: "0.1.4", minor_version: "1",
+  def self.assemble(
+    project_id: nil, lantern_version: "0.2.2", extras_version: "0.1.4", minor_version: "1",
     org_id: nil, name: nil, instance_type: "writer",
     db_name: "postgres", db_user: "postgres", db_user_password: nil,
     location: "us-central1", target_vm_size: nil, storage_size_gib: 50,
-    postgres_password: nil, master_host: nil, master_port: nil, domain: nil)
+    postgres_password: nil, master_host: nil, master_port: nil, domain: nil,
+    app_env: Config.rack_env, repl_password: nil, enable_telemetry: Config.production?,
+    enable_debug: false, repl_user: "repl_user")
+
     DB.transaction do
       unless (project = Project[project_id])
         fail "No existing parent"
       end
       ubid = LanternServer.generate_ubid
       name ||= LanternServer.ubid_to_name(ubid)
+      repl_password ||= SecureRandom.urlsafe_base64(15)
+      enable_debug ||= false
+      repl_user ||= "repl_user"
 
       Validation::validate_name(name)
-      Validation::validate_name(db_user)
-      Validation::validate_name(db_name)
+      if db_user
+        Validation::validate_name(db_user)
+      else
+        db_user = "postgres"
+      end
+
+      if db_name
+        Validation::validate_name(db_name)
+      else
+        db_name = "postgres"
+      end
 
       if postgres_password == nil
         postgres_password = SecureRandom.urlsafe_base64(15)
@@ -65,7 +81,12 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
         postgres_password: postgres_password,
         master_host: master_host,
         master_port: master_port,
-        vm_id: vm_st.id
+        vm_id: vm_st.id,
+        app_env: app_env,
+        debug: enable_debug,
+        enable_telemetry: enable_telemetry,
+        repl_user: repl_user,
+        repl_password: repl_password
       ) { _1.id = ubid.to_uuid }
       lantern_server.associate_with_project(project)
 
@@ -101,7 +122,21 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
 
   label def wait_update_rhizome
     reap
-    hop_wait if leaf?
+    if leaf?
+      when_update_lantern_extension_set? do
+        hop_update_lantern_extension
+      end
+
+      when_update_extras_extension_set? do
+        hop_update_extras_extension
+      end
+
+      when_update_image_set? do
+        hop_update_image
+      end
+
+      hop_wait
+    end
     donate
   end
 
@@ -128,7 +163,11 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       org_id: lantern_server.org_id,
       instance_id: lantern_server.name,
       instance_type: lantern_server.instance_type,
-      app_env: Config.rack_env,
+      app_env: lantern_server.app_env,
+      enable_debug: lantern_server.debug,
+      enable_telemetry: lantern_server.enable_telemetry,
+      repl_user: lantern_server.repl_user,
+      repl_password: lantern_server.repl_password,
       replication_mode: lantern_server.instance_type == "writer" ? "master" : "slave",
       db_name: lantern_server.db_name,
       db_user: lantern_server.db_user,
@@ -136,7 +175,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       postgres_password: lantern_server.postgres_password,
       master_host: lantern_server.master_host,
       master_port: lantern_server.master_port,
-      enable_telemetry: Config.production?,
       prom_password: Config.prom_password,
       gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
       gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
@@ -219,27 +257,26 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     hop_wait
   end
 
-  label def update_superuser_password
-    decr_update_superuser_password
+  label def update_user_password
+    decr_update_user_password
 
-    #     encrypted_password = DB.synchronize do |conn|
-    #       # This uses PostgreSQL's PQencryptPasswordConn function, but it needs a connection, because
-    #       # the encryption is made by PostgreSQL, not by control plane. We use our own control plane
-    #       # database to do the encryption.
-    #       conn.encrypt_password(postgres_server.resource.superuser_password, "postgres", "scram-sha-256")
-    #     end
-    #     commands = <<SQL
-    # BEGIN;
-    # SET LOCAL log_statement = 'none';
-    # ALTER ROLE postgres WITH PASSWORD #{DB.literal(encrypted_password)};
-    # COMMIT;
-    # SQL
-    #     postgres_server.run_query(commands)
-    #
-    #     when_initial_provisioning_set? do
-    #       hop_wait if retval&.dig("msg") == "postgres server is restarted"
-    #       push self.class, frame, "restart"
-    #     end
+    if lantern_server.db_user == "postgres"
+      hop_wait
+    end
+
+    encrypted_password = DB.synchronize do |conn|
+      # This uses PostgreSQL's PQencryptPasswordConn function, but it needs a connection, because
+      # the encryption is made by PostgreSQL, not by control plane. We use our own control plane
+      # database to do the encryption.
+      conn.encrypt_password(lantern_server.db_user_password, lantern_server.db_user, "scram-sha-256")
+    end
+    commands = <<SQL
+BEGIN;
+SET LOCAL log_statement = 'none';
+ALTER ROLE #{lantern_server.db_user} WITH PASSWORD #{DB.literal(encrypted_password)};
+COMMIT;
+SQL
+        lantern_server.run_query(commands)
 
     hop_wait
   end
@@ -247,28 +284,24 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   label def wait
     decr_initial_provisioning
 
-    when_update_superuser_password_set? do
-      hop_update_superuser_password
+    when_update_user_password_set? do
+      hop_update_user_password
     end
 
     when_checkup_set? do
       hop_unavailable if !available?
     end
 
-    when_restart_set? do
-      push self.class, frame, "restart"
+    when_restart_server_set? do
+      hop_restart_server
     end
 
-    when_update_lantern_extension_set? do
-      hop_update_lantern_extension
+    when_start_server_set? do
+      hop_start_server
     end
 
-    when_update_extras_extension_set? do
-      hop_update_extras_extension
-    end
-
-    when_update_image_set? do
-      hop_update_image
+    when_stop_server_set? do
+      hop_stop_server
     end
 
     when_add_domain_set? do
@@ -316,21 +349,37 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   label def destroy
     decr_destroy
 
-    strand.children.each { _1.destroy }
+    DB.transaction do
+      strand.children.each { _1.destroy }
 
-    if gcp_vm.domain != nil
-      destroy_domain
+      if gcp_vm.domain != nil
+        destroy_domain
+      end
+
+      lantern_server.projects.map { lantern_server.dissociate_with_project(_1) }
+      lantern_server.destroy
+
+      gcp_vm.incr_destroy
     end
-
-    gcp_vm.incr_destroy
-    lantern_server.destroy
     pop "postgres server is deleted"
   end
 
-  label def restart
-    decr_restart
-    gcp_vm.sshable.cmd("sudo postgres/bin/restart")
+  label def stop_server
+    decr_stop_server
+    gcp_vm.incr_stop_vm
     hop_wait
+  end
+
+  label def start_server
+    decr_start_server
+    gcp_vm.incr_start_vm
+    hop_wait_db_available
+  end
+
+  label def restart_server
+    decr_restart
+    incr_stop_server
+    incr_start_server
   end
 
   def available?

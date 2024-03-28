@@ -112,8 +112,8 @@
           </form>
         </div>
         <div class="px-4 py-5 sm:p-6">
-          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/update_extension" %>" role="form" method="POST">
-            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/update_extension") %>
+          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/update-extension" %>" role="form" method="POST">
+            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/update-extension") %>
             <div class="sm:flex sm:items-center sm:justify-between">
               <div>
                 <h3 class="text-base font-semibold leading-6 text-gray-900">Update Lantern/Extras extensions</h3>
@@ -158,8 +158,8 @@
           </form>
         </div>
         <div class="px-4 py-5 sm:p-6">
-          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/update_image" %>" role="form" method="POST">
-            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/update_image") %>
+          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/update-image" %>" role="form" method="POST">
+            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/update-image") %>
             <div class="sm:flex sm:items-center sm:justify-between">
               <div>
                 <h3 class="text-base font-semibold leading-6 text-gray-900">Update Container Image</h3>
@@ -219,8 +219,8 @@
         </div>
         <% if !@pg[:domain?] %>
         <div class="px-4 py-5 sm:p-6">
-          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/add_domain" %>" role="form" method="POST">
-            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/add_domain") %>
+          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/add-domain" %>" role="form" method="POST">
+            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/add-domain") %>
             <div class="sm:flex sm:items-center sm:justify-between">
               <div>
                 <h3 class="text-base font-semibold leading-6 text-gray-900">Add Domain</h3>
@@ -252,8 +252,8 @@
         </div>
         <% end %>
         <div class="px-4 py-5 sm:p-6">
-          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/update_rhizome" %>" role="form" method="POST">
-            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/update_rhizome") %>
+          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/update-rhizome" %>" role="form" method="POST">
+            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/update-rhizome") %>
             <div class="sm:flex sm:items-center sm:justify-between">
               <div>
                 <h3 class="text-base font-semibold leading-6 text-gray-900">Update Rhizome</h3>

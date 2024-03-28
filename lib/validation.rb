@@ -69,6 +69,16 @@ module Validation
     fail ValidationFailed.new({user: msg}) unless os_user_name&.match(ALLOWED_OS_USER_NAME_PATTERN)
   end
 
+  def self.validate_org_id(org_id)
+    msg = "org_id should be number"
+    fail ValidationFailed.new({org_id: msg}) unless org_id.to_s.match?  /^\d+$/
+  end
+
+  def self.validate_version(version, field_name)
+    msg = "#{field_name} should not be empty"
+    fail ValidationFailed.new({version: msg}) unless version && !version.to_s.strip.empty?
+  end
+
   def self.validate_storage_volumes(storage_volumes, boot_disk_index)
     allowed_keys = [:encrypted, :size_gib, :boot, :skip_sync]
     fail ValidationFailed.new({storage_volumes: "At least one storage volume is required."}) if storage_volumes.empty?
@@ -103,6 +113,11 @@ module Validation
   rescue ArgumentError
     msg = "\"#{date}\" is not a valid date for \"#{param}\"."
     fail ValidationFailed.new({param => msg})
+  end
+
+  def self.validate_lantern_storage_size(current_storage_size_gib, storage_size_gib)
+    msg = "storage_size_gib can not be smaller than #{current_storage_size_gib}"
+    fail ValidationFailed.new({storage_size_gib: msg}) unless current_storage_size_gib < storage_size_gib
   end
 
   def self.validate_postgres_superuser_password(original_password, repeat_password = nil)
