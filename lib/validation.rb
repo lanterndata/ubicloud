@@ -92,12 +92,12 @@ module Validation
     }
   end
 
-  def self.validate_postgres_size(size)
-    unless (postgres_size = Option::PostgresSizes.find { _1.name == size })
-      fail ValidationFailed.new({size: "\"#{size}\" is not a valid PostgreSQL database size. Available sizes: #{Option::PostgresSizes.map(&:name)}"})
-    end
-    postgres_size
-  end
+  # def self.validate_postgres_size(size)
+  #   unless (postgres_size = Option::PostgresSizes.find { _1.name == size })
+  #     fail ValidationFailed.new({size: "\"#{size}\" is not a valid PostgreSQL database size. Available sizes: #{Option::PostgresSizes.map(&:name)}"})
+  #   end
+  #   postgres_size
+  # end
 
   def self.validate_lantern_size(size)
     unless (postgres_size = Option::LanternSizes.find { _1.name == size })

@@ -24,6 +24,8 @@ Sequel.migration do
       column :postgres_password, :text, collate: '"C"', null: false
       column :master_host, :text, collate: '"C"'
       column :master_port, Integer
+      column :target_vm_size, :text, collate: '"C"', null: false
+      column :target_storage_size_gib, :bigint, null: false
       foreign_key :vm_id, :gcp_vm, type: :uuid
       column :created_at, :timestamptz, null: false, default: Sequel.lit("now()")
     end

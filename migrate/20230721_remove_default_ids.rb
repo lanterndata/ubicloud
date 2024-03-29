@@ -14,18 +14,6 @@ Sequel.migration do
       set_column_default :id, nil
     end
 
-    alter_table(:vm) do
-      set_column_default :id, nil
-    end
-
-    alter_table(:vm_storage_volume) do
-      set_column_default :id, nil
-    end
-
-    alter_table(:storage_key_encryption_key) do
-      set_column_default :id, nil
-    end
-
     alter_table(:project) do
       set_column_default :id, nil
     end
@@ -38,10 +26,6 @@ Sequel.migration do
       set_column_default :id, nil
     end
 
-    alter_table(:ipsec_tunnel) do
-      set_column_default :id, nil
-    end
-
     alter_table(:accounts) do
       set_column_default :id, nil
     end
@@ -51,22 +35,6 @@ Sequel.migration do
     end
 
     alter_table(:account_jwt_refresh_keys) do
-      set_column_default :id, nil
-    end
-
-    alter_table(:vm_private_subnet) do
-      set_column_default :id, nil
-    end
-
-    alter_table(:address) do
-      set_column_default :id, nil
-    end
-
-    alter_table(:assigned_vm_address) do
-      set_column_default :id, nil
-    end
-
-    alter_table(:assigned_host_address) do
       set_column_default :id, nil
     end
   end

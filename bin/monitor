@@ -3,7 +3,9 @@
 
 require_relative "../loader"
 
-MONITORABLE_RESOURCE_TYPES = [PostgresServer, MinioServer, GithubRunner]
+# TODO
+# MONITORABLE_RESOURCE_TYPES = [LanternServer]
+MONITORABLE_RESOURCE_TYPES = []
 
 sessions = {}
 ssh_threads = {}

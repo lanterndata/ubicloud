@@ -85,7 +85,6 @@ def setup_initial_compose_file()
   mem_limit = "#{mem_mb}MB"
 
   map = {
-    "version" => "3",
     "services" => {
       "postgresql" => {
         "image" => $configure_hash["container_image"],

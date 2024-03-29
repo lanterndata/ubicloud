@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 require "googleauth"
+require "excon"
 require_relative "../../config"
+
 class Hosting::GcpApis
   def initialize
     @project = Config.gcp_project_id

@@ -27,19 +27,5 @@ Sequel.migration do
       column :host, :text, collate: '"C"', null: false, unique: true
       column :private_key, :text, collate: '"C"'
     end
-
-    create_table(:vm_host) do
-      foreign_key :id, :sshable, type: :uuid, primary_key: true
-      column :allocation_state, :allocation_state, default: "unprepared", null: false
-      column :ip6, :inet, unique: true
-      column :net6, :cidr, unique: true
-    end
-
-    create_table(:vm) do
-      column :id, :uuid, primary_key: true, default: Sequel.lit("gen_random_uuid()")
-      column :ephemeral_net6, :cidr, unique: true
-
-      foreign_key :vm_host_id, :vm_host, type: :uuid
-    end
   end
 end

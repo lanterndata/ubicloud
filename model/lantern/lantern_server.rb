@@ -10,6 +10,7 @@ class LanternServer < Sequel::Model
   dataset_module Authorization::Dataset
   dataset_module Pagination
 
+  include HealthMonitorMethods
   include ResourceMethods
   include SemaphoreMethods
   include Authorization::HyperTagMethods

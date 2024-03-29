@@ -19,33 +19,6 @@
             <%== render(
               "layouts/sidebar/item",
               locals: {
-                name: "Compute",
-                url: "#{@project_data[:path]}/vm",
-                is_active: request.path.start_with?("#{@project_data[:path]}/vm"),
-                icon: "hero-server-stack"
-              }
-            ) %>
-            <%== render(
-              "layouts/sidebar/item",
-              locals: {
-                name: "Networking",
-                url: "#{@project_data[:path]}/private-subnet",
-                is_active: request.path.start_with?("#{@project_data[:path]}/private-subnet"),
-                icon: "hero-globe-alt"
-              }
-            ) %>
-            <%== render(
-              "layouts/sidebar/item",
-              locals: {
-                name: "PostgreSQL",
-                url: "#{@project_data[:path]}/postgres",
-                is_active: request.path.start_with?("#{@project_data[:path]}/postgres"),
-                icon: "hero-circle-stack"
-              }
-            ) %>
-            <%== render(
-              "layouts/sidebar/item",
-              locals: {
                 name: "Lantern",
                 url: "#{@project_data[:path]}/lantern",
                 is_active: request.path.start_with?("#{@project_data[:path]}/lantern"),
