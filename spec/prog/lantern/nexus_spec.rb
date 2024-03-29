@@ -66,7 +66,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.instance_type).to eq("writer")
       expect(lantern_server.db_name).to eq("testdb")
       expect(lantern_server.db_user).to eq("test")
-      expect(lantern_server.gcp_vm.cores).to eq(1)
+      expect(lantern_server.gcp_vm.cores).to eq(2)
     end
   end
 

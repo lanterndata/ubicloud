@@ -71,7 +71,7 @@ module Validation
 
   def self.validate_org_id(org_id)
     msg = "org_id should be number"
-    fail ValidationFailed.new({org_id: msg}) unless org_id.to_s.match?  /^\d+$/
+    fail ValidationFailed.new({org_id: msg}) unless org_id.to_s.match? (/^\d+$/)
   end
 
   def self.validate_version(version, field_name)

@@ -94,15 +94,19 @@ class CloverWeb < Roda
 
   plugin :rodauth do
     enable :argon2, :change_login, :change_password, :close_account,
-      :lockout, :login, :logout, :remember, :reset_password,
+      :lockout, :login, :logout, :remember,
       :disallow_password_reuse, :password_grace_period, :active_sessions,
       :verify_login_change, :change_password_notify, :confirm_password,
       :otp, :webauthn, :recovery_codes
 
+    unless Config.production?
+      enable :create_account, :reset_password
+    end
+
     title_instance_variable :@page_title
 
     # :nocov:
-    unless Config.development?
+    if Config.test?
       enable :disallow_common_passwords, :verify_account
 
       email_from Config.mail_from
@@ -145,33 +149,35 @@ class CloverWeb < Roda
       end
     end
 
-    # create_account_view { view "auth/create_account", "Create Account" }
-    # create_account_redirect { login_route }
-    # create_account_set_password? true
     password_confirm_label "Password Confirmation"
-    # before_create_account do
-    #   account[:id] = Account.generate_uuid
-    #   account[:name] = param("name")
-    # end
-    # after_create_account do
-    #   Account[account_id].create_project_with_default_policy("Default")
-    # end
+    unless Config.production?
+      create_account_view { view "auth/create_account", "Create Account" }
+      create_account_redirect { login_route }
+      create_account_set_password? true
+      before_create_account do
+        account[:id] = Account.generate_uuid
+        account[:name] = param("name")
+      end
+      after_create_account do
+        Account[account_id].create_project_with_default_policy("Default")
+      end
 
-    reset_password_view { view "auth/reset_password", "Request Password" }
-    reset_password_request_view { view "auth/reset_password_request", "Request Password Reset" }
-    reset_password_redirect { login_route }
-    reset_password_email_sent_redirect { login_route }
-    reset_password_email_recently_sent_redirect { reset_password_request_route }
+      reset_password_view { view "auth/reset_password", "Request Password" }
+      reset_password_request_view { view "auth/reset_password_request", "Request Password Reset" }
+      reset_password_redirect { login_route }
+      reset_password_email_sent_redirect { login_route }
+      reset_password_email_recently_sent_redirect { reset_password_request_route }
 
-    send_reset_password_email do
-      user = Account[account_id]
-      scope.send_email(user.email, "Reset Ubicloud Account Password",
-        greeting: "Hello #{user.name},",
-        body: ["We received a request to reset your account password. To reset your password, click the button below.",
-          "If you did not initiate this request, no action is needed. Your account remains secure.",
-          "For any questions or assistance, reach out to our team at support@ubicloud.com."],
-        button_title: "Reset Password",
-        button_link: reset_password_email_link)
+      send_reset_password_email do
+        user = Account[account_id]
+        scope.send_email(user.email, "Reset Ubicloud Account Password",
+          greeting: "Hello #{user.name},",
+          body: ["We received a request to reset your account password. To reset your password, click the button below.",
+            "If you did not initiate this request, no action is needed. Your account remains secure.",
+            "For any questions or assistance, reach out to our team at support@ubicloud.com."],
+          button_title: "Reset Password",
+          button_link: reset_password_email_link)
+      end
     end
 
     change_password_redirect "/account/change-password"
