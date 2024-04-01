@@ -4,7 +4,7 @@
   <%== render(
     "components/breadcrumb",
     locals: {
-      back: "#{@project_data[:path]}/postgres",
+      back: "#{@project_data[:path]}/lantern",
       parts: [
         %w[Projects /project],
         [@project_data[:name], @project_data[:path]],
@@ -286,7 +286,7 @@
                 locals: {
                   url: request.path,
                   confirmation: @pg[:name],
-                  redirect: "#{@project_data[:path]}/postgres"
+                  redirect: "#{@project_data[:path]}/lantern"
                 }
               ) %>
             </div>

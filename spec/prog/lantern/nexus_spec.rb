@@ -442,6 +442,11 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect { nx.wait }.to hop("update_rhizome")
     end
 
+    it "should hop to destroy" do
+      nx.incr_destroy
+      expect { nx.wait }.to hop("destroy")
+    end
+
     it "should nap 30" do
       expect { nx.wait }.to nap(30)
     end

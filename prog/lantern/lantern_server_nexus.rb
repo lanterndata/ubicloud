@@ -272,6 +272,9 @@ SQL
     # when_checkup_set? do
     #   hop_unavailable if !available?
     # end
+    when_destroy_set? do
+      hop_destroy
+    end
 
     when_restart_server_set? do
       hop_restart_server
