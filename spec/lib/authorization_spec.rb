@@ -130,13 +130,13 @@ RSpec.describe Authorization do
   #     expect(projects[0].hyper_tag_name).to eq("project/#{projects[0].ubid}")
   #   end
   #
-  #   it "hyper_tag_name error" do
-  #     c = Class.new(Sequel::Model) do
-  #       include Authorization::HyperTagMethods
-  #     end
-  #
-  #     expect { c.new.hyper_tag_name }.to raise_error NoMethodError
-  #   end
+  it "hyper_tag_name error" do
+    c = Class.new(Sequel::Model) do
+      include Authorization::HyperTagMethods
+    end
+
+    expect { c.new.hyper_tag_name }.to raise_error NoMethodError
+  end
   #
   #   it "hyper_tag methods" do
   #     project = Project.create_with_id(name: "test")
@@ -153,20 +153,22 @@ RSpec.describe Authorization do
   #     expect(AppliedTag.where(access_tag_id: tag.id).count).to eq(0)
   #   end
   #
-  #   it "associate/dissociate with project" do
-  #     project = Project.create_with_id(name: "test")
-  #     project.associate_with_project(project)
-  #     users[0].associate_with_project(project)
-  #
-  #     expect(project.applied_access_tags.count).to eq(1)
-  #     expect(users[0].applied_access_tags.count).to eq(2)
-  #
-  #     users[0].dissociate_with_project(project)
-  #     project.dissociate_with_project(project)
-  #
-  #     expect(project.reload.applied_access_tags.count).to eq(0)
-  #     expect(users[0].reload.applied_access_tags.count).to eq(0)
-  #   end
+    it "associate/dissociate with project" do
+      project = Project.create_with_id(name: "test")
+      project.associate_with_project(project)
+      expect(project.associate_with_project(nil)).to be_nil
+      users[0].associate_with_project(project)
+
+      expect(project.applied_access_tags.count).to eq(1)
+      expect(users[0].applied_access_tags.count).to eq(2)
+
+      users[0].dissociate_with_project(project)
+      expect(project.dissociate_with_project(nil)).to be_nil
+      project.dissociate_with_project(project)
+
+      expect(project.reload.applied_access_tags.count).to eq(0)
+      expect(users[0].reload.applied_access_tags.count).to eq(0)
+    end
   #
   #   it "does not associate/dissociate with nil project" do
   #     project = Project.create_with_id(name: "test")

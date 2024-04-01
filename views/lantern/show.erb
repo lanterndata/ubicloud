@@ -46,11 +46,11 @@
   <% if @pg[:primary?] %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
-        <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/reset-superuser-password" %>" role="form" method="POST">
-          <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/reset-superuser-password") %>
+        <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/reset-user-password" %>" role="form" method="POST">
+          <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/reset-user-password") %>
           <div class="space-y-4">
             <div>
-              <h2 class="text-lg font-medium leading-6 text-gray-900">Reset superuser password</h2>
+              <h2 class="text-lg font-medium leading-6 text-gray-900">Reset user password</h2>
             </div>
             <div class="grid grid-cols-12 gap-6">
               <div class="col-span-12 sm:col-span-5">
@@ -151,7 +151,7 @@
               </div>
               <div id="lantern-extension-update-<%=@pg[:ubid]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
                 <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
-                  <%== render("components/form/submit_button", locals: { text: "Update", extra_class: "update-btn" }) %>
+                  <%== render("components/form/submit_button", locals: { text: "Update Extensions", extra_class: "update-btn" }) %>
                 </div>
               </div>
             </div>
@@ -172,7 +172,7 @@
                   "components/form/text",
                   locals: {
                     label: "Lantern version",
-                    name: "lantern_version",
+                    name: "img_lantern_version",
                     type: "text",
                     attributes: {
                       required: true,
@@ -186,7 +186,7 @@
                   "components/form/text",
                   locals: {
                     label: "Lantern Extras version",
-                    name: "extras_version",
+                    name: "img_extras_version",
                     type: "text",
                     attributes: {
                       required: true,
@@ -200,7 +200,7 @@
                   "components/form/text",
                   locals: {
                     label: "Minor version",
-                    name: "minor_version",
+                    name: "img_minor_version",
                     type: "text",
                     attributes: {
                       required: true,
@@ -211,7 +211,7 @@
               </div>
               <div id="lantern-image-update-<%=@pg[:ubid]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
                 <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
-                  <%== render("components/form/submit_button", locals: { text: "Update", extra_class: "restart-btn" }) %>
+                  <%== render("components/form/submit_button", locals: { text: "Update Image", extra_class: "restart-btn" }) %>
                 </div>
               </div>
             </div>
@@ -263,7 +263,7 @@
               </div>
               <div id="lantern-rhizome-<%=@pg[:ubid]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
                 <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
-                  <%== render("components/form/submit_button", locals: { text: "Update", extra_class: "update-btn" }) %>
+                  <%== render("components/form/submit_button", locals: { text: "Update rhizome", extra_class: "update-btn" }) %>
                 </div>
               </div>
             </div>

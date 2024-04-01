@@ -109,6 +109,10 @@ class Prog::Test < Prog::Base
     hop_popper
   end
 
+  label def before_run
+    return
+  end
+
   label def bad_pop
     pop nil
   end

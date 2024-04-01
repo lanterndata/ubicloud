@@ -43,12 +43,12 @@ class CloverApi
         Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
         Authorization.authorize(@current_user.id, "Postgres:view", pg.id)
 
-        #TODO
         DB.transaction do
           if r.params["storage_size_gib"]
-            Validation.validate_lantern_size(pg.target_storage_size_gib, r.params["storage_size_gib"])
-            pg.update(target_storage_size_gib: r.params["storage_size_gib"])
-            GcpVm.dataset.where(id: pg.vm_id).update(storage_size_gib: r.params["storage_size_gib"])
+            storage_size_gib = r.params["storage_size_gib"].to_i
+            Validation.validate_lantern_storage_size(pg.target_storage_size_gib, storage_size_gib)
+            pg.update(target_storage_size_gib: storage_size_gib)
+            GcpVm.dataset.where(id: pg.vm_id).update(storage_size_gib: storage_size_gib)
             pg.incr_update_storage_size
           end
 
@@ -186,15 +186,7 @@ class CloverApi
         postgres_password: r.params["postgres_password"]
       )
       pg = LanternServer[st.id]
-
-      unless pg
-        response.status = 404
-        r.halt
-      end
-
-      pg = serialize(pg, :detailed)
-
-      pg
+      serialize(pg, :detailed)
     end
   end
 end

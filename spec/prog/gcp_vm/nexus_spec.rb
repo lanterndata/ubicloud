@@ -79,6 +79,14 @@ RSpec.describe Prog::GcpVm::Nexus do
       expect { nx.wait_create_vm }.to hop("wait_ipv4")
     end
 
+    it "naps if ip4 is not yet reserved" do
+      stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+      stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm").to_return(status: 200, body: JSON.dump({"status" => "RUNNING"}), headers: {"Content-Type" => "application/json"})
+      stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/regions/us-central1/addresses").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+      stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/test-project/regions/us-central1/addresses/dummy-vm-addr").to_return(status: 200, body: JSON.dump({status: "CREATING", address: "1.1.1.1"}), headers: {"Content-Type" => "application/json"})
+      expect { nx.wait_ipv4 }.to nap(10)
+    end
+
     it "hops to wait_sshable after assigning ipv4" do
       sshable = instance_double(Sshable)
       expect(gcp_vm).to receive(:sshable).and_return(sshable)
@@ -91,6 +99,93 @@ RSpec.describe Prog::GcpVm::Nexus do
       expect(gcp_vm).to receive(:update).with({:has_static_ipv4 => true})
       expect(sshable).to receive(:update).with({:host => "1.1.1.1"})
       expect { nx.wait_ipv4 }.to hop("wait_sshable")
+    end
+  end
+
+  describe "#wait_sshable" do
+    it "naps if sshable not ready" do
+      sshable = instance_double(Sshable, host: "1.1.1.1")
+      expect(gcp_vm).to receive(:sshable).and_return(sshable)
+      expect(Socket).to receive(:tcp).with("1.1.1.1", 22, connect_timeout: 1).and_raise Errno::ECONNREFUSED
+      expect { nx.wait_sshable }.to nap(1)
+    end
+
+    it "update display_state to running when sshable ready" do
+      sshable = instance_double(Sshable, host: "1.1.1.1")
+      expect(gcp_vm).to receive(:sshable).and_return(sshable)
+      expect(gcp_vm).to receive(:update).with({:display_state => "running"})
+      expect(Socket).to receive(:tcp).with("1.1.1.1", 22, connect_timeout: 1)
+      expect { nx.wait_sshable }.to hop("wait")
+    end
+  end
+
+  describe "#start_vm" do
+    it "hops to wait_sshable after run" do
+      expect(gcp_vm).to receive(:update).with({:display_state => "starting"})
+      expect(gcp_vm).to receive(:update).with({:display_state => "running"})
+      stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+      stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm/start").to_return(status: 200, body: "", headers: {})
+      expect { nx.start_vm }.to hop("wait_sshable")
+    end
+  end
+
+  describe "#stop_vm" do
+    it "hops to wait after stop" do
+      expect(gcp_vm).to receive(:update).with({:display_state => "stopping"})
+      expect(gcp_vm).to receive(:update).with({:display_state => "stopped"})
+      stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+      stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm/stop").to_return(status: 200, body: "", headers: {})
+      expect { nx.stop_vm }.to hop("wait")
+    end
+  end
+
+  describe "#destroy" do
+    it "exits after run destroy" do
+      expect(gcp_vm).to receive(:has_static_ipv4).and_return(false)
+      expect(gcp_vm).to receive(:update).with({:display_state => "deleting"})
+      expect(gcp_vm).to receive(:destroy)
+      stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+      stub_request(:delete, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm").to_return(status: 200, body: "", headers: {})
+      expect { nx.destroy }.to exit({"msg" => "gcp vm deleted"})
+    end
+
+    it "release ip4 if exists" do
+      expect(gcp_vm).to receive(:has_static_ipv4).and_return(true)
+      expect(gcp_vm).to receive(:update).with({:display_state => "deleting"})
+      expect(gcp_vm).to receive(:destroy)
+      stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+      stub_request(:delete, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm").to_return(status: 200, body: "", headers: {})
+      stub_request(:delete, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/regions/us-central1/addresses/dummy-vm-addr")
+      expect { nx.destroy }.to exit({"msg" => "gcp vm deleted"})
+    end
+  end
+
+  describe "#wait" do
+    it "hops to stop_vm" do
+      expect(nx).to receive(:when_stop_vm_set?).and_yield
+      expect { nx.wait }.to hop("stop_vm")
+    end
+
+    it "hops to start_vm" do
+      expect(nx).to receive(:when_start_vm_set?).and_yield
+      expect { nx.wait }.to hop("start_vm")
+    end
+
+    it "hops to destroy" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect { nx.wait }.to hop("destroy")
+    end
+
+    it "naps 30s" do
+      expect { nx.wait }.to nap(30)
+    end
+  end
+
+  describe "properties" do
+    it "should have valid host" do
+      sshable = instance_double(Sshable, host: "1.1.1.1")
+      expect(gcp_vm).to receive(:sshable).and_return(sshable)
+      expect(nx.host).to eq("1.1.1.1")
     end
   end
 end

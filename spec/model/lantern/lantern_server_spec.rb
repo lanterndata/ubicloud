@@ -7,184 +7,40 @@ RSpec.describe LanternServer do
     described_class.new { _1.id = "c068cac7-ed45-82db-bf38-a003582b36ee" }
   }
 
-  # let(:resource) {
-  #   instance_double(
-  #     PostgresResource,
-  #     representative_server: postgres_server,
-  #     identity: "pgubid.postgres.ubicloud.com",
-  #     ha_type: PostgresResource::HaType::NONE
-  #   )
-  # }
-  #
-  # let(:vm) {
-  #   instance_double(
-  #     Vm,
-  #     sshable: instance_double(Sshable),
-  #     mem_gib: 8,
-  #     ephemeral_net4: "1.2.3.4",
-  #     ephemeral_net6: NetAddr::IPv6Net.parse("fdfa:b5aa:14a3:4a3d::/64"),
-  #     private_subnets: [
-  #       instance_double(
-  #         PrivateSubnet,
-  #         net4: NetAddr::IPv4Net.parse("172.0.0.0/26"),
-  #         net6: NetAddr::IPv6Net.parse("fdfa:b5aa:14a3:4a3d::/64")
-  #       )
-  #     ]
-  #   )
-  # }
-  #
-  # before do
-  #   allow(postgres_server).to receive_messages(resource: resource, vm: vm)
-  # end
-  #
-  # describe "#configure" do
-  #   before do
-  #     allow(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, blob_storage: "dummy-blob-storage"))
-  #   end
-  #
-  #   it "does not set archival related configs if blob storage is not configured" do
-  #     expect(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, blob_storage: nil))
-  #     expect(postgres_server.configure_hash[:configs]).not_to include(:archive_mode, :archive_timeout, :archive_command, :synchronous_standby_names, :primary_conninfo, :recovery_target_time, :restore_command)
-  #   end
-  #
-  #   it "sets configs that are specific to primary" do
-  #     postgres_server.timeline_access = "push"
-  #     expect(postgres_server.configure_hash[:configs]).to include(:archive_mode, :archive_timeout, :archive_command)
-  #   end
-  #
-  #   it "sets synchronous_standby_names for sync replication mode" do
-  #     postgres_server.timeline_access = "push"
-  #     expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
-  #     expect(resource).to receive(:servers).and_return([
-  #       postgres_server,
-  #       instance_double(described_class, ubid: "pgubidstandby1", standby?: true, synchronization_status: "catching_up"),
-  #       instance_double(described_class, ubid: "pgubidstandby2", standby?: true, synchronization_status: "ready")
-  #     ])
-  #
-  #     expect(postgres_server.configure_hash[:configs]).to include(synchronous_standby_names: "'ANY 1 (pgubidstandby2)'")
-  #   end
-  #
-  #   it "sets synchronous_standby_names as empty if there is no caught up standby" do
-  #     postgres_server.timeline_access = "push"
-  #     expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
-  #     expect(resource).to receive(:servers).and_return([
-  #       postgres_server,
-  #       instance_double(described_class, ubid: "pgubidstandby1", standby?: true, synchronization_status: "catching_up"),
-  #       instance_double(described_class, ubid: "pgubidstandby2", standby?: true, synchronization_status: "catching_up")
-  #     ])
-  #
-  #     expect(postgres_server.configure_hash[:configs]).not_to include(:synchronous_standby_names)
-  #   end
-  #
-  #   it "sets configs that are specific to standby" do
-  #     postgres_server.timeline_access = "fetch"
-  #     expect(postgres_server).to receive(:doing_pitr?).and_return(false).at_least(:once)
-  #     expect(resource).to receive(:replication_connection_string)
-  #     expect(postgres_server.configure_hash[:configs]).to include(:primary_conninfo, :restore_command)
-  #   end
-  #
-  #   it "sets configs that are specific to restoring servers" do
-  #     postgres_server.timeline_access = "fetch"
-  #     expect(resource).to receive(:restore_target)
-  #     expect(postgres_server.configure_hash[:configs]).to include(:recovery_target_time, :restore_command)
-  #   end
-  # end
-  #
-  # describe "#failover_target" do
-  #   before do
-  #     postgres_server.timeline_access = "push"
-  #     expect(resource).to receive(:servers).and_return([
-  #       postgres_server,
-  #       instance_double(described_class, ubid: "pgubidstandby1", standby?: true, strand: instance_double(Strand, label: "wait_catch_up")),
-  #       instance_double(described_class, ubid: "pgubidstandby2", standby?: true, run_query: "1/5", strand: instance_double(Strand, label: "wait")),
-  #       instance_double(described_class, ubid: "pgubidstandby3", standby?: true, run_query: "1/10", strand: instance_double(Strand, label: "wait"))
-  #     ])
-  #   end
-  #
-  #   it "returns the standby with highest lsn in sync replication" do
-  #     expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
-  #     expect(postgres_server.failover_target.ubid).to eq("pgubidstandby3")
-  #   end
-  #
-  #   it "returns nil if last_known_lsn in unknown for async replication" do
-  #     expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
-  #     expect(postgres_server).to receive(:lsn_monitor).and_return(instance_double(PostgresLsnMonitor, last_known_lsn: nil))
-  #     expect(postgres_server.failover_target).to be_nil
-  #   end
-  #
-  #   it "returns nil if lsn difference is too hign for async replication" do
-  #     expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
-  #     expect(postgres_server).to receive(:lsn_monitor).and_return(instance_double(PostgresLsnMonitor, last_known_lsn: "2/0")).twice
-  #     expect(postgres_server.failover_target).to be_nil
-  #   end
-  #
-  #   it "returns the standby with highest lsn if lsn difference is not high in async replication" do
-  #     expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
-  #     expect(postgres_server).to receive(:lsn_monitor).and_return(instance_double(PostgresLsnMonitor, last_known_lsn: "1/11")).twice
-  #     expect(postgres_server.failover_target.ubid).to eq("pgubidstandby3")
-  #   end
-  # end
-  #
-  # it "initiates a new health monitor session" do
-  #   forward = instance_double(Net::SSH::Service::Forward)
-  #   expect(forward).to receive(:local_socket)
-  #   session = instance_double(Net::SSH::Connection::Session)
-  #   expect(session).to receive(:forward).and_return(forward)
-  #   expect(postgres_server.vm.sshable).to receive(:start_fresh_session).and_return(session)
-  #   postgres_server.init_health_monitor_session
-  # end
-  #
-  # it "checks pulse" do
-  #   session = {
-  #     ssh_session: instance_double(Net::SSH::Connection::Session),
-  #     db_connection: DB
-  #   }
-  #   pulse = {
-  #     reading: "down",
-  #     reading_rpt: 5,
-  #     reading_chg: Time.now - 30
-  #   }
-  #
-  #   expect(postgres_server).not_to receive(:incr_checkup)
-  #   postgres_server.check_pulse(session: session, previous_pulse: pulse)
-  # end
-  #
-  # it "increments checkup semaphore if pulse is down for a while" do
-  #   session = {
-  #     ssh_session: instance_double(Net::SSH::Connection::Session),
-  #     db_connection: instance_double(Sequel::Postgres::Database)
-  #   }
-  #   pulse = {
-  #     reading: "down",
-  #     reading_rpt: 5,
-  #     reading_chg: Time.now - 30
-  #   }
-  #
-  #   expect(session[:db_connection]).to receive(:[]).and_raise(Sequel::DatabaseConnectionError)
-  #   expect(postgres_server).to receive(:incr_checkup)
-  #   postgres_server.check_pulse(session: session, previous_pulse: pulse)
-  # end
-  #
-  # it "uses pg_current_wal_lsn to track lsn for primaries" do
-  #   session = {
-  #     ssh_session: instance_double(Net::SSH::Connection::Session),
-  #     db_connection: instance_double(Sequel::Postgres::Database)
-  #   }
-  #   pulse = {
-  #     reading: "down",
-  #     reading_rpt: 5,
-  #     reading_chg: Time.now - 30
-  #   }
-  #
-  #   expect(session[:db_connection]).to receive(:[]).with("SELECT pg_current_wal_lsn() AS lsn").and_raise(Sequel::DatabaseConnectionError)
-  #   expect(postgres_server).to receive(:primary?).and_return(true)
-  #
-  #   expect(postgres_server).to receive(:incr_checkup)
-  #   postgres_server.check_pulse(session: session, previous_pulse: pulse)
-  # end
-  #
-  # it "runs query on vm" do
-  #   expect(postgres_server.vm.sshable).to receive(:cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv", stdin: "SELECT 1").and_return("1\n")
-  #   expect(postgres_server.run_query("SELECT 1")).to eq("1")
-  # end
+  let(:gcp_vm) {
+    instance_double(
+      GcpVm,
+      sshable: instance_double(Sshable),
+      mem_gib: 8
+    )
+  }
+
+  before do
+    allow(lantern_server).to receive(:gcp_vm).and_return(gcp_vm)
+  end
+
+  it "Shows display state" do
+    expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "setup domain"))
+    expect(lantern_server.display_state).to eq("domain setup")
+
+    expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "setup_ssl")).twice
+    expect(lantern_server.display_state).to eq("ssl setup")
+
+    expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "update_extension")).exactly(3).times
+    expect(lantern_server.display_state).to eq("updating")
+
+    expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait")).exactly(4).times
+    expect(lantern_server.display_state).to eq("running")
+
+    expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "destroy")).exactly(5).times
+    expect(lantern_server.display_state).to eq("deleting")
+  end
+  it "returns name from ubid" do
+    expect(LanternServer.ubid_to_name(lantern_server.id)).to eq("c068cac7")
+  end
+
+  it "runs query on vm" do
+    expect(lantern_server.gcp_vm.sshable).to receive(:cmd).with("sudo lantern/bin/exec", stdin: "SELECT 1").and_return("1\n")
+    expect(lantern_server.run_query("SELECT 1")).to eq("1")
+  end
 end

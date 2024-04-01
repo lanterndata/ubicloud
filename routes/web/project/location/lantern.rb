@@ -24,45 +24,41 @@ class CloverWeb
         return {message: "Deleting #{pg.name}"}.to_json
       end
 
-      r.post "reset-superuser-password" do
+      r.post "reset-user-password" do
         Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
         Authorization.authorize(@current_user.id, "Postgres:view", pg.id)
 
-        unless pg.representative_server.primary?
-          flash["error"] = "Superuser password cannot be updated during restore!"
-          return redirect_back_with_inputs
-        end
-
         Validation.validate_postgres_superuser_password(r.params["original_password"], r.params["repeat_password"])
 
-        pg.update(postgres_password: r.params["original_password"])
-        pg.representative_server.incr_update_superuser_password
+        pg.update(db_user_password: r.params["original_password"])
+        pg.incr_update_user_password
 
         flash["notice"] = "The superuser password will be updated in a few seconds"
-
         r.redirect "#{@project.path}#{pg.path}"
       end
 
       r.post "update-extension" do
         Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
 
+        pg.incr_update_rhizome
+
         if r.params["lantern_version"] != pg.lantern_version
           pg.update(lantern_version: r.params["lantern_version"])
-          pg.incr_update_rhizome
           pg.incr_update_lantern_extension
         end
+
         if r.params["extras_version"] != pg.extras_version
           pg.update(extras_version: r.params["extras_version"])
-          pg.incr_update_rhizome
           pg.incr_update_extras_extension
         end
+
         r.redirect "#{@project.path}#{pg.path}"
       end
 
       r.post "update-image" do
         Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
 
-        pg.update(lantern_version: r.params["lantern_version"] || pg.lantern_version, extras_version: r.params["extras_version"] || pg.extras_version, minor_version: r.params["minor_version"] || pg.minor_version)
+        pg.update(lantern_version: r.params["img_lantern_version"] || pg.lantern_version, extras_version: r.params["img_extras_version"] || pg.extras_version, minor_version: r.params["img_minor_version"] || pg.minor_version)
         pg.incr_update_rhizome
         pg.incr_update_image
         r.redirect "#{@project.path}#{pg.path}"

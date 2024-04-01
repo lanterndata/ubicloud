@@ -100,7 +100,9 @@ class CloverWeb < Roda
       :otp, :webauthn, :recovery_codes
 
     unless Config.production?
+      # :nocov:
       enable :create_account, :reset_password
+      # :nocov:
     end
 
     title_instance_variable :@page_title
@@ -151,6 +153,7 @@ class CloverWeb < Roda
 
     password_confirm_label "Password Confirmation"
     unless Config.production?
+      # :nocov:
       create_account_view { view "auth/create_account", "Create Account" }
       create_account_redirect { login_route }
       create_account_set_password? true
@@ -178,6 +181,7 @@ class CloverWeb < Roda
           button_title: "Reset Password",
           button_link: reset_password_email_link)
       end
+      # :nocov:
     end
 
     change_password_redirect "/account/change-password"
@@ -324,9 +328,6 @@ class CloverWeb < Roda
     r.public
     r.assets
 
-    r.on "webhook" do
-      r.hash_branches(:webhook_prefix)
-    end
     check_csrf!
 
     rodauth.load_memory

@@ -11,7 +11,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   def_delegators :lantern_server, :gcp_vm
 
   semaphore :initial_provisioning, :update_user_password, :update_lantern_extension, :update_extras_extension, :update_image, :setup_ssl, :add_domain, :update_rhizome, :checkup
-  semaphore :start_server, :stop_server, :restart_server, :configure, :take_over, :destroy
+  semaphore :start_server, :stop_server, :restart_server, :take_over, :destroy, :update_storage_size, :update_vm_size
 
   def self.assemble(
     project_id: nil, lantern_version: "0.2.2", extras_version: "0.1.4", minor_version: "1",
@@ -94,16 +94,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      if strand.label != "destroy"
-        hop_destroy
-      elsif strand.stack.count > 1
-        pop "operation is cancelled due to the destruction of the postgres server"
-      end
-    end
-  end
-
   label def start
     nap 5 unless gcp_vm.strand.label == "wait"
 
@@ -121,23 +111,19 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   end
 
   label def wait_update_rhizome
-    reap
-    if leaf?
-      when_update_lantern_extension_set? do
-        hop_update_lantern_extension
-      end
-
-      when_update_extras_extension_set? do
-        hop_update_extras_extension
-      end
-
-      when_update_image_set? do
-        hop_update_image
-      end
-
-      hop_wait
+    when_update_lantern_extension_set? do
+      hop_update_lantern_extension
     end
-    donate
+
+    when_update_extras_extension_set? do
+      hop_update_extras_extension
+    end
+
+    when_update_image_set? do
+      hop_update_image
+    end
+
+    hop_wait
   end
 
   label def bootstrap_rhizome
@@ -196,11 +182,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     nap 10
   end
 
-  label def configure
-    decr_configure
-    nap 5
-  end
-
   label def update_lantern_extension
     gcp_vm.sshable.cmd("sudo lantern/bin/update_lantern", stdin: JSON.generate({
       version: lantern_server.lantern_version
@@ -254,7 +235,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       domain: lantern_server.gcp_vm.domain,
     }))
     decr_setup_ssl
-    hop_wait
+    hop_wait_db_available
   end
 
   label def update_user_password
@@ -288,9 +269,9 @@ SQL
       hop_update_user_password
     end
 
-    when_checkup_set? do
-      hop_unavailable if !available?
-    end
+    # when_checkup_set? do
+    #   hop_unavailable if !available?
+    # end
 
     when_restart_server_set? do
       hop_restart_server
@@ -319,8 +300,8 @@ SQL
     nap 30
   end
 
-  label def unavailable
-    register_deadline(:wait, 10 * 60)
+  # label def unavailable
+  #   register_deadline(:wait, 10 * 60)
 
     # if postgres_server.primary? && (standby = postgres_server.failover_target)
     #   standby.incr_take_over
@@ -328,23 +309,23 @@ SQL
     #   nap 0
     # end
 
-    reap
-    nap 5 unless strand.children.select { _1.prog == "Lantern::LanternServerNexus" && _1.label == "restart" }.empty?
+  #   reap
+  #   nap 5 unless strand.children.select { _1.prog == "Lantern::LanternServerNexus" && _1.label == "restart" }.empty?
+  #
+  #   if available?
+  #     decr_checkup
+  #     hop_wait
+  #   end
+  #
+  #   bud self.class, frame, :restart
+  #   nap 5
+  # end
 
-    if available?
-      decr_checkup
-      hop_wait
-    end
-
-    bud self.class, frame, :restart
-    nap 5
-  end
-
-  label def wait_primary_destroy
-    decr_take_over
+  # label def wait_primary_destroy
+  #   decr_take_over
     # hop_take_over if postgres_server.resource.representative_server.nil?
-    nap 5
-  end
+    # nap 5
+  # end
 
   label def destroy
     decr_destroy
@@ -361,7 +342,7 @@ SQL
 
       gcp_vm.incr_destroy
     end
-    pop "postgres server is deleted"
+    pop "lantern server was deleted"
   end
 
   label def stop_server
@@ -377,9 +358,10 @@ SQL
   end
 
   label def restart_server
-    decr_restart
+    decr_restart_server
     incr_stop_server
     incr_start_server
+    hop_wait
   end
 
   def available?

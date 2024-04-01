@@ -45,17 +45,17 @@ RSpec.describe Clover, "vm" do
       end
     end
 
-    # describe "create" do
-    #   it "success" do
-    #     post "/api/project", {
-    #       name: "test-project",
-    #       provider: "hetzner"
-    #     }
-    #
-    #     expect(last_response.status).to eq(200)
-    #     expect(JSON.parse(last_response.body)["name"]).to eq("test-project")
-    #   end
-    # end
+    describe "create" do
+      it "success" do
+        post "/api/project", {
+          name: "test-project",
+          provider: "gcp"
+        }
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq("test-project")
+      end
+    end
 
     describe "delete" do
       it "success" do
@@ -74,14 +74,14 @@ RSpec.describe Clover, "vm" do
         expect(last_response.status).to eq(204)
       end
 
-      # it "can not delete project when it has resources" do
-      #   Prog::Vm::Nexus.assemble("key", project.id, name: "vm1")
-      #
-      #   delete "api/project/#{project.ubid}"
-      #
-      #   expect(last_response.status).to eq(409)
-      #   expect(JSON.parse(last_response.body)["error"]["message"]).to eq("'#{project.name}' project has some resources. Delete all related resources first.")
-      # end
+      it "can not delete project when it has resources" do
+        Prog::Lantern::LanternServerNexus.assemble(project_id: project.id, name: "vm1", target_vm_size: "standard-2")
+
+        delete "api/project/#{project.ubid}"
+
+        expect(last_response.status).to eq(409)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("'#{project.name}' project has some resources. Delete all related resources first.")
+      end
 
       it "not authorized" do
         u = create_account("test@test.com")

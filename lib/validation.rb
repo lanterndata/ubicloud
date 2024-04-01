@@ -58,11 +58,11 @@ module Validation
     vm_size
   end
 
-  def self.validate_postgres_ha_type(ha_type)
-    unless Option::PostgresHaOptions.find { _1.name == ha_type }
-      fail ValidationFailed.new({ha_type: "\"#{ha_type}\" is not a valid PostgreSQL high availability option. Available options: #{Option::PostgresHaOptions.map(&:name)}"})
-    end
-  end
+  # def self.validate_postgres_ha_type(ha_type)
+  #   unless Option::PostgresHaOptions.find { _1.name == ha_type }
+  #     fail ValidationFailed.new({ha_type: "\"#{ha_type}\" is not a valid PostgreSQL high availability option. Available options: #{Option::PostgresHaOptions.map(&:name)}"})
+  #   end
+  # end
 
   def self.validate_os_user_name(os_user_name)
     msg = "OS user name must only contain lowercase letters, numbers, hyphens and underscore and cannot start with a number or hyphen. It also have max length of 32."
@@ -157,26 +157,5 @@ module Validation
     end
 
     end_port ? [start_port, end_port] : [start_port]
-  end
-
-  def self.validate_request_body(request_body, required_keys, allowed_optional_keys = [])
-    begin
-      request_body_params = JSON.parse(request_body)
-    rescue JSON::ParserError
-      fail ValidationFailed.new({body: "Request body isn't a valid JSON object."})
-    end
-
-    missing_required_keys = required_keys - request_body_params.keys
-    unless missing_required_keys.empty?
-      fail ValidationFailed.new({body: "Request body must include required parameters: #{missing_required_keys.join(", ")}"})
-    end
-
-    allowed_keys = required_keys + allowed_optional_keys
-    unallowed_keys = request_body_params.keys - allowed_keys
-    if unallowed_keys.any?
-      fail ValidationFailed.new({body: "Only following parameters are allowed: #{allowed_keys.join(", ")}"})
-    end
-
-    request_body_params
   end
 end

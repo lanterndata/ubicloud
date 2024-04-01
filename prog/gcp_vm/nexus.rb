@@ -54,20 +54,8 @@ class Prog::GcpVm::Nexus < Prog::Base
     st
   end
 
-  def vm_name
-    @vm_name ||= vm.inhost_name
-  end
-
-  def q_vm
-    vm_name.shellescape
-  end
-
-  def vm_home
-    File.join("", "vm", vm_name)
-  end
-
   def host
-    @host ||= gcp_vm.vm_host
+    @host ||= gcp_vm.host
   end
 
   label def wait_ipv4
@@ -102,12 +90,6 @@ class Prog::GcpVm::Nexus < Prog::Base
     hop_wait_create_vm
   end
 
-  label def run
-    gcp_client = Hosting::GcpApis::new
-    gcp_client.start_vm(gcp_vm.name, gcp_vm.location)
-    hop_wait_sshable
-  end
-
   label def wait_sshable
     addr = gcp_vm.sshable.host
 
@@ -120,7 +102,6 @@ class Prog::GcpVm::Nexus < Prog::Base
     # problems.
 
     begin
-      Clog.emit("Trying to ssh to addr") { {addr: addr.to_s} }
       Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
     rescue SystemCallError
       nap 1
@@ -152,20 +133,20 @@ class Prog::GcpVm::Nexus < Prog::Base
     gcp_vm.update(display_state: "stopping")
 
     gcp_client = Hosting::GcpApis::new
-    gcp_client.stop_vm(gcp_vm.name, gcp_vm.location)
+    gcp_client.stop_vm(gcp_vm.name, "#{gcp_vm.location}-a")
 
     gcp_vm.update(display_state: "stopped")
 
     decr_stop_vm
 
-    hop_wait_sshable
+    hop_wait
   end
 
   label def start_vm
     gcp_vm.update(display_state: "starting")
 
     gcp_client = Hosting::GcpApis::new
-    gcp_client.start_vm(gcp_vm.name, gcp_vm.location)
+    gcp_client.start_vm(gcp_vm.name, "#{gcp_vm.location}-a")
 
     gcp_vm.update(display_state: "running")
 

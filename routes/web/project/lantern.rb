@@ -12,8 +12,6 @@ class CloverWeb
 
     r.post true do
       Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
-      fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
-
       parsed_size = Validation.validate_lantern_size(r.params["size"])
       st = Prog::Lantern::LanternServerNexus.assemble(
         project_id: @project.id,

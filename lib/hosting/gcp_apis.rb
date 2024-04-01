@@ -172,12 +172,12 @@ class Hosting::GcpApis
     connection.delete(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}", expects: [200, 404])
   end
 
-  def start_vm(vm_name, region)
+  def start_vm(vm_name, zone)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
     connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/start", expects: 200)
   end
 
-  def stop_vm(vm_name, region)
+  def stop_vm(vm_name, zone)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
     connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/stop", expects: 200)
   end

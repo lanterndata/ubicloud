@@ -29,6 +29,13 @@ RSpec.describe Prog::InstallRhizome do
       expect(sshable).to receive(:cmd)
       expect { ir_spec.start }.to hop("install_gems")
     end
+
+    it "writes without including specs" do
+      ir_spec = described_class.new(Strand.new(stack: [{"target_folder" => "host", "install_specs" => false}]))
+      expect(ir_spec).to receive(:sshable).and_return(sshable).at_least(:once)
+      expect(sshable).to receive(:cmd)
+      expect { ir_spec.start }.to hop("install_gems")
+    end
   end
 
   describe "#install_gems" do

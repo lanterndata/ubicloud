@@ -17,7 +17,7 @@ class LanternServer < Sequel::Model
   include Authorization::TaggableMethods
 
   semaphore :initial_provisioning, :update_user_password, :update_lantern_extension, :update_extras_extension, :update_image, :setup_ssl, :add_domain, :update_rhizome, :checkup
-  semaphore :start_server, :stop_server, :restart_server, :configure, :take_over, :destroy
+  semaphore :start_server, :stop_server, :restart_server, :take_over, :destroy, :update_storage_size, :update_vm_size
 
   def hyper_tag_name(project)
     "project/#{project.ubid}/location/#{location}/lantern/#{name}"

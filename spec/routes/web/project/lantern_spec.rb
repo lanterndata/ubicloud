@@ -13,7 +13,10 @@ RSpec.describe Clover, "lantern" do
       location: "us-central1",
       name: "pg-with-permission",
       target_vm_size: "standard-2",
-      storage_size_gib: 100
+      storage_size_gib: 100,
+      lantern_version: "0.2.2",
+      extras_version: "0.1.4",
+      minor_version: "1"
     ).subject
   end
 
@@ -158,6 +161,27 @@ RSpec.describe Clover, "lantern" do
         end
       end
 
+      describe "reset-user-password" do
+        it "can update user password" do
+          visit "#{project.path}#{pg.path}"
+          expect(page).to have_content "Reset user password"
+
+          fill_in "New password", with: "DummyPassword123"
+          fill_in "New password (repeat)", with: "DummyPassword123"
+          click_button "Reset"
+
+          expect(page.status_code).to eq(200)
+        end
+
+         it "does not show reset user password for reader" do
+          pg.update(instance_type: "reader")
+
+          visit "#{project.path}#{pg.path}"
+          expect(page).to have_no_content "Reset user password"
+          expect(page.status_code).to eq(200)
+        end
+      end
+
       describe "delete" do
         it "can delete Lantern database" do
           visit "#{project.path}#{pg.path}"
@@ -184,6 +208,76 @@ RSpec.describe Clover, "lantern" do
           expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
         end
       end
+
+
+      describe "update-extension" do
+        it "can update lantern extension" do
+          visit "#{project.path}#{pg.path}"
+          fill_in "lantern_version", with: "0.2.1"
+          click_button "Update Extensions"
+          pg = LanternServer.first
+          expect(pg.lantern_version).to eq("0.2.1")
+          expect(pg.extras_version).to eq("0.1.4")
+          expect(page.status_code).to eq(200)
+        end
+
+        it "can update lantern_extras extension" do
+          visit "#{project.path}#{pg.path}"
+          fill_in "extras_version", with: "0.1.1"
+          click_button "Update Extensions"
+          pg = LanternServer.first
+          expect(pg.lantern_version).to eq("0.2.2")
+          expect(pg.extras_version).to eq("0.1.1")
+          expect(page.status_code).to eq(200)
+        end
+
+        it "can update both extension" do
+          visit "#{project.path}#{pg.path}"
+          fill_in "lantern_version", with: "0.2.0"
+          fill_in "extras_version", with: "0.1.0"
+          click_button "Update Extensions"
+          pg = LanternServer.first
+          expect(pg.lantern_version).to eq("0.2.0")
+          expect(pg.extras_version).to eq("0.1.0")
+          expect(page.status_code).to eq(200)
+        end
+      end
+
+      describe "update-image" do
+        it "can update image" do
+          visit "#{project.path}#{pg.path}"
+          fill_in "img_lantern_version", with: "0.2.0"
+          fill_in "img_extras_version", with: "0.1.0"
+          fill_in "img_minor_version", with: "2"
+          click_button "Update Image"
+          pg = LanternServer.first
+          expect(pg.lantern_version).to eq("0.2.0")
+          expect(pg.extras_version).to eq("0.1.0")
+          expect(pg.minor_version).to eq("2")
+          expect(page.status_code).to eq(200)
+        end
+      end
+
+      describe "add-domain" do
+        it "can add domain" do
+          visit "#{project.path}#{pg.path}"
+          fill_in "domain", with: "example.com"
+          click_button "Add domain"
+          pg = LanternServer.first
+          expect(pg.gcp_vm.domain).to eq("example.com")
+        end
+      end
+
+      describe "update-rhizome" do
+        it "can update rhizome" do
+          visit "#{project.path}#{pg.path}"
+          click_button "Update rhizome"
+          sem = Semaphore.first
+          expect(sem.name).to eq("update_rhizome")
+          expect(page.status_code).to eq(200)
+        end
+      end
+
     end
   end
 end
