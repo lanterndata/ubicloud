@@ -75,7 +75,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "can not delete project when it has resources" do
-        Prog::Lantern::LanternServerNexus.assemble(project_id: project.id, name: "vm1", target_vm_size: "standard-2")
+        Prog::Lantern::LanternServerNexus.assemble(project_id: project.id, name: "vm1", target_vm_size: "n1-standard-2")
 
         delete "api/project/#{project.ubid}"
 

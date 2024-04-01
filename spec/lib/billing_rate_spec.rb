@@ -7,11 +7,7 @@ RSpec.describe BillingRate do
 
   describe ".line_item_description" do
     it "returns for VmCores" do
-      expect(described_class.line_item_description("VmCores", "standard", 4)).to eq("standard-8 Virtual Machine")
-    end
-
-    it "returns for IPAddress" do
-      expect(described_class.line_item_description("IPAddress", "IPv4", 1)).to eq("IPv4 Address")
+      expect(described_class.line_item_description("VmCores", "n1-standard", 4)).to eq("n1-standard-8 Virtual Machine")
     end
 
     it "raises exception for unknown type" do
@@ -22,16 +18,6 @@ RSpec.describe BillingRate do
       described_class.rates.each do |rate|
         expect(described_class.line_item_description(rate["resource_type"], rate["resource_family"], 1)).not_to be_nil
       end
-    end
-  end
-
-  describe ".line_item_usage" do
-    it "returns usage by duration" do
-      expect(described_class.line_item_usage("VmCores", "standard", 5, 1)).to eq("1 minutes")
-    end
-
-    it "returns usage by amount" do
-      expect(described_class.line_item_usage("GitHubRunnerMinutes", "standard-2", 5, 1)).to eq("5 minutes")
     end
   end
 end

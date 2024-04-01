@@ -27,7 +27,7 @@ RSpec.describe Clover, "lantern" do
         project_id: project.id,
         location: "us-central1",
         name: "lantern-foo-1",
-        target_vm_size: "standard-2",
+        target_vm_size: "n1-standard-2",
         storage_size_gib: 100
       )
 
@@ -35,7 +35,7 @@ RSpec.describe Clover, "lantern" do
         project_id: project.id,
         location: "us-central1",
         name: "lantern-foo-2",
-        target_vm_size: "standard-2",
+        target_vm_size: "n1-standard-2",
         storage_size_gib: 100
       )
 

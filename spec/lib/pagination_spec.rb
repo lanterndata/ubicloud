@@ -6,11 +6,11 @@ RSpec.describe Pagination do
   let(:project) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
 
   let!(:first_server) do
-    Prog::Lantern::LanternServerNexus.assemble(target_vm_size: "standard-2", name: "test", project_id: project.id).subject
+    Prog::Lantern::LanternServerNexus.assemble(target_vm_size: "n1-standard-2", name: "test", project_id: project.id).subject
   end
 
   let!(:second_server) do
-    Prog::Lantern::LanternServerNexus.assemble(target_vm_size: "standard-2", name: "test2", project_id: project.id).subject
+    Prog::Lantern::LanternServerNexus.assemble(target_vm_size: "n1-standard-2", name: "test2", project_id: project.id).subject
   end
 
   describe "#validate_paginated_result" do
@@ -45,7 +45,7 @@ RSpec.describe Pagination do
 
       it "big page size" do
         101.times do |index|
-           Prog::Lantern::LanternServerNexus.assemble(target_vm_size: "standard-2", name: "additional-lantern-#{index}", project_id: project.id).subject
+           Prog::Lantern::LanternServerNexus.assemble(target_vm_size: "n1-standard-2", name: "additional-lantern-#{index}", project_id: project.id).subject
         end
 
         result = project.lantern_servers_dataset.paginated_result(page_size: 1000)

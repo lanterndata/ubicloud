@@ -29,8 +29,8 @@ module Option
   VmSize = Struct.new(:name, :family, :vcpu, :memory, :storage_size_gib) do
     alias_method :display_name, :name
   end
-  VmSizes = [2, 4, 8, 16].map {
-    VmSize.new("standard-#{_1}", "standard", _1, _1 * 4, (_1 / 2) * 25)
+  VmSizes = [2, 4, 8, 16, 32].map {
+    VmSize.new("n1-standard-#{_1}", "n1-standard", _1, _1 * 4, (_1 / 2) * 25)
   }.freeze
 
   LanternSize = Struct.new(:name, :vm_size, :family, :vcpu, :memory, :storage_size_gib) do
@@ -38,7 +38,7 @@ module Option
   end
 
   LanternSizes = [2, 4, 8, 16, 32].map {
-    LanternSize.new("standard-#{_1}", "standard-#{_1}", "standard", _1, _1 * 4, (_1 / 2) * 128)
+    LanternSize.new("n1-standard-#{_1}", "n1-standard-#{_1}", "n1-standard", _1, _1 * 4, (_1 / 2) * 128)
   }.freeze
 
   # PostgresHaOption = Struct.new(:name, :standby_count, :title, :explanation)

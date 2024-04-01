@@ -50,9 +50,9 @@ RSpec.describe GcpVm do
     end
 
     it ".display_size" do
-      expect(gcp_vm).to receive(:family).and_return("standard")
+      expect(gcp_vm).to receive(:family).and_return("n1-standard")
       expect(gcp_vm).to receive(:cores).and_return(2)
-      expect(gcp_vm.display_size).to eq("standard-2")
+      expect(gcp_vm.display_size).to eq("n1-standard-2")
     end
 
     it ".inhost_name" do

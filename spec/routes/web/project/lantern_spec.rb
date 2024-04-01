@@ -12,7 +12,7 @@ RSpec.describe Clover, "lantern" do
       project_id: project.id,
       location: "us-central1",
       name: "pg-with-permission",
-      target_vm_size: "standard-2",
+      target_vm_size: "n1-standard-2",
       storage_size_gib: 100,
       lantern_version: "0.2.2",
       extras_version: "0.1.4",
@@ -25,7 +25,7 @@ RSpec.describe Clover, "lantern" do
       project_id: project_wo_permissions.id,
       location: "us-central1",
       name: "pg-without-permission",
-      target_vm_size: "standard-2",
+      target_vm_size: "n1-standard-2",
       storage_size_gib: 100
     ).subject
   end
@@ -80,7 +80,7 @@ RSpec.describe Clover, "lantern" do
         name = "new-pg-db"
         fill_in "Name", with: name
         choose option: "us-central1"
-        choose option: "standard-2"
+        choose option: "n1-standard-2"
 
         click_button "Create"
 
@@ -97,7 +97,7 @@ RSpec.describe Clover, "lantern" do
 
         fill_in "Name", with: "invalid name"
         choose option: "us-central1"
-        choose option: "standard-2"
+        choose option: "n1-standard-2"
 
         click_button "Create"
 
@@ -113,7 +113,7 @@ RSpec.describe Clover, "lantern" do
 
         fill_in "Name", with: pg.name
         choose option: "us-central1"
-        choose option: "standard-2"
+        choose option: "n1-standard-2"
 
         click_button "Create"
 

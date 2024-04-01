@@ -11,8 +11,6 @@ class BillingRate
     case resource_type
     when "VmCores"
       "#{resource_family}-#{(amount * 2).to_i} Virtual Machine"
-    when "IPAddress"
-      "#{resource_family} Address"
     when "PostgresCores"
       "#{resource_family}-#{(amount * 2).to_i} backed PostgreSQL Database"
     when "PostgresStandbyCores"
@@ -21,19 +19,8 @@ class BillingRate
       "#{amount.to_i} GiB Storage for PostgreSQL Database"
     when "PostgresStandbyStorage"
       "#{amount.to_i} GiB Storage for PostgreSQL Database (HA Standby)"
-    when "GitHubRunnerMinutes"
-      "#{resource_family} GitHub Runner"
     else
       fail "BUG: Unknown resource type for line item description"
-    end
-  end
-
-  def self.line_item_usage(resource_type, resource_family, amount, duration)
-    case resource_type
-    when "GitHubRunnerMinutes"
-      "#{amount.to_i} minutes"
-    else
-      "#{duration} minutes"
     end
   end
 end

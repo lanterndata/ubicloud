@@ -14,7 +14,7 @@ RSpec.describe Clover, "lantern" do
       project_id: project.id,
       location: "us-central1",
       name: "instance-1",
-      target_vm_size: "standard-2",
+      target_vm_size: "n1-standard-2",
       storage_size_gib: 100,
       org_id: 0
     ).subject
@@ -25,7 +25,7 @@ RSpec.describe Clover, "lantern" do
       project_id: project_wo_permissions.id,
       location: "us-central1",
       name: "lantern-wo-permission",
-      target_vm_size: "standard-2",
+      target_vm_size: "n1-standard-2",
       storage_size_gib: 100,
       org_id: 0
     ).subject
@@ -128,7 +128,7 @@ RSpec.describe Clover, "lantern" do
           project_id: project.id,
           location: "us-central1",
           name: "lantern-test-2",
-          target_vm_size: "standard-2",
+          target_vm_size: "n1-standard-2",
           storage_size_gib: 100
         )
 
@@ -139,7 +139,7 @@ RSpec.describe Clover, "lantern" do
       end
 
       it "creates new lantern database" do
-        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern", {"size": "standard-2", "name": "instance-2", "org_id": 0, "location": "us-central1", "storage_size_gib": 100, "lantern_version": "0.2.2", "extras_version": "0.1.4", "minor_version": "1", "domain": "test.db.lantern.dev", "app_env": "test", "repl_password": "test-repl-pass", "enable_telemetry": true, "postgres_password": "test-pg-pass"}
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern", {"size": "n1-standard-2", "name": "instance-2", "org_id": 0, "location": "us-central1", "storage_size_gib": 100, "lantern_version": "0.2.2", "extras_version": "0.1.4", "minor_version": "1", "domain": "test.db.lantern.dev", "app_env": "test", "repl_password": "test-repl-pass", "enable_telemetry": true, "postgres_password": "test-pg-pass"}
 
         body = JSON.parse(last_response.body)
         expect(last_response.status).to eq(200)
@@ -164,7 +164,7 @@ RSpec.describe Clover, "lantern" do
 
       it "creates new lantern database with subdomain" do
         expect(Config).to receive(:lantern_top_domain).and_return("db.lantern.dev")
-        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern", {"size": "standard-2", "name": "instance-2", "org_id": 0, "location": "us-central1", "storage_size_gib": 100, "lantern_version": "0.2.2", "extras_version": "0.1.4", "minor_version": "1", "subdomain": "test", "app_env": "test", "repl_password": "test-repl-pass", "enable_telemetry": true, "postgres_password": "test-pg-pass"}
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern", {"size": "n1-standard-2", "name": "instance-2", "org_id": 0, "location": "us-central1", "storage_size_gib": 100, "lantern_version": "0.2.2", "extras_version": "0.1.4", "minor_version": "1", "subdomain": "test", "app_env": "test", "repl_password": "test-repl-pass", "enable_telemetry": true, "postgres_password": "test-pg-pass"}
 
         body = JSON.parse(last_response.body)
         expect(last_response.status).to eq(200)
@@ -271,9 +271,9 @@ RSpec.describe Clover, "lantern" do
       end
 
       it "should update vm size" do
-        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-vm", {"size": "standard-4" }
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-vm", {"size": "n1-standard-4" }
         pg = LanternServer.where(name: "instance-1").first
-        expect(pg.target_vm_size).to eq("standard-4")
+        expect(pg.target_vm_size).to eq("n1-standard-4")
         expect(last_response.status).to eq(200)
       end
     end

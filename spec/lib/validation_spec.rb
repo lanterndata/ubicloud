@@ -43,11 +43,11 @@ RSpec.describe Validation do
 
     describe "#validate_vm_size" do
       it "valid vm size" do
-        expect(described_class.validate_vm_size("standard-2").name).to eq("standard-2")
+        expect(described_class.validate_vm_size("n1-standard-2").name).to eq("n1-standard-2")
       end
 
       it "invalid vm size" do
-        expect { described_class.validate_vm_size("standard-3") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_vm_size("n1-standard-3") }.to raise_error described_class::ValidationFailed
       end
     end
 
@@ -172,11 +172,11 @@ RSpec.describe Validation do
 
     describe "#validate_lantern_size" do
       it "valid lantern size" do
-        expect(described_class.validate_lantern_size("standard-2").name).to eq("standard-2")
+        expect(described_class.validate_lantern_size("n1-standard-2").name).to eq("n1-standard-2")
       end
 
       it "invalid lantern size" do
-        expect { described_class.validate_lantern_size("standard-3") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_lantern_size("n1-standard-3") }.to raise_error described_class::ValidationFailed
       end
     end
 

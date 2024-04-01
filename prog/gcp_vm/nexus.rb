@@ -12,7 +12,7 @@ class Prog::GcpVm::Nexus < Prog::Base
   subject_is :gcp_vm
   semaphore :destroy, :start_vm, :stop_vm
 
-  def self.assemble(public_key, project_id, name: nil, size: "standard-2",
+  def self.assemble(public_key, project_id, name: nil, size: "n1-standard-2",
     unix_user: "lantern", location: "us-central1", boot_image: "ubuntu-2204-jammy-v20240319",
     storage_size_gib: nil, arch: "x64", domain: nil)
 
@@ -85,7 +85,7 @@ class Prog::GcpVm::Nexus < Prog::Base
 
   label def start
     gcp_client = Hosting::GcpApis::new
-    gcp_client.create_vm(gcp_vm.name, "#{gcp_vm.location}-a", gcp_vm.boot_image, gcp_vm.public_key, gcp_vm.unix_user, "n1-#{gcp_vm.family}-#{gcp_vm.cores}", gcp_vm.storage_size_gib)
+    gcp_client.create_vm(gcp_vm.name, "#{gcp_vm.location}-a", gcp_vm.boot_image, gcp_vm.public_key, gcp_vm.unix_user, "#{gcp_vm.family}-#{gcp_vm.cores}", gcp_vm.storage_size_gib)
     register_deadline(:wait, 10 * 60)
     hop_wait_create_vm
   end

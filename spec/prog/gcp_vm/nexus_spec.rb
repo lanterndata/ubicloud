@@ -31,7 +31,7 @@ RSpec.describe Prog::GcpVm::Nexus do
     end
 
     it "creates arm64 vm with double core count and 3.2GB memory per core" do
-      st = described_class.assemble("some_ssh_key", prj.id, size: "standard-4", arch: "arm64", domain: "test-domain")
+      st = described_class.assemble("some_ssh_key", prj.id, size: "n1-standard-4", arch: "arm64", domain: "test-domain")
       expect(st.subject.cores).to eq(4)
       expect(st.subject.mem_gib_ratio).to eq(3.2)
       expect(st.subject.mem_gib).to eq(12)
