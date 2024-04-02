@@ -173,7 +173,7 @@ RSpec.describe Clover, "lantern" do
       end
 
       it "updates lantern extension" do
-        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-extension", {"lantern_version": "0.2.4", "extras_version": "0.1.4" }
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-extension", {"lantern_version": "0.2.4", "extras_version": "0.1.4"}
         expect(last_response.status).to eq(200)
       end
 
@@ -190,80 +190,80 @@ RSpec.describe Clover, "lantern" do
 
     describe "get" do
       it "returns 404" do
-          get "/api/project/#{project.ubid}/location/#{pg.location}/lantern/test"
-          expect(last_response.status).to eq(404)
+        get "/api/project/#{project.ubid}/location/#{pg.location}/lantern/test"
+        expect(last_response.status).to eq(404)
       end
 
       it "returns instance" do
-          get "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1"
-          data = JSON.parse(last_response.body)
-          expect(data["name"]).to eq("instance-1")
-          expect(last_response.status).to eq(200)
+        get "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1"
+        data = JSON.parse(last_response.body)
+        expect(data["name"]).to eq("instance-1")
+        expect(last_response.status).to eq(200)
       end
     end
 
     describe "delete" do
       it "deletes instance" do
-          delete "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1"
-          expect(last_response.status).to eq(200)
+        delete "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1"
+        expect(last_response.status).to eq(200)
       end
     end
 
     describe "start,stop,restart" do
       it "starts instance" do
-          post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/start"
-          expect(last_response.status).to eq(200)
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/start"
+        expect(last_response.status).to eq(200)
       end
 
       it "stops instance" do
-          post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/stop"
-          expect(last_response.status).to eq(200)
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/stop"
+        expect(last_response.status).to eq(200)
       end
 
       it "restarts instance" do
-          post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/restart"
-          expect(last_response.status).to eq(200)
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/restart"
+        expect(last_response.status).to eq(200)
       end
     end
 
     describe "add-domain" do
       it "adds domain" do
-          post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/add-domain", { "domain": "example.com"}
-          vm = GcpVm[pg.vm_id]
-          expect(vm.domain).to eq("example.com")
-          expect(last_response.status).to eq(200)
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/add-domain", {"domain": "example.com"}
+        vm = GcpVm[pg.vm_id]
+        expect(vm.domain).to eq("example.com")
+        expect(last_response.status).to eq(200)
       end
     end
 
     describe "update-rhizome" do
       it "updates rhizome" do
-          post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-rhizome"
-          expect(last_response.status).to eq(200)
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-rhizome"
+        expect(last_response.status).to eq(200)
       end
     end
 
     describe "reset-user-password" do
       it "fails validation" do
-          post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/reset-user-password", {"original_password": "password123!", "repeat_password": "test"}
-          expect(last_response.status).to eq(400)
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/reset-user-password", {"original_password": "password123!", "repeat_password": "test"}
+        expect(last_response.status).to eq(400)
       end
 
       it "resets password" do
-          post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/reset-user-password", {"original_password": "Password123!", "repeat_password": "Password123!"}
-          pg = LanternServer.where(name: "instance-1").first
-          expect(pg.db_user_password).to eq("Password123!")
-          expect(last_response.status).to eq(200)
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/reset-user-password", {"original_password": "Password123!", "repeat_password": "Password123!"}
+        pg = LanternServer.where(name: "instance-1").first
+        expect(pg.db_user_password).to eq("Password123!")
+        expect(last_response.status).to eq(200)
       end
     end
 
     describe "update-vm" do
       it "should fail validation" do
-        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-vm", {"storage_size_gib": 10 }
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-vm", {"storage_size_gib": 10}
         expect(last_response.status).to eq(400)
       end
 
       it "should update storage" do
-        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-vm", {"storage_size_gib": 200 }
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-vm", {"storage_size_gib": 200}
         pg = LanternServer.where(name: "instance-1").first
         expect(pg.target_storage_size_gib).to eq(200)
         expect(pg.gcp_vm.storage_size_gib).to eq(200)
@@ -271,12 +271,11 @@ RSpec.describe Clover, "lantern" do
       end
 
       it "should update vm size" do
-        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-vm", {"size": "n1-standard-4" }
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-vm", {"size": "n1-standard-4"}
         pg = LanternServer.where(name: "instance-1").first
         expect(pg.target_vm_size).to eq("n1-standard-4")
         expect(last_response.status).to eq(200)
       end
     end
   end
-
 end

@@ -240,5 +240,18 @@ RSpec.describe Validation do
         expect { described_class.validate_cidr("not_a_cidr") }.to raise_error described_class::ValidationFailed
       end
     end
+
+    describe "#validate_domain" do
+      it "valid domain" do
+        expect { described_class.validate_domain("example.com") }.not_to raise_error
+        expect { described_class.validate_domain("db.example.com") }.not_to raise_error
+      end
+
+      it "invalid domain" do
+        expect { described_class.validate_domain("invalid..example.com") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_domain("") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_domain("a") }.to raise_error described_class::ValidationFailed
+      end
+    end
   end
 end

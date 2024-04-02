@@ -45,7 +45,7 @@ RSpec.describe Pagination do
 
       it "big page size" do
         101.times do |index|
-           Prog::Lantern::LanternServerNexus.assemble(target_vm_size: "n1-standard-2", name: "additional-lantern-#{index}", project_id: project.id).subject
+          Prog::Lantern::LanternServerNexus.assemble(target_vm_size: "n1-standard-2", name: "additional-lantern-#{index}", project_id: project.id).subject
         end
 
         result = project.lantern_servers_dataset.paginated_result(page_size: 1000)

@@ -29,9 +29,9 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
   describe ".assemble" do
     it "fails to create lantern server if no project found" do
       expect {
-      described_class.assemble(
-        project_id: "6ae7e513-c34a-8039-a72a-7be45b53f2a0",
-      )
+        described_class.assemble(
+          project_id: "6ae7e513-c34a-8039-a72a-7be45b53f2a0",
+        )
       }.to raise_error "No existing parent"
     end
 
@@ -103,7 +103,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.gcp_vm.sshable).to receive(:cmd) do |cmd, stdin: ""|
         expect(JSON.parse(stdin)["replication_mode"]).to eq("slave")
       end
-      expect {nx.setup_docker_stack }.to hop("wait_db_available")
+      expect { nx.setup_docker_stack }.to hop("wait_db_available")
     end
 
     it "creates lantern server as writer instance" do
@@ -144,7 +144,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.gcp_vm.sshable).to receive(:cmd) do |cmd, stdin: ""|
         expect(JSON.parse(stdin)["replication_mode"]).to eq("master")
       end
-      expect {nx.setup_docker_stack }.to hop("wait_db_available")
+      expect { nx.setup_docker_stack }.to hop("wait_db_available")
     end
 
     it "creates lantern server and vm with sshable" do
@@ -255,6 +255,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
         expect { nx.wait_db_available }.to nap(10)
         expect(nx).to receive(:available?).and_return(true)
         expect { nx.wait_db_available }.to hop("wait")
+        expect(lantern_server.gcp_vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
         expect { nx.wait }.to hop("add_domain")
       end
     end
@@ -267,6 +268,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       lantern_server.update(lantern_version: "0.2.0")
       nx.incr_update_rhizome
       nx.incr_update_lantern_extension
+      expect(lantern_server.gcp_vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect { nx.wait }.to hop("update_rhizome")
       expect { nx.wait_update_rhizome }.to hop("update_lantern_extension")
 
@@ -281,6 +283,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     it "should update lantern_extras extension" do
       allow(lantern_server).to receive(:update)
       allow(lantern_server).to receive(:incr_update_extras_extension)
+      expect(lantern_server.gcp_vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       lantern_server.update(lantern_version: "0.1.1")
       nx.incr_update_rhizome
       nx.incr_update_extras_extension
@@ -298,6 +301,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     it "should update container image" do
       allow(lantern_server).to receive(:update)
       allow(lantern_server).to receive(:incr_update_image)
+      expect(lantern_server.gcp_vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       lantern_server.update(lantern_version: "0.1.1", minor_version: "2")
       nx.incr_update_rhizome
       nx.incr_update_image
@@ -326,6 +330,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     it "should add domain and setup ssl" do
       allow(lantern_server).to receive(:update)
       allow(lantern_server).to receive(:incr_add_domain)
+      expect(lantern_server.gcp_vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       lantern_server.update(domain: "test.lantern.dev")
       nx.incr_add_domain
       expect { nx.wait }.to hop("add_domain")
@@ -374,13 +379,13 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
     it "should destroy domain" do
       expect(lantern_server.gcp_vm).to receive(:domain).and_return("example.com")
-      stub_request(:get, "https://api.cloudflare.com/client/v4/zones/test/dns_records?name=example.com").to_return(status: 200, body: JSON.dump({:result => [{ :id => "test-domain" }]}), headers: {})
+      stub_request(:get, "https://api.cloudflare.com/client/v4/zones/test/dns_records?name=example.com").to_return(status: 200, body: JSON.dump({:result => [{:id => "test-domain"}]}), headers: {})
       stub_request(:delete, "https://api.cloudflare.com/client/v4/zones/test/dns_records/test-domain").to_return(status: 200, body: "", headers: {})
       nx.destroy_domain
-
     end
 
     it "should update rhizome" do
+      expect(lantern_server.gcp_vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       nx.incr_update_rhizome
       expect { nx.wait }.to hop("update_rhizome")
       expect { nx.update_rhizome }.to hop("wait_update_rhizome")
@@ -408,46 +413,72 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
   describe "#wait" do
     it "should hop to update_user_password" do
+      expect(lantern_server.gcp_vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       nx.incr_update_user_password
       expect { nx.wait }.to hop("update_user_password")
     end
 
     it "should hop to restart_server" do
+      expect(lantern_server.gcp_vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       nx.incr_restart_server
       expect { nx.wait }.to hop("restart_server")
     end
 
     it "should hop to start_server" do
+      expect(lantern_server.gcp_vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       nx.incr_start_server
       expect { nx.wait }.to hop("start_server")
     end
 
     it "should hop to stop_server" do
+      expect(lantern_server.gcp_vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       nx.incr_stop_server
       expect { nx.wait }.to hop("stop_server")
     end
 
     it "should hop to add_domain" do
+      expect(lantern_server.gcp_vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       nx.incr_add_domain
       expect { nx.wait }.to hop("add_domain")
     end
 
     it "should hop to setup_ssl" do
+      expect(lantern_server.gcp_vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       nx.incr_setup_ssl
       expect { nx.wait }.to hop("setup_ssl")
     end
 
     it "should hop to update_rhizome" do
+      expect(lantern_server.gcp_vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       nx.incr_update_rhizome
       expect { nx.wait }.to hop("update_rhizome")
     end
 
     it "should hop to destroy" do
+      expect(lantern_server.gcp_vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       nx.incr_destroy
       expect { nx.wait }.to hop("destroy")
     end
 
+    it "should hop to update_storage_size" do
+      expect(lantern_server.gcp_vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      nx.incr_update_storage_size
+      expect { nx.wait }.to hop("update_storage_size")
+    end
+
+    it "should hop to update_vm_size" do
+      expect(lantern_server.gcp_vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      nx.incr_update_vm_size
+      expect { nx.wait }.to hop("update_vm_size")
+    end
+
+    it "should hop to wait_db_available" do
+      expect(lantern_server.gcp_vm).to receive(:strand).and_return(instance_double(Strand, label: "updating"))
+      expect { nx.wait }.to hop("wait_db_available")
+    end
+
     it "should nap 30" do
+      expect(lantern_server.gcp_vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect { nx.wait }.to nap(30)
     end
   end
@@ -474,7 +505,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server).to receive(:projects).and_return([project])
       expect(lantern_server).to receive(:dissociate_with_project).with(project)
       expect(lantern_server).to receive(:destroy)
-      expect { nx.destroy }.to exit({ "msg" => "lantern server was deleted" })
+      expect { nx.destroy }.to exit({"msg" => "lantern server was deleted"})
     end
 
     it "should destroy lantern_server, gcp_vm and domain" do
@@ -485,7 +516,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server).to receive(:dissociate_with_project).with(project)
       expect(nx).to receive(:destroy_domain)
       expect(lantern_server).to receive(:destroy)
-      expect { nx.destroy }.to exit({ "msg" => "lantern server was deleted" })
+      expect { nx.destroy }.to exit({"msg" => "lantern server was deleted"})
     end
   end
 
@@ -507,6 +538,20 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(nx).to receive(:incr_stop_server)
       expect(nx).to receive(:incr_start_server)
       expect { nx.restart_server }.to hop("wait")
+    end
+  end
+
+  describe "#update_storage_size" do
+    it "should call update_storage_size on gcp_vm" do
+      expect(lantern_server.gcp_vm).to receive(:incr_update_storage)
+      expect { nx.update_storage_size }.to hop("wait")
+    end
+  end
+
+  describe "#update_vm_size" do
+    it "should call update_vm_size on gcp_vm" do
+      expect(lantern_server.gcp_vm).to receive(:incr_update_size)
+      expect { nx.update_vm_size }.to hop("wait")
     end
   end
 end

@@ -23,7 +23,7 @@ RSpec.describe Prog::UpdateRhizome do
 
   describe ".user (lantern)" do
     it "should return lantern" do
-      st = instance_double(Strand, id: "c39ae087-6ec4-033a-d440-b7a821061caf", prog: "UpdateRhizome", stack: [{ "user" => "lantern" }])
+      st = instance_double(Strand, id: "c39ae087-6ec4-033a-d440-b7a821061caf", prog: "UpdateRhizome", stack: [{"user" => "lantern"}])
       br = described_class.new(st)
       expect(br.user).to eq("lantern")
     end

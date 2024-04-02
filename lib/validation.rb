@@ -30,6 +30,8 @@ module Validation
 
   ALLOWED_PORT_RANGE_PATTERN = '\A(\d+)(?:\.\.(\d+))?\z'
 
+  ALLOWED_DOMAIN_PATTERN = '^\A((?!-)[a-z0-9-]{1,63}(?<!-)\.)+[a-z]{2,6}\z'
+
   def self.validate_name(name)
     msg = "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."
     fail ValidationFailed.new({name: msg}) unless name&.match(ALLOWED_NAME_PATTERN)
@@ -157,5 +159,10 @@ module Validation
     end
 
     end_port ? [start_port, end_port] : [start_port]
+  end
+
+  def self.validate_domain(domain)
+    msg = "Domain name must only contain lowercase letters, numbers, hyphens and underscore and cannot start with a number or hyphen"
+    fail ValidationFailed.new({domain: msg}) unless domain.match?(ALLOWED_DOMAIN_PATTERN)
   end
 end

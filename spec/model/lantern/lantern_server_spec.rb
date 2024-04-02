@@ -29,11 +29,14 @@ RSpec.describe LanternServer do
     expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "update_extension")).exactly(3).times
     expect(lantern_server.display_state).to eq("updating")
 
-    expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait")).exactly(4).times
+    expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait")).exactly(5).times
     expect(lantern_server.display_state).to eq("running")
 
-    expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "destroy")).exactly(5).times
+    expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "destroy")).exactly(6).times
     expect(lantern_server.display_state).to eq("deleting")
+
+    expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait_db_available")).exactly(4).times
+    expect(lantern_server.display_state).to eq("unavailable")
   end
   it "returns name from ubid" do
     expect(LanternServer.ubid_to_name(lantern_server.id)).to eq("c068cac7")

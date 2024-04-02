@@ -81,6 +81,30 @@ class CloverWeb
         r.redirect "#{@project.path}#{pg.path}"
       end
 
+      r.post "update-vm" do
+        Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
+        Authorization.authorize(@current_user.id, "Postgres:view", pg.id)
+
+        DB.transaction do
+          if r.params["storage_size_gib"].to_i != pg.target_storage_size_gib
+            storage_size_gib = r.params["storage_size_gib"].to_i
+            Validation.validate_lantern_storage_size(pg.target_storage_size_gib, storage_size_gib)
+            pg.update(target_storage_size_gib: storage_size_gib)
+            GcpVm.dataset.where(id: pg.vm_id).update(storage_size_gib: storage_size_gib)
+            pg.incr_update_storage_size
+          end
+
+          if r.params["size"] != pg.target_vm_size
+            parsed_size = Validation.validate_lantern_size(r.params["size"])
+            pg.update(target_vm_size: parsed_size.vm_size)
+            GcpVm.dataset.where(id: pg.vm_id).update(cores: parsed_size.vcpu)
+            pg.incr_update_vm_size
+          end
+        end
+
+        flash["notice"] = "'#{pg.name}' will be updated in a few minutes"
+        r.redirect "#{@project.path}#{pg.path}"
+      end
       # r.post "restart" do
       #   Authorization.authorize(@current_user.id, "postgres:edit", pg.id)
       #   pg.gcp_vm.incr_restart

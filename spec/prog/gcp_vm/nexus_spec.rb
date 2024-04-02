@@ -31,11 +31,11 @@ RSpec.describe Prog::GcpVm::Nexus do
     end
 
     it "creates arm64 vm with double core count and 3.2GB memory per core" do
-      st = described_class.assemble("some_ssh_key", prj.id, size: "n1-standard-4", arch: "arm64", domain: "test-domain")
+      st = described_class.assemble("some_ssh_key", prj.id, size: "n1-standard-4", arch: "arm64", domain: "test-domain.example.com")
       expect(st.subject.cores).to eq(4)
       expect(st.subject.mem_gib_ratio).to eq(3.2)
       expect(st.subject.mem_gib).to eq(12)
-      expect(st.subject.domain).to eq("test-domain")
+      expect(st.subject.domain).to eq("test-domain.example.com")
     end
   end
 
@@ -135,7 +135,11 @@ RSpec.describe Prog::GcpVm::Nexus do
       expect(gcp_vm).to receive(:update).with({:display_state => "stopped"})
       stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
       stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm/stop").to_return(status: 200, body: "", headers: {})
-      expect { nx.stop_vm }.to hop("wait")
+      stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm").to_return(status: 200, body: JSON.dump({"status" => "STOPPING"}), headers: {})
+      expect { nx.stop_vm }.to hop("wait_vm_stopped")
+      expect { nx.wait_vm_stopped }.to nap(5)
+      stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm").to_return(status: 200, body: JSON.dump({"status" => "TERMINATED"}), headers: {})
+      expect { nx.wait_vm_stopped }.to hop("wait")
     end
   end
 
@@ -176,8 +180,123 @@ RSpec.describe Prog::GcpVm::Nexus do
       expect { nx.wait }.to hop("destroy")
     end
 
+    it "hops to update_storage" do
+      expect(nx).to receive(:when_update_storage_set?).and_yield
+      expect { nx.wait }.to hop("update_storage")
+    end
+
+    it "hops to update_size" do
+      expect(nx).to receive(:when_update_size_set?).and_yield
+      expect { nx.wait }.to hop("update_size")
+    end
+
     it "naps 30s" do
       expect { nx.wait }.to nap(30)
+    end
+  end
+
+  describe "#update_storage" do
+    it "should stop vm before updating" do
+      expect(gcp_vm).to receive(:display_state).and_return("running")
+      expect { nx.update_storage }.to hop("stop_vm")
+    end
+
+    it "should resize vm disk" do
+      expect(gcp_vm).to receive(:display_state).and_return("stopped")
+      expect(gcp_vm).to receive(:update).with({display_state: "updating"})
+      stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+      stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm")
+        .with(
+          headers: {
+            'Authorization' => 'Bearer ',
+            'Content-Type' => 'application/json',
+            'Host' => 'compute.googleapis.com:443'
+          }
+        )
+        .to_return(status: 200, body: JSON.dump({disks: [{source: "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/disks/test-disk"}]}), headers: {})
+      stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/disks/test-disk/resize")
+        .with(
+          body: "{\"sizeGb\":\"50\"}",
+          headers: {
+            'Authorization' => 'Bearer ',
+            'Content-Type' => 'application/json',
+            'Host' => 'compute.googleapis.com:443'
+          }
+        )
+        .to_return(status: 200, body: "{}", headers: {})
+      expect { nx.update_storage }.to hop("start_vm")
+    end
+
+    it "should resize vm disk and hop to vm size update" do
+      expect(gcp_vm).to receive(:display_state).and_return("stopped")
+      expect(gcp_vm).to receive(:update).with({display_state: "updating"})
+      expect(nx).to receive(:when_update_size_set?).and_yield
+      stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+      stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm")
+        .with(
+          headers: {
+            'Authorization' => 'Bearer ',
+            'Content-Type' => 'application/json',
+            'Host' => 'compute.googleapis.com:443'
+          }
+        )
+        .to_return(status: 200, body: JSON.dump({disks: [{source: "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/disks/test-disk"}]}), headers: {})
+      stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/disks/test-disk/resize")
+        .with(
+          body: "{\"sizeGb\":\"50\"}",
+          headers: {
+            'Authorization' => 'Bearer ',
+            'Content-Type' => 'application/json',
+            'Host' => 'compute.googleapis.com:443'
+          }
+        )
+        .to_return(status: 200, body: "{}", headers: {})
+      expect { nx.update_storage }.to hop("update_size")
+    end
+  end
+
+  describe "#update_size" do
+    it "should hop to stop_vm" do
+      expect { nx.update_size }.to hop("stop_vm")
+    end
+
+    it "should update vm size" do
+      expect(gcp_vm).to receive(:display_state).and_return("stopped")
+      expect(gcp_vm).to receive(:update).with({display_state: "updating"})
+      stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm")
+        .to_return(status: 200, body: JSON.dump({machineType: "standard-2"}))
+      stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+      stub_request(:put, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm?mostDisruptiveAllowedAction=RESTART")
+        .with(
+          body: "{\"machineType\":\"projects/ringed-griffin-394922/zones/us-central1-a/machineTypes/standard-1\"}",
+          headers: {
+            'Authorization' => 'Bearer ',
+            'Content-Type' => 'application/json',
+            'Host' => 'compute.googleapis.com:443'
+          }
+        )
+        .to_return(status: 200, body: "{}", headers: {})
+      expect { nx.update_size }.to hop("start_vm")
+    end
+
+    it "should hop to update_storage after vm size update" do
+      expect(gcp_vm).to receive(:display_state).and_return("stopped")
+      expect(gcp_vm).to receive(:update).with({display_state: "updating"})
+      expect(nx).to receive(:when_update_storage_set?).and_yield
+      stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm")
+        .to_return(status: 200, body: JSON.dump({machineType: "standard-2"}))
+      stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+      stub_request(:put, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm?mostDisruptiveAllowedAction=RESTART")
+        .with(
+          body: "{\"machineType\":\"projects/ringed-griffin-394922/zones/us-central1-a/machineTypes/standard-1\"}",
+          headers: {
+            'Authorization' => 'Bearer ',
+            'Content-Type' => 'application/json',
+            'Host' => 'compute.googleapis.com:443'
+          }
+        )
+        .to_return(status: 200, body: "{}", headers: {})
+      expect { nx.update_size }.to hop("update_storage")
     end
   end
 

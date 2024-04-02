@@ -26,6 +26,15 @@ class Hosting::GcpApis
     }
   end
 
+  def self.check_errors(response)
+    body = JSON.parse(response.body)
+
+    errors = body.fetch("error", {}).fetch("errors", [])
+    if errors.size > 0
+      fail errors[0]["message"]
+    end
+  end
+
   def get_region_from_zone(zone)
     zone[..-3]
   end
@@ -180,5 +189,22 @@ class Hosting::GcpApis
   def stop_vm(vm_name, zone)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
     connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/stop", expects: 200)
+  end
+
+  def update_vm_type(vm_name, zone, machine_type)
+    query = {mostDisruptiveAllowedAction: "RESTART"}
+    connection = Excon.new(@host[:connection_string], headers: @host[:headers])
+    vm = get_vm(vm_name, zone)
+    vm["machineType"] = "projects/#{@project}/zones/#{zone}/machineTypes/#{machine_type}"
+    response = connection.put(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}", body: JSON.dump(vm), query: query, expects: [200, 400])
+    Hosting::GcpApis.check_errors(response)
+  end
+
+  def resize_vm_disk(disk_source, storage_size_gib)
+    connection = Excon.new(@host[:connection_string], headers: @host[:headers])
+    body = {sizeGb: storage_size_gib.to_s}
+    path = URI.parse(disk_source).path
+    response = connection.post(path: "#{path}/resize", body: JSON.dump(body), expects: [200, 400])
+    Hosting::GcpApis.check_errors(response)
   end
 end

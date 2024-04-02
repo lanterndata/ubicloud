@@ -90,6 +90,24 @@ RSpec.describe Clover, "lantern" do
         expect(LanternServer.first.projects.first.id).to eq(project.id)
       end
 
+      it "can create new Lantern database with domain" do
+        visit "#{project.path}/lantern/create"
+
+        expect(page.title).to eq("Ubicloud - Create Lantern Database")
+        name = "new-pg-db"
+        fill_in "Name", with: name
+        fill_in "Domain", with: "example.com"
+        choose option: "us-central1"
+        choose option: "n1-standard-2"
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_content "'#{name}' will be ready in a few minutes"
+        expect(LanternServer.count).to eq(1)
+        expect(LanternServer.first.projects.first.id).to eq(project.id)
+      end
+
       it "can not create Lantern database with invalid name" do
         visit "#{project.path}/lantern/create"
 
@@ -173,7 +191,7 @@ RSpec.describe Clover, "lantern" do
           expect(page.status_code).to eq(200)
         end
 
-         it "does not show reset user password for reader" do
+        it "does not show reset user password for reader" do
           pg.update(instance_type: "reader")
 
           visit "#{project.path}#{pg.path}"
@@ -208,7 +226,6 @@ RSpec.describe Clover, "lantern" do
           expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
         end
       end
-
 
       describe "update-extension" do
         it "can update lantern extension" do
@@ -278,6 +295,29 @@ RSpec.describe Clover, "lantern" do
         end
       end
 
+      describe "update-vm" do
+        it "should fail validation" do
+          visit "#{project.path}#{pg.path}"
+          fill_in "storage_size_gib", with: "1"
+          click_button "Update VM"
+          expect(page).to have_content "storage_size_gib can not be smaller than "
+          expect(page.status_code).to eq(200)
+        end
+
+        it "should update validation" do
+          visit "#{project.path}#{pg.path}"
+          fill_in "storage_size_gib", with: "200"
+          click_button "Update VM"
+          expect(page.status_code).to eq(200)
+        end
+
+        it "should update vm size" do
+          visit "#{project.path}#{pg.path}"
+          select "n1-standard-4", from: "size"
+          click_button "Update VM"
+          expect(page.status_code).to eq(200)
+        end
+      end
     end
   end
 end

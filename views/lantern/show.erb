@@ -270,6 +270,49 @@
           </form>
         </div>
       <% end %>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6">
+        <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/update-vm" %>" role="form" method="POST">
+          <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/update-vm") %>
+          <div class="space-y-4">
+            <div>
+              <h2 class="text-lg font-medium leading-6 text-gray-900">Update VM Size and Storage</h2>
+            </div>
+            <div class="grid grid-cols-12 gap-6">
+              <div class="col-span-12 sm:col-span-5">
+                <%== render(
+                  "components/form/select",
+                  locals: {
+                    name: "size",
+                    label: "VM Size",
+                    options: Option::LanternSizes.map { [_1[:vm_size], _1[:vm_size]] }.to_h,
+                    attributes: {
+                      value: @pg[:vm_size]
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="col-span-12 sm:col-span-5">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    label: "Storage (Gib)",
+                    name: "storage_size_gib",
+                    type: "text",
+                    attributes: {
+                      value: @pg[:storage_size_gib]
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                <%== render("components/form/submit_button", locals: { text: "Update VM" }) %>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
       <!-- Delete Card -->
       <% if Authorization.has_permission?(@current_user.id, "Postgres:delete", @pg[:id]) %>
         <div class="px-4 py-5 sm:p-6">

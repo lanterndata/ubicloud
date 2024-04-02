@@ -11,7 +11,7 @@ class Project < Sequel::Model
 
   dataset_module Authorization::Dataset
 
-  plugin :association_dependencies, access_tags: :destroy, access_policies: :destroy #, gcp_vms: :destroy, lantern_servers: :destroy
+  plugin :association_dependencies, access_tags: :destroy, access_policies: :destroy # , gcp_vms: :destroy, lantern_servers: :destroy
 
   include ResourceMethods
   include Authorization::HyperTagMethods

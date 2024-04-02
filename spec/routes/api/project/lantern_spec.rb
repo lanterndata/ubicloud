@@ -16,7 +16,7 @@ RSpec.describe Clover, "lantern" do
     end
   end
 
- describe "authenticated" do
+  describe "authenticated" do
     before do
       login_api(user.email)
       lantern_project = Project.create_with_id(name: "default", provider: "gcp").tap { _1.associate_with_project(_1) }
@@ -45,5 +45,4 @@ RSpec.describe Clover, "lantern" do
       expect(JSON.parse(last_response.body)["items"].length).to eq(2)
     end
   end
-
 end

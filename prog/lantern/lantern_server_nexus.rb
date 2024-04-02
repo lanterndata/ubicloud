@@ -20,7 +20,8 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     location: "us-central1", target_vm_size: nil, storage_size_gib: 50,
     postgres_password: nil, master_host: nil, master_port: nil, domain: nil,
     app_env: Config.rack_env, repl_password: nil, enable_telemetry: Config.production?,
-    enable_debug: false, repl_user: "repl_user")
+    enable_debug: false, repl_user: "repl_user"
+  )
 
     DB.transaction do
       unless (project = Project[project_id])
@@ -257,13 +258,17 @@ SET LOCAL log_statement = 'none';
 ALTER ROLE #{lantern_server.db_user} WITH PASSWORD #{DB.literal(encrypted_password)};
 COMMIT;
 SQL
-        lantern_server.run_query(commands)
+    lantern_server.run_query(commands)
 
     hop_wait
   end
 
   label def wait
     decr_initial_provisioning
+
+    if gcp_vm.strand.label != "wait"
+      hop_wait_db_available
+    end
 
     when_update_user_password_set? do
       hop_update_user_password
@@ -300,17 +305,25 @@ SQL
       hop_update_rhizome
     end
 
+    when_update_storage_size_set? do
+      hop_update_storage_size
+    end
+
+    when_update_vm_size_set? do
+      hop_update_vm_size
+    end
+
     nap 30
   end
 
   # label def unavailable
   #   register_deadline(:wait, 10 * 60)
 
-    # if postgres_server.primary? && (standby = postgres_server.failover_target)
-    #   standby.incr_take_over
-    #   postgres_server.incr_destroy
-    #   nap 0
-    # end
+  # if postgres_server.primary? && (standby = postgres_server.failover_target)
+  #   standby.incr_take_over
+  #   postgres_server.incr_destroy
+  #   nap 0
+  # end
 
   #   reap
   #   nap 5 unless strand.children.select { _1.prog == "Lantern::LanternServerNexus" && _1.label == "restart" }.empty?
@@ -322,12 +335,6 @@ SQL
   #
   #   bud self.class, frame, :restart
   #   nap 5
-  # end
-
-  # label def wait_primary_destroy
-  #   decr_take_over
-    # hop_take_over if postgres_server.resource.representative_server.nil?
-    # nap 5
   # end
 
   label def destroy
@@ -364,6 +371,18 @@ SQL
     decr_restart_server
     incr_stop_server
     incr_start_server
+    hop_wait
+  end
+
+  label def update_storage_size
+    decr_update_storage_size
+    gcp_vm.incr_update_storage
+    hop_wait
+  end
+
+  label def update_vm_size
+    decr_update_vm_size
+    gcp_vm.incr_update_size
     hop_wait
   end
 

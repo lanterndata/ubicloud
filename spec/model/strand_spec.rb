@@ -65,6 +65,10 @@ SQL
     expect(st.load).to be_instance_of Prog::Test
   end
 
+  it "before run" do
+    expect(st.load).to be_instance_of Prog::Test
+  end
+
   it "can hop" do
     st.save_changes
     st.label = "hop_entry"

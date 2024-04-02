@@ -10,7 +10,7 @@ require_relative "../../lib/hosting/gcp_apis"
 
 class Prog::GcpVm::Nexus < Prog::Base
   subject_is :gcp_vm
-  semaphore :destroy, :start_vm, :stop_vm
+  semaphore :destroy, :start_vm, :stop_vm, :update_storage, :update_size
 
   def self.assemble(public_key, project_id, name: nil, size: "n1-standard-2",
     unix_user: "lantern", location: "us-central1", boot_image: "ubuntu-2204-jammy-v20240319",
@@ -28,6 +28,10 @@ class Prog::GcpVm::Nexus < Prog::Base
 
     Validation.validate_name(name)
     Validation.validate_os_user_name(unix_user)
+
+    if domain != nil
+      Validation.validate_domain(domain)
+    end
 
     DB.transaction do
       cores = vm_size.vcpu
@@ -126,7 +130,25 @@ class Prog::GcpVm::Nexus < Prog::Base
       hop_destroy
     end
 
+    when_update_size_set? do
+      hop_update_size
+    end
+
+    when_update_storage_set? do
+      hop_update_storage
+    end
+
     nap 30
+  end
+
+  label def wait_vm_stopped
+    gcp_client = Hosting::GcpApis::new
+    vm = gcp_client.get_vm(gcp_vm.name, "#{gcp_vm.location}-a")
+    if vm["status"] == "TERMINATED"
+      gcp_vm.update(display_state: "stopped")
+      hop_wait
+    end
+    nap 5
   end
 
   label def stop_vm
@@ -135,11 +157,9 @@ class Prog::GcpVm::Nexus < Prog::Base
     gcp_client = Hosting::GcpApis::new
     gcp_client.stop_vm(gcp_vm.name, "#{gcp_vm.location}-a")
 
-    gcp_vm.update(display_state: "stopped")
-
     decr_stop_vm
 
-    hop_wait
+    hop_wait_vm_stopped
   end
 
   label def start_vm
@@ -153,6 +173,43 @@ class Prog::GcpVm::Nexus < Prog::Base
     decr_start_vm
 
     hop_wait_sshable
+  end
+
+  label def update_storage
+    if gcp_vm.display_state != "stopped"
+      hop_stop_vm
+    end
+    decr_update_storage
+    register_deadline(:wait, 5 * 60)
+    gcp_vm.update(display_state: "updating")
+    gcp_client = Hosting::GcpApis::new
+    zone = "#{gcp_vm.location}-a"
+    vm = gcp_client.get_vm(gcp_vm.name, zone)
+    disk_source = vm["disks"][0]["source"]
+    gcp_client.resize_vm_disk(disk_source, gcp_vm.storage_size_gib)
+
+    when_update_size_set? do
+      hop_update_size
+    end
+
+    hop_start_vm
+  end
+
+  label def update_size
+    if gcp_vm.display_state != "stopped"
+      hop_stop_vm
+    end
+    decr_update_size
+    register_deadline(:wait, 5 * 60)
+    gcp_vm.update(display_state: "updating")
+    gcp_client = Hosting::GcpApis::new
+    gcp_client.update_vm_type(gcp_vm.name, "#{gcp_vm.location}-a", gcp_vm.display_size)
+
+    when_update_storage_set? do
+      hop_update_storage
+    end
+
+    hop_start_vm
   end
 
   label def destroy
