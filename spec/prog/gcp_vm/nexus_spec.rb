@@ -120,11 +120,17 @@ RSpec.describe Prog::GcpVm::Nexus do
   end
 
   describe "#start_vm" do
+    it "naps 10 to retry start" do
+      expect(gcp_vm).to receive(:update).with({:display_state => "starting"})
+      stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+      stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm/start").to_return(status: 200, body: "{\"status\": \"PENDING\"}", headers: {})
+      expect { nx.start_vm }.to nap(10)
+    end
     it "hops to wait_sshable after run" do
       expect(gcp_vm).to receive(:update).with({:display_state => "starting"})
       expect(gcp_vm).to receive(:update).with({:display_state => "running"})
       stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
-      stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm/start").to_return(status: 200, body: "", headers: {})
+      stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm/start").to_return(status: 200, body: "{\"status\": \"DONE\"}", headers: {})
       expect { nx.start_vm }.to hop("wait_sshable")
     end
   end

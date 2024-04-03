@@ -183,7 +183,9 @@ class Hosting::GcpApis
 
   def start_vm(vm_name, zone)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
-    connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/start", expects: 200)
+    response = connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/start", expects: 200)
+    Hosting::GcpApis.check_errors(response)
+    JSON.parse(response.body)
   end
 
   def stop_vm(vm_name, zone)

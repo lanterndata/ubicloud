@@ -166,7 +166,11 @@ class Prog::GcpVm::Nexus < Prog::Base
     gcp_vm.update(display_state: "starting")
 
     gcp_client = Hosting::GcpApis::new
-    gcp_client.start_vm(gcp_vm.name, "#{gcp_vm.location}-a")
+    res = gcp_client.start_vm(gcp_vm.name, "#{gcp_vm.location}-a")
+
+    if !["DONE"].include?(res["status"])
+      nap 10
+    end
 
     gcp_vm.update(display_state: "running")
 
