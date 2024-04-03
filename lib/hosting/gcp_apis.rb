@@ -192,7 +192,7 @@ class Hosting::GcpApis
   end
 
   def update_vm_type(vm_name, zone, machine_type)
-    query = {mostDisruptiveAllowedAction: "RESTART"}
+    query = {mostDisruptiveAllowedAction: "NONE"}
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
     vm = get_vm(vm_name, zone)
     vm["machineType"] = "projects/#{@project}/zones/#{zone}/machineTypes/#{machine_type}"

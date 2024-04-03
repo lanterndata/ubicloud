@@ -266,7 +266,7 @@ RSpec.describe Prog::GcpVm::Nexus do
       stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm")
         .to_return(status: 200, body: JSON.dump({machineType: "standard-2"}))
       stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
-      stub_request(:put, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm?mostDisruptiveAllowedAction=RESTART")
+      stub_request(:put, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm?mostDisruptiveAllowedAction=NONE")
         .with(
           body: "{\"machineType\":\"projects/ringed-griffin-394922/zones/us-central1-a/machineTypes/standard-1\"}",
           headers: {
@@ -286,7 +286,7 @@ RSpec.describe Prog::GcpVm::Nexus do
       stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm")
         .to_return(status: 200, body: JSON.dump({machineType: "standard-2"}))
       stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
-      stub_request(:put, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm?mostDisruptiveAllowedAction=RESTART")
+      stub_request(:put, "https://compute.googleapis.com/compute/v1/projects/ringed-griffin-394922/zones/us-central1-a/instances/dummy-vm?mostDisruptiveAllowedAction=NONE")
         .with(
           body: "{\"machineType\":\"projects/ringed-griffin-394922/zones/us-central1-a/machineTypes/standard-1\"}",
           headers: {

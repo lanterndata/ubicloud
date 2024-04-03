@@ -25,3 +25,5 @@ assets/css/app.css
 
 # Built Visual Studio Code Extensions
 *.vsix
+
+.DS_Store
