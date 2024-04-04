@@ -96,3 +96,15 @@ def configure_tls(domain, email, dns_token, dns_zone_id, provider)
 
   restart_if_needed()
 end
+
+def calculate_memory_sizes()
+  total_ram = (r "free -tk | awk 'NR == 2 {print $2}'")
+  # Calculate 95% of the total RAM in kilobytes
+  shared_buf_mb = (total_ram.to_i * 0.95 / 1024).round
+  # Calculate 50% of the total RAM in kilobytes
+  shm_size_mb = (total_ram.to_i * 0.5 / 1024).round
+  mem_limit_buf = "#{shared_buf_mb}MB"
+  mem_limit_shm = "#{shm_size_mb}MB"
+
+  return {:shm_size => mem_limit_shm, :shared_bufs => mem_limit_buf}
+end

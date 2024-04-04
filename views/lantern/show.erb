@@ -286,9 +286,7 @@
                     name: "size",
                     label: "VM Size",
                     options: Option::LanternSizes.map { [_1[:vm_size], _1[:vm_size]] }.to_h,
-                    attributes: {
-                      value: @pg[:vm_size]
-                    }
+                    selected: @pg[:vm_size]
                   }
                 ) %>
               </div>

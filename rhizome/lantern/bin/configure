@@ -78,11 +78,7 @@ end
 
 def setup_initial_compose_file()
   # setup_initial_compose_file
-  # Get the total amount of RAM in kilobytes
-  total_ram = (r "free -tk | awk 'NR == 2 {print $2}'")
-  # Calculate 95% of the total RAM in kilobytes
-  mem_mb = (total_ram.to_i * 0.95 / 1024).round
-  mem_limit = "#{mem_mb}MB"
+  memory_sizes = calculate_memory_sizes()
 
   map = {
     "services" => {
@@ -92,9 +88,10 @@ def setup_initial_compose_file()
         "volumes" => ["/var/lib/lantern-data:/bitnami/postgresql"],
         "deploy" => {
           "restart_policy" => {"condition" => "always"},
-          "resources" => {"limits" => {"memory" => mem_limit}}
+          "resources" => {"limits" => {"memory" => memory_sizes[:shared_bufs]}}
         },
-        "env_file" => $env_file
+        "env_file" => $env_file,
+        "shm_size" => memory_sizes[:shm_size]
       }
     }
   }

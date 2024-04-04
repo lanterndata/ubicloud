@@ -483,6 +483,16 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
   end
 
+  describe "#wait_db_available" do
+    it "should update memory limits" do
+      expect(nx).to receive(:when_update_memory_limits_set?).and_yield
+      expect(lantern_server).to receive(:run_query)
+      expect(lantern_server.gcp_vm.sshable).to receive(:invalidate_cache_entry)
+      expect(lantern_server.gcp_vm.sshable).to receive(:cmd).with("sudo lantern/bin/update_memory_limits")
+      expect { nx.wait_db_available }.to hop("wait")
+    end
+  end
+
   describe "#available" do
     it "should mark as available" do
       expect(lantern_server).to receive(:run_query)

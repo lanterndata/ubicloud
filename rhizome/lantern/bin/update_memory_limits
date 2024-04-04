@@ -1,0 +1,16 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require 'yaml'
+require_relative "../../common/lib/util"
+require_relative "../lib/common"
+
+map = YAML.load_file $compose_file
+memory_sizes = calculate_memory_sizes()
+map["services"]["postgresql"]["shm_size"] = memory_sizes[:shm_size]
+map["services"]["postgresql"]["deploy"]["resources"]["limits"]["memory"] = memory_sizes[:shared_bufs]
+
+File.open($compose_file, 'w') { |f| YAML.dump(map, f) }
+
+restart_if_needed

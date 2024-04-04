@@ -11,7 +11,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   def_delegators :lantern_server, :gcp_vm
 
   semaphore :initial_provisioning, :update_user_password, :update_lantern_extension, :update_extras_extension, :update_image, :setup_ssl, :add_domain, :update_rhizome, :checkup
-  semaphore :start_server, :stop_server, :restart_server, :take_over, :destroy, :update_storage_size, :update_vm_size
+  semaphore :start_server, :stop_server, :restart_server, :take_over, :destroy, :update_storage_size, :update_vm_size, :update_memory_limits
 
   def self.assemble(
     project_id: nil, lantern_version: "0.2.2", extras_version: "0.1.4", minor_version: "1",
@@ -177,6 +177,11 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
 
   label def wait_db_available
     if available?
+      when_update_memory_limits_set? do
+        gcp_vm.sshable.cmd("sudo lantern/bin/update_memory_limits")
+        decr_update_memory_limits
+      end
+
       hop_wait
     end
 
@@ -383,6 +388,7 @@ SQL
   label def update_vm_size
     decr_update_vm_size
     gcp_vm.incr_update_size
+    incr_update_memory_limits
     hop_wait
   end
 
