@@ -7,7 +7,7 @@ class Project < Sequel::Model
   one_to_many :access_policies
 
   many_to_many :gcp_vms, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
-  many_to_many :lantern_servers, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
+  many_to_many :lantern_resources, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
 
   dataset_module Authorization::Dataset
 

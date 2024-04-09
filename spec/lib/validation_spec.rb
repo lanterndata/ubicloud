@@ -253,5 +253,59 @@ RSpec.describe Validation do
         expect { described_class.validate_domain("a") }.to raise_error described_class::ValidationFailed
       end
     end
+
+    describe "#validate_lantern_ha_type" do
+      it "valid lantern ha_type" do
+        [LanternResource::HaType::NONE, LanternResource::HaType::ASYNC, LanternResource::HaType::SYNC].each { |ha_type| expect { described_class.validate_lantern_ha_type(ha_type) }.not_to raise_error }
+      end
+
+      it "invalid lantern ha_type" do
+        ["quorum", "on", "off"].each { |ha_type| expect { described_class.validate_lantern_ha_type(ha_type) }.to raise_error described_class::ValidationFailed }
+      end
+    end
+
+    describe "#validate_db_name" do
+      it "valid names" do
+        [
+          "abc",
+          "abc123"
+        ].each do |name|
+          expect(described_class.validate_db_name(name)).to be_nil
+        end
+      end
+
+      it "invalid names" do
+        [
+          nil,
+          "ABC_123",
+          "ABC$123",
+          "a" * 64
+        ].each do |name|
+          expect { described_class.validate_db_name(name) }.to raise_error described_class::ValidationFailed
+        end
+      end
+    end
+
+    describe "#validate_db_user" do
+      it "valid names" do
+        [
+          "abc",
+          "abc123"
+        ].each do |name|
+          expect(described_class.validate_db_user(name)).to be_nil
+        end
+      end
+
+      it "invalid names" do
+        [
+          nil,
+          "ABC_123",
+          "ABC$123",
+          "a" * 64
+        ].each do |name|
+          expect { described_class.validate_db_user(name) }.to raise_error described_class::ValidationFailed
+        end
+      end
+    end
   end
 end

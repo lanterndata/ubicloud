@@ -37,6 +37,16 @@ module Validation
     fail ValidationFailed.new({name: msg}) unless name&.match(ALLOWED_NAME_PATTERN)
   end
 
+  def self.validate_db_name(db_name)
+    msg = "DB name must only contain lowercase letters, numbers, and hyphens and have max length 63."
+    fail ValidationFailed.new({db_name: msg}) unless db_name&.match(ALLOWED_NAME_PATTERN)
+  end
+
+  def self.validate_db_user(db_user)
+    msg = "DB name must only contain lowercase letters, numbers, and hyphens and have max length 63."
+    fail ValidationFailed.new({db_user: msg}) unless db_user&.match(ALLOWED_NAME_PATTERN)
+  end
+
   def self.validate_minio_username(username)
     msg = "Minio user must only contain lowercase letters, numbers, hyphens and underscore and cannot start with a number or hyphen. It also have max length of 32, min length of 3."
     fail ValidationFailed.new({username: msg}) unless username&.match(ALLOWED_MINIO_USERNAME_PATTERN)
@@ -60,11 +70,11 @@ module Validation
     vm_size
   end
 
-  # def self.validate_postgres_ha_type(ha_type)
-  #   unless Option::PostgresHaOptions.find { _1.name == ha_type }
-  #     fail ValidationFailed.new({ha_type: "\"#{ha_type}\" is not a valid PostgreSQL high availability option. Available options: #{Option::PostgresHaOptions.map(&:name)}"})
-  #   end
-  # end
+  def self.validate_lantern_ha_type(ha_type)
+    unless Option::LanternHaOptions.find { _1.name == ha_type }
+      fail ValidationFailed.new({ha_type: "\"#{ha_type}\" is not a valid PostgreSQL high availability option. Available options: #{Option::LanternHaOptions.map(&:name)}"})
+    end
+  end
 
   def self.validate_os_user_name(os_user_name)
     msg = "OS user name must only contain lowercase letters, numbers, hyphens and underscore and cannot start with a number or hyphen. It also have max length of 32."

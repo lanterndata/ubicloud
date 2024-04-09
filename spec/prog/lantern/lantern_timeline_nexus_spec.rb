@@ -7,26 +7,27 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
 
   let(:sshable) { instance_double(Sshable) }
 
+  let(:timeline) {
+    instance_double(
+      LanternTimeline,
+      id: "6ae7e513-c34a-8039-a72a-7be45b53f2a0",
+      gcp_creds_b64: "test-creds",
+      service_account_name: "test-sa",
+      bucket_name: "test-bucket",
+      parent: nil
+    )
+  }
+
   let(:lantern_server) {
     instance_double(
       LanternServer,
-      org_id: 0,
-      name: "test",
       ubid: "6ae7e513-c34a-8039-a72a-7be45b53f2a0",
-      gcp_vm: instance_double(
+      vm: instance_double(
         GcpVm,
         id: "104b0033-b3f6-8214-ae27-0cd3cef18ce4",
-        sshable: sshable,
-        domain: nil
+        sshable: sshable
       ),
-      timeline: instance_double(
-        LanternTimeline,
-        id: "6ae7e513-c34a-8039-a72a-7be45b53f2a0",
-        gcp_creds_b64: "test-creds",
-        service_account_name: "test-sa",
-        bucket_name: "test-bucket",
-        parent: nil
-      )
+      timeline: timeline
     )
   }
 
@@ -122,7 +123,7 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
       expect(lantern_server.timeline).to receive(:leader).and_return(lantern_server)
       expect(lantern_server.timeline).to receive(:latest_backup_started_at=)
       expect(lantern_server.timeline).to receive(:save_changes)
-      expect(lantern_server.gcp_vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/take_backup' take_postgres_backup")
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/take_backup' take_postgres_backup")
       expect { nx.take_backup }.to hop("wait")
     end
   end

@@ -23,20 +23,20 @@ RSpec.describe Clover, "lantern" do
     end
 
     it "success all servers" do
-      Prog::Lantern::LanternServerNexus.assemble(
+      Prog::Lantern::LanternResourceNexus.assemble(
         project_id: project.id,
         location: "us-central1",
         name: "lantern-foo-1",
         target_vm_size: "n1-standard-2",
-        storage_size_gib: 100
+        target_storage_size_gib: 100
       )
 
-      Prog::Lantern::LanternServerNexus.assemble(
+      Prog::Lantern::LanternResourceNexus.assemble(
         project_id: project.id,
         location: "us-central1",
         name: "lantern-foo-2",
         target_vm_size: "n1-standard-2",
-        storage_size_gib: 100
+        target_storage_size_gib: 100
       )
 
       get "/api/project/#{project.ubid}/lantern"

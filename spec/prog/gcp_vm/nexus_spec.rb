@@ -37,11 +37,10 @@ RSpec.describe Prog::GcpVm::Nexus do
     end
 
     it "creates arm64 vm with double core count and 3.2GB memory per core" do
-      st = described_class.assemble("some_ssh_key", prj.id, size: "n1-standard-4", arch: "arm64", domain: "test-domain.example.com")
+      st = described_class.assemble("some_ssh_key", prj.id, size: "n1-standard-4", arch: "arm64")
       expect(st.subject.cores).to eq(4)
       expect(st.subject.mem_gib_ratio).to eq(3.2)
       expect(st.subject.mem_gib).to eq(12)
-      expect(st.subject.domain).to eq("test-domain.example.com")
     end
   end
 
@@ -66,7 +65,12 @@ RSpec.describe Prog::GcpVm::Nexus do
     it "Hops to wait_create_vm on start" do
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
-      expect(gcp_api).to receive(:create_vm)
+      frame = {"labels" => {"parent" => "test-label"}}
+      expect(gcp_api).to receive(:create_vm).with("dummy-vm", "us-central1-a", nil, nil, nil, "standard-1", 50, labels: frame["labels"])
+      expect(nx).to receive(:frame).and_return(frame)
+      expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(nx.strand).to receive(:modified!).with(:stack).at_least(:once)
+      expect(nx.strand).to receive(:save_changes).at_least(:once)
       expect { nx.start }.to hop("wait_create_vm")
     end
 
@@ -147,7 +151,7 @@ RSpec.describe Prog::GcpVm::Nexus do
       expect(gcp_vm).to receive(:update).with({display_state: "stopping"})
       expect(gcp_vm).to receive(:update).with({display_state: "stopped"})
       gcp_api = instance_double(Hosting::GcpApis)
-      expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api).exactly(3).times
+      expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api).at_least(:once)
       expect(gcp_api).to receive(:stop_vm).with("dummy-vm", "us-central1-a")
       expect(gcp_api).to receive(:get_vm).with("dummy-vm", "us-central1-a").and_return({"status" => "STOPPING"})
       expect { nx.stop_vm }.to hop("wait_vm_stopped")

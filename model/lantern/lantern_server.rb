@@ -6,6 +6,7 @@ require_relative "../../model"
 class LanternServer < Sequel::Model
   one_to_one :strand, key: :id
   one_to_one :gcp_vm, key: :id, primary_key: :vm_id
+  many_to_one :resource, class: LanternResource, key: :resource_id
   many_to_one :timeline, class: LanternTimeline, key: :timeline_id
 
   dataset_module Authorization::Dataset
@@ -14,36 +15,40 @@ class LanternServer < Sequel::Model
   include HealthMonitorMethods
   include ResourceMethods
   include SemaphoreMethods
-  include Authorization::HyperTagMethods
-  include Authorization::TaggableMethods
 
   semaphore :initial_provisioning, :update_user_password, :update_lantern_extension, :update_extras_extension, :update_image, :setup_ssl, :add_domain, :update_rhizome, :checkup
-  semaphore :start_server, :stop_server, :restart_server, :take_over, :destroy, :update_storage_size, :update_vm_size, :update_memory_limits
-
-  def hyper_tag_name(project)
-    "project/#{project.ubid}/location/#{location}/lantern/#{name}"
-  end
-
-  def path
-    "/location/#{gcp_vm.location}/lantern/#{name}"
-  end
+  semaphore :start_server, :stop_server, :restart_server, :take_over, :destroy, :update_storage_size, :update_vm_size, :update_memory_limits, :init_sql
 
   def self.ubid_to_name(id)
     id.to_s[0..7]
   end
 
+  def vm
+    gcp_vm
+  end
+
+  def hostname
+    if domain
+      return domain
+    end
+
+    return nil unless vm.sshable.host && !vm.sshable.host.start_with?("temp")
+
+    vm.sshable.host
+  end
+
   def connection_string
-    return nil unless gcp_vm.sshable.host && !gcp_vm.sshable.host.start_with?("temp")
+    return nil unless (hn = hostname)
     URI::Generic.build2(
       scheme: "postgres",
-      userinfo: "postgres:#{URI.encode_uri_component(postgres_password)}",
-      host: gcp_vm.domain || gcp_vm.sshable.host,
+      userinfo: "postgres:#{URI.encode_uri_component(resource.superuser_password)}",
+      host: hn,
       port: 6432
     ).to_s
   end
 
   def run_query(query)
-    gcp_vm.sshable.cmd("sudo lantern/bin/exec", stdin: query).chomp
+    vm.sshable.cmd("sudo lantern/bin/exec", stdin: query).chomp
   end
 
   def display_state
@@ -56,7 +61,73 @@ class LanternServer < Sequel::Model
     "creating"
   end
 
+  def primary?
+    timeline_access == "push"
+  end
+
   def standby?
-    instance_type == "reader"
+    timeline_access == "fetch" && !doing_pitr?
+  end
+
+  def doing_pitr?
+    !resource.representative_server.primary?
+  end
+
+  def instance_type
+    standby? ? "reader" : "writer"
+  end
+
+  def configure_hash
+    walg_config = timeline.generate_walg_config
+    backup_label = ""
+
+    # Set backup_label if the database is being initialized from backup
+    if !resource.parent.nil?
+      backup_label = if standby? || resource.restore_target.nil?
+        "LATEST"
+      else
+        timeline.latest_backup_label_before_target(resource.restore_target)
+      end
+    end
+
+    JSON.generate({
+      enable_coredumps: true,
+      org_id: resource.org_id,
+      instance_id: resource.name,
+      instance_type: instance_type,
+      app_env: resource.app_env,
+      enable_debug: resource.debug,
+      enable_telemetry: resource.enable_telemetry || "",
+      repl_user: resource.repl_user || "",
+      repl_password: resource.repl_password || "",
+      replication_mode: standby? ? "slave" : "master",
+      db_name: resource.db_name || "",
+      db_user: resource.db_user || "",
+      db_user_password: resource.db_user_password || "",
+      postgres_password: resource.superuser_password || "",
+      # master_host: lantern_server.master_host,
+      # master_port: lantern_server.master_port,
+      prom_password: Config.prom_password,
+      gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
+      gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
+      container_image: "#{Config.gcr_image}:lantern-#{lantern_version}-extras-#{extras_version}-minor-#{minor_version}",
+      postgresql_recover_from_backup: backup_label,
+      postgresql_recovery_target_time: resource.restore_target || "",
+      gcp_creds_walg_b64: walg_config[:gcp_creds_b64],
+      walg_gs_prefix: walg_config[:walg_gs_prefix]
+    })
+  end
+
+  def update_walg_creds
+    walg_config = timeline.generate_walg_config
+    vm.sshable.cmd("sudo lantern/bin/update_env", stdin: JSON.generate([
+      ["WALG_GS_PREFIX", walg_config[:walg_gs_prefix]],
+      ["GOOGLE_APPLICATION_CREDENTIALS_WALG_B64", walg_config[:gcp_creds_b64]],
+      ["POSTGRESQL_RECOVER_FROM_BACKUP", ""]
+    ]))
+  end
+
+  def container_image
+    "#{Config.gcr_image}:lantern-#{lantern_version}-extras-#{extras_version}-minor-#{minor_version}"
   end
 end

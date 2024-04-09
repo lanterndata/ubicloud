@@ -2,7 +2,7 @@
 
 require_relative "../../spec_helper"
 
-RSpec.describe Serializers::Api::Lantern do
+RSpec.describe Serializers::Web::Lantern do
   let(:lantern) {
     LanternResource.new(
       name: "lantern-1",
@@ -32,6 +32,7 @@ RSpec.describe Serializers::Api::Lantern do
       display_state: "running",
       instance_type: "writer",
       hostname: "db.lantern.dev",
+      primary?: true,
       connection_string: "postgres://postgres:test123@db.lantern.dev:6432")
     expect(lantern).to receive(:representative_server).and_return(leader).at_least(:once)
     data = described_class.new(:default).serialize(lantern)
@@ -39,7 +40,6 @@ RSpec.describe Serializers::Api::Lantern do
     expect(data[:state]).to eq("running")
     expect(data[:connection_string]).to be_nil
     expect(data[:vm_size]).to eq("standard-2")
-    expect(data[:host]).to eq("db.lantern.dev")
   end
 
   it "correctly serializes Lantern Server without representative_server" do
@@ -53,6 +53,7 @@ RSpec.describe Serializers::Api::Lantern do
       display_state: "running",
       instance_type: "writer",
       hostname: "db.lantern.dev",
+      primary?: true,
       connection_string: "postgres://postgres:test123@db.lantern.dev:6432")
     expect(lantern).to receive(:representative_server).and_return(nil).at_least(:once)
     data = described_class.new(:default).serialize(lantern)
@@ -75,6 +76,7 @@ RSpec.describe Serializers::Api::Lantern do
       display_state: "running",
       instance_type: "writer",
       hostname: "db.lantern.dev",
+      primary?: true,
       connection_string: "postgres://postgres:test123@db.lantern.dev:6432")
     expect(lantern).to receive(:representative_server).and_return(leader).at_least(:once)
     expect(lantern).to receive(:servers).and_return([leader]).at_least(:once)
@@ -83,7 +85,6 @@ RSpec.describe Serializers::Api::Lantern do
     expect(data[:state]).to eq("running")
     expect(data[:connection_string]).to eq("postgres://postgres:test123@db.lantern.dev:6432")
     expect(data[:vm_size]).to eq("standard-2")
-    expect(data[:host]).to eq("db.lantern.dev")
     expect(data[:servers][0][:connection_string]).to eq("postgres://postgres:test123@db.lantern.dev:6432")
   end
 
@@ -98,6 +99,7 @@ RSpec.describe Serializers::Api::Lantern do
       display_state: "running",
       instance_type: "writer",
       hostname: "db.lantern.dev",
+      primary?: true,
       connection_string: "postgres://postgres:test123@db.lantern.dev:6432")
     expect(lantern).to receive(:representative_server).and_return(leader).at_least(:once)
     data = described_class.new(:default).serialize([lantern, lantern])

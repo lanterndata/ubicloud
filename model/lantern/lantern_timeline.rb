@@ -6,7 +6,7 @@ class LanternTimeline < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :parent, key: :parent_id, class: self
   one_to_many :children, key: :parent_id, class: self
-  one_to_one :leader, class: LanternServer, key: :timeline_id, conditions: {instance_type: "writer"}
+  one_to_one :leader, class: LanternServer, key: :timeline_id, conditions: {timeline_access: "push"}
 
   include ResourceMethods
   include SemaphoreMethods
@@ -21,22 +21,14 @@ class LanternTimeline < Sequel::Model
     "gs://#{Config.lantern_backup_bucket}/#{ubid}"
   end
 
+  def latest_restore_time
+    Time.now
+  end
+
   def generate_walg_config
-    # If there's no parent or leader
-    # So this is reader instance without writer or backup point
-    # That means this is a bug
-    if parent.nil? && leader.nil?
-      fail "standby instance without parent timeline"
-    end
-
-    gcp_creds_walg_push_b64, walg_gs_push_prefix = leader.nil? ? [nil, nil] : [gcp_creds_b64, bucket_name]
-    gcp_creds_walg_pull_b64, walg_gs_pull_prefix = parent.nil? ? [nil, nil] : [parent.gcp_creds_b64, parent.bucket_name]
-
     {
-      gcp_creds_walg_push_b64: gcp_creds_walg_push_b64,
-      walg_gs_push_prefix: walg_gs_push_prefix,
-      gcp_creds_walg_pull_b64: gcp_creds_walg_pull_b64,
-      walg_gs_pull_prefix: walg_gs_pull_prefix
+      gcp_creds_b64: gcp_creds_b64,
+      walg_gs_prefix: bucket_name
     }
   end
 

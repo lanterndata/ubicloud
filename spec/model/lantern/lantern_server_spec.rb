@@ -7,7 +7,7 @@ RSpec.describe LanternServer do
     described_class.new { _1.id = "c068cac7-ed45-82db-bf38-a003582b36ee" }
   }
 
-  let(:gcp_vm) {
+  let(:vm) {
     instance_double(
       GcpVm,
       sshable: instance_double(Sshable),
@@ -16,27 +16,63 @@ RSpec.describe LanternServer do
   }
 
   before do
-    allow(lantern_server).to receive(:gcp_vm).and_return(gcp_vm)
+    allow(lantern_server).to receive(:gcp_vm).and_return(vm)
   end
 
-  it "Shows display state" do
-    expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "setup domain"))
-    expect(lantern_server.display_state).to eq("domain setup")
+  describe "#instance_type" do
+    it "returns reader" do
+      expect(lantern_server).to receive(:standby?).and_return(true)
+      expect(lantern_server.instance_type).to eq("reader")
+    end
 
-    expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "setup_ssl")).twice
-    expect(lantern_server.display_state).to eq("ssl setup")
+    it "returns writer" do
+      expect(lantern_server).to receive(:standby?).and_return(false)
+      expect(lantern_server.instance_type).to eq("writer")
+    end
+  end
 
-    expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "update_extension")).exactly(3).times
-    expect(lantern_server.display_state).to eq("updating")
+  describe "#display_state" do
+    it "shows domain setup" do
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "setup domain")).at_least(:once)
+      expect(lantern_server.display_state).to eq("domain setup")
+    end
 
-    expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait")).exactly(5).times
-    expect(lantern_server.display_state).to eq("running")
+    it "shows ssl setup" do
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "setup_ssl")).at_least(:once)
+      expect(lantern_server.display_state).to eq("ssl setup")
+    end
 
-    expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "destroy")).exactly(6).times
-    expect(lantern_server.display_state).to eq("deleting")
+    it "shows updating" do
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "update_extension")).at_least(:once)
+      expect(lantern_server.display_state).to eq("updating")
+    end
 
-    expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait_db_available")).exactly(4).times
-    expect(lantern_server.display_state).to eq("unavailable")
+    it "shows running" do
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait")).at_least(:once)
+      expect(lantern_server.display_state).to eq("running")
+    end
+
+    it "shows deleting" do
+      expect(lantern_server).to receive(:destroy_set?).and_return(false).at_least(:once)
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "destroy")).at_least(:once)
+      expect(lantern_server.display_state).to eq("deleting")
+    end
+
+    it "shows deleting if destroy set" do
+      expect(lantern_server).to receive(:destroy_set?).and_return(true).at_least(:once)
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "unknown")).at_least(:once)
+      expect(lantern_server.display_state).to eq("deleting")
+    end
+
+    it "shows unavailable" do
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait_db_available")).at_least(:once)
+      expect(lantern_server.display_state).to eq("unavailable")
+    end
+
+    it "shows creating" do
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "unknown")).at_least(:once)
+      expect(lantern_server.display_state).to eq("creating")
+    end
   end
 
   it "returns name from ubid" do
@@ -44,17 +80,342 @@ RSpec.describe LanternServer do
   end
 
   it "runs query on vm" do
-    expect(lantern_server.gcp_vm.sshable).to receive(:cmd).with("sudo lantern/bin/exec", stdin: "SELECT 1").and_return("1\n")
+    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo lantern/bin/exec", stdin: "SELECT 1").and_return("1\n")
     expect(lantern_server.run_query("SELECT 1")).to eq("1")
   end
 
-  it "#standby? - false" do
-    expect(lantern_server).to receive(:instance_type).and_return("writer")
-    expect(lantern_server.standby?).to be(false)
+  describe "#standby?" do
+    it "false if timeline is push" do
+      expect(lantern_server).to receive(:timeline_access).and_return("push")
+      expect(lantern_server.standby?).to be(false)
+    end
+
+    it "false if timeline is fetch and pitr" do
+      expect(lantern_server).to receive(:doing_pitr?).and_return(true)
+      expect(lantern_server).to receive(:timeline_access).and_return("fetch")
+      expect(lantern_server.standby?).to be(false)
+    end
+
+    it "true if timeline is fetch and no pitr" do
+      expect(lantern_server).to receive(:doing_pitr?).and_return(false)
+      expect(lantern_server).to receive(:timeline_access).and_return("fetch")
+      expect(lantern_server.standby?).to be(true)
+    end
   end
 
-  it "#standby? - true" do
-    expect(lantern_server).to receive(:instance_type).and_return("reader")
-    expect(lantern_server.standby?).to be(true)
+  describe "#primary?" do
+    it "true if timeline is push" do
+      expect(lantern_server).to receive(:timeline_access).and_return("push")
+      expect(lantern_server.primary?).to be(true)
+    end
+
+    it "false if timeline is fetch" do
+      expect(lantern_server).to receive(:timeline_access).and_return("fetch")
+      expect(lantern_server.primary?).to be(false)
+    end
+  end
+
+  describe "#doing_pitr?" do
+    it "returns false if representative is primary" do
+      expect(lantern_server).to receive(:resource).and_return(instance_double(LanternResource, representative_server: instance_double(described_class, primary?: true)))
+      expect(lantern_server.doing_pitr?).to be(false)
+    end
+
+    it "returns true if representative is not primary" do
+      expect(lantern_server).to receive(:resource).and_return(instance_double(LanternResource, representative_server: instance_double(described_class, primary?: false)))
+      expect(lantern_server.doing_pitr?).to be(true)
+    end
+  end
+
+  describe "#vm" do
+    it "returns gcp_vm" do
+      expect(lantern_server.vm).to eq(lantern_server.gcp_vm)
+    end
+  end
+
+  describe "#hostname" do
+    it "returns domain" do
+      expect(lantern_server).to receive(:domain).and_return("db.lantern.dev").at_least(:once)
+      expect(lantern_server.hostname).to eq("db.lantern.dev")
+    end
+
+    it "returns vm host if not temp" do
+      expect(lantern_server).to receive(:domain).and_return(nil).at_least(:once)
+      expect(vm.sshable).to receive(:host).and_return("1.1.1.1").at_least(:once)
+      expect(lantern_server.hostname).to eq("1.1.1.1")
+    end
+
+    it "returns nil if vm host is temp" do
+      expect(lantern_server).to receive(:domain).and_return(nil).at_least(:once)
+      expect(vm.sshable).to receive(:host).and_return("temp_111").at_least(:once)
+      expect(lantern_server.hostname).to be_nil
+    end
+
+    it "returns nil if vm has no host" do
+      expect(lantern_server).to receive(:domain).and_return(nil).at_least(:once)
+      expect(vm.sshable).to receive(:host).and_return(nil).at_least(:once)
+      expect(lantern_server.hostname).to be_nil
+    end
+  end
+
+  describe "#connection_string" do
+    it "returns nil if no hostname" do
+      expect(lantern_server).to receive(:hostname).and_return(nil)
+      expect(lantern_server.connection_string).to be_nil
+    end
+
+    it "returns correct connection string" do
+      expect(lantern_server).to receive(:hostname).and_return("db.lantern.dev")
+      expect(lantern_server).to receive(:resource).and_return(instance_double(LanternResource, superuser_password: "pwd123"))
+      expect(lantern_server.connection_string).to eq("postgres://postgres:pwd123@db.lantern.dev:6432")
+    end
+  end
+
+  describe "#configure_hash" do
+    it "generates config hash without backup label" do
+      timeline = instance_double(LanternTimeline)
+      resource = instance_double(LanternResource,
+        parent: nil,
+        org_id: 0,
+        name: "test-db",
+        app_env: "test",
+        debug: false,
+        enable_telemetry: false,
+        repl_user: "repl_user",
+        repl_password: "repl_password",
+        db_name: "postgres",
+        db_user: "postgres",
+        db_user_password: "pwd123",
+        superuser_password: "pwd1234",
+        restore_target: nil)
+      expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
+      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
+      expect(timeline).to receive(:generate_walg_config).and_return({gcp_creds_b64: "test-creds-push", walg_gs_prefix: "test-bucket-push"}).at_least(:once)
+      expect(lantern_server).to receive(:resource).and_return(resource).at_least(:once)
+      expect(lantern_server).to receive(:timeline).and_return(timeline).at_least(:once)
+      expect(lantern_server).to receive(:standby?).and_return(false).at_least(:once)
+      expect(lantern_server).to receive(:lantern_version).and_return("0.2.2").at_least(:once)
+      expect(lantern_server).to receive(:extras_version).and_return("0.1.4").at_least(:once)
+      expect(lantern_server).to receive(:minor_version).and_return("1").at_least(:once)
+
+      walg_conf = timeline.generate_walg_config
+      expected_conf = JSON.generate({
+        enable_coredumps: true,
+        org_id: resource.org_id,
+        instance_id: resource.name,
+        instance_type: lantern_server.standby? ? "reader" : "writer",
+        app_env: resource.app_env,
+        enable_debug: resource.debug,
+        enable_telemetry: resource.enable_telemetry || "",
+        repl_user: resource.repl_user || "",
+        repl_password: resource.repl_password || "",
+        replication_mode: lantern_server.standby? ? "slave" : "master",
+        db_name: resource.db_name || "",
+        db_user: resource.db_user || "",
+        db_user_password: resource.db_user_password || "",
+        postgres_password: resource.superuser_password || "",
+        prom_password: Config.prom_password,
+        gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
+        gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
+        container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}",
+        postgresql_recover_from_backup: "",
+        postgresql_recovery_target_time: resource.restore_target || "",
+        gcp_creds_walg_b64: walg_conf[:gcp_creds_b64],
+        walg_gs_prefix: walg_conf[:walg_gs_prefix]
+      })
+      expect(lantern_server.configure_hash).to eq(expected_conf)
+    end
+
+    it "generates config hash with backup label" do
+      timeline = instance_double(LanternTimeline)
+      parent = instance_double(LanternResource)
+      resource = instance_double(LanternResource,
+        parent: parent,
+        org_id: 0,
+        name: "test-db",
+        app_env: "test",
+        debug: false,
+        enable_telemetry: false,
+        repl_user: "repl_user",
+        repl_password: "repl_password",
+        db_name: "postgres",
+        db_user: "postgres",
+        db_user_password: "pwd123",
+        superuser_password: "pwd1234",
+        restore_target: Time.now)
+      expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
+      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
+      expect(timeline).to receive(:latest_backup_label_before_target).and_return("test-label").at_least(:once)
+      expect(timeline).to receive(:generate_walg_config).and_return({gcp_creds_b64: "test-creds-push", walg_gs_prefix: "test-bucket-push"}).at_least(:once)
+      expect(lantern_server).to receive(:resource).and_return(resource).at_least(:once)
+      expect(lantern_server).to receive(:timeline).and_return(timeline).at_least(:once)
+      expect(lantern_server).to receive(:standby?).and_return(false).at_least(:once)
+      expect(lantern_server).to receive(:lantern_version).and_return("0.2.2").at_least(:once)
+      expect(lantern_server).to receive(:extras_version).and_return("0.1.4").at_least(:once)
+      expect(lantern_server).to receive(:minor_version).and_return("1").at_least(:once)
+
+      walg_conf = timeline.generate_walg_config
+      expected_conf = JSON.generate({
+        enable_coredumps: true,
+        org_id: resource.org_id,
+        instance_id: resource.name,
+        instance_type: lantern_server.standby? ? "reader" : "writer",
+        app_env: resource.app_env,
+        enable_debug: resource.debug,
+        enable_telemetry: resource.enable_telemetry || "",
+        repl_user: resource.repl_user || "",
+        repl_password: resource.repl_password || "",
+        replication_mode: lantern_server.standby? ? "slave" : "master",
+        db_name: resource.db_name || "",
+        db_user: resource.db_user || "",
+        db_user_password: resource.db_user_password || "",
+        postgres_password: resource.superuser_password || "",
+        prom_password: Config.prom_password,
+        gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
+        gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
+        container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}",
+        postgresql_recover_from_backup: "test-label",
+        postgresql_recovery_target_time: resource.restore_target || "",
+        gcp_creds_walg_b64: walg_conf[:gcp_creds_b64],
+        walg_gs_prefix: walg_conf[:walg_gs_prefix]
+      })
+      expect(lantern_server.configure_hash).to eq(expected_conf)
+    end
+
+    it "generates config hash with backup label without restore_target" do
+      timeline = instance_double(LanternTimeline)
+      parent = instance_double(LanternResource)
+      resource = instance_double(LanternResource,
+        parent: parent,
+        org_id: 0,
+        name: "test-db",
+        app_env: "test",
+        debug: false,
+        enable_telemetry: false,
+        repl_user: "repl_user",
+        repl_password: "repl_password",
+        db_name: "postgres",
+        db_user: "postgres",
+        db_user_password: "pwd123",
+        superuser_password: "pwd1234",
+        restore_target: nil)
+      expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
+      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
+      expect(timeline).to receive(:generate_walg_config).and_return({gcp_creds_b64: "test-creds-push", walg_gs_prefix: "test-bucket-push"}).at_least(:once)
+      expect(lantern_server).to receive(:resource).and_return(resource).at_least(:once)
+      expect(lantern_server).to receive(:timeline).and_return(timeline).at_least(:once)
+      expect(lantern_server).to receive(:standby?).and_return(false).at_least(:once)
+      expect(lantern_server).to receive(:lantern_version).and_return("0.2.2").at_least(:once)
+      expect(lantern_server).to receive(:extras_version).and_return("0.1.4").at_least(:once)
+      expect(lantern_server).to receive(:minor_version).and_return("1").at_least(:once)
+
+      walg_conf = timeline.generate_walg_config
+      expected_conf = JSON.generate({
+        enable_coredumps: true,
+        org_id: resource.org_id,
+        instance_id: resource.name,
+        instance_type: lantern_server.standby? ? "reader" : "writer",
+        app_env: resource.app_env,
+        enable_debug: resource.debug,
+        enable_telemetry: resource.enable_telemetry || "",
+        repl_user: resource.repl_user || "",
+        repl_password: resource.repl_password || "",
+        replication_mode: lantern_server.standby? ? "slave" : "master",
+        db_name: resource.db_name || "",
+        db_user: resource.db_user || "",
+        db_user_password: resource.db_user_password || "",
+        postgres_password: resource.superuser_password || "",
+        prom_password: Config.prom_password,
+        gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
+        gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
+        container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}",
+        postgresql_recover_from_backup: "LATEST",
+        postgresql_recovery_target_time: resource.restore_target || "",
+        gcp_creds_walg_b64: walg_conf[:gcp_creds_b64],
+        walg_gs_prefix: walg_conf[:walg_gs_prefix]
+      })
+      expect(lantern_server.configure_hash).to eq(expected_conf)
+    end
+
+    it "generates config hash for standby" do
+      timeline = instance_double(LanternTimeline)
+      parent = instance_double(LanternResource)
+      resource = instance_double(LanternResource,
+        parent: parent,
+        org_id: 0,
+        name: "test-db",
+        app_env: "test",
+        debug: false,
+        enable_telemetry: false,
+        repl_user: "repl_user",
+        repl_password: "repl_password",
+        db_name: "postgres",
+        db_user: "postgres",
+        db_user_password: "pwd123",
+        superuser_password: "pwd1234",
+        restore_target: Time.now)
+      expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
+      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
+      expect(timeline).to receive(:generate_walg_config).and_return({gcp_creds_b64: "test-creds-push", walg_gs_prefix: "test-bucket-push"}).at_least(:once)
+      expect(lantern_server).to receive(:resource).and_return(resource).at_least(:once)
+      expect(lantern_server).to receive(:timeline).and_return(timeline).at_least(:once)
+      expect(lantern_server).to receive(:standby?).and_return(true).at_least(:once)
+      expect(lantern_server).to receive(:lantern_version).and_return("0.2.2").at_least(:once)
+      expect(lantern_server).to receive(:extras_version).and_return("0.1.4").at_least(:once)
+      expect(lantern_server).to receive(:minor_version).and_return("1").at_least(:once)
+
+      walg_conf = timeline.generate_walg_config
+      expected_conf = JSON.generate({
+        enable_coredumps: true,
+        org_id: resource.org_id,
+        instance_id: resource.name,
+        instance_type: lantern_server.standby? ? "reader" : "writer",
+        app_env: resource.app_env,
+        enable_debug: resource.debug,
+        enable_telemetry: resource.enable_telemetry || "",
+        repl_user: resource.repl_user || "",
+        repl_password: resource.repl_password || "",
+        replication_mode: lantern_server.standby? ? "slave" : "master",
+        db_name: resource.db_name || "",
+        db_user: resource.db_user || "",
+        db_user_password: resource.db_user_password || "",
+        postgres_password: resource.superuser_password || "",
+        prom_password: Config.prom_password,
+        gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
+        gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
+        container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}",
+        postgresql_recover_from_backup: "LATEST",
+        postgresql_recovery_target_time: resource.restore_target || "",
+        gcp_creds_walg_b64: walg_conf[:gcp_creds_b64],
+        walg_gs_prefix: walg_conf[:walg_gs_prefix]
+      })
+      expect(lantern_server.configure_hash).to eq(expected_conf)
+    end
+  end
+
+  describe "#update_walg_creds" do
+    it "calls update_env on vm" do
+      timeline = instance_double(LanternTimeline)
+      expect(timeline).to receive(:generate_walg_config).and_return({gcp_creds_b64: "test-creds-push", walg_gs_prefix: "test-bucket-push"}).at_least(:once)
+      expect(lantern_server).to receive(:timeline).and_return(timeline).at_least(:once)
+      walg_config = timeline.generate_walg_config
+      expect(vm.sshable).to receive(:cmd).with("sudo lantern/bin/update_env", stdin: JSON.generate([
+        ["WALG_GS_PREFIX", walg_config[:walg_gs_prefix]],
+        ["GOOGLE_APPLICATION_CREDENTIALS_WALG_B64", walg_config[:gcp_creds_b64]],
+        ["POSTGRESQL_RECOVER_FROM_BACKUP", ""]
+      ]))
+
+      expect { lantern_server.update_walg_creds }.not_to raise_error
+    end
+  end
+
+  describe "#container_image" do
+    it "returns correct image" do
+      expect(Config).to receive(:gcr_image).and_return("test-image")
+      expect(lantern_server).to receive(:lantern_version).and_return("0.2.2")
+      expect(lantern_server).to receive(:extras_version).and_return("0.1.4")
+      expect(lantern_server).to receive(:minor_version).and_return("2")
+      expect(lantern_server.container_image).to eq("test-image:lantern-0.2.2-extras-0.1.4-minor-2")
+    end
   end
 end

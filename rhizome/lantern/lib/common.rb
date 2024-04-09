@@ -46,11 +46,6 @@ def run_database(container_image)
   data["services"]["postgresql"]["volumes"].push(volume_mount)
   File.open($compose_file, "w") { |f| YAML.dump(data, f) }
   r "sudo docker compose -f #{$compose_file} up -d"
-  # Wait 10 seconds for initdb
-  sleep(10)
-  wait_for_pg
-  # Enable lantern extension
-  update_extensions_in_sql
 end
 
 def restart_if_needed

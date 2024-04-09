@@ -5,7 +5,7 @@ class CloverApi
     @serializer = Serializers::Api::Lantern
 
     r.get true do
-      result = @project.lantern_servers_dataset.authorized(@current_user.id, "Postgres:view").eager(:semaphores, :strand).paginated_result(
+      result = @project.lantern_resources_dataset.authorized(@current_user.id, "Postgres:view").eager(:semaphores, :strand).paginated_result(
         cursor: r.params["cursor"],
         page_size: r.params["page_size"],
         order_column: r.params["order_column"]

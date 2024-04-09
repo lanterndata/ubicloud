@@ -89,7 +89,7 @@
                     label: "Minor Version",
                     attributes: {
                       required: false,
-                      value: "2"
+                      value: "3"
                     }
                   }
                 ) %>
@@ -208,7 +208,7 @@
                       <%== render(
                         "components/form/select",
                         locals: {
-                          name: "timeline_id",
+                          name: "parent_id",
                           label: "Backup Database",
                           options: @timelines,
                         }

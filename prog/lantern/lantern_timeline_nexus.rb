@@ -70,7 +70,7 @@ class Prog::Lantern::LanternTimelineNexus < Prog::Base
     # the state to database. Since backup taking is an expensive operation,
     # we check if backup is truly needed.
     if lantern_timeline.need_backup?
-      lantern_timeline.leader.gcp_vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/take_backup' take_postgres_backup")
+      lantern_timeline.leader.vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/take_backup' take_postgres_backup")
       lantern_timeline.latest_backup_started_at = Time.now
       lantern_timeline.save_changes
     end

@@ -43,7 +43,14 @@ RSpec.describe Hosting::GcpApis do
     end
 
     describe "#create_vm" do
-      it "creates vm successfully" do
+      it "creates vm successfully with labels" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        api = described_class.new
+        expect { api.create_vm("dummy-vm", "us-central1-a", "test", "test", "lantern", "n1-standard-1", 50, labels: {"parent" => "test"}) }.not_to raise_error
+      end
+
+      it "creates vm successfully without labels" do
         stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
         stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
         api = described_class.new

@@ -14,7 +14,7 @@ class Prog::GcpVm::Nexus < Prog::Base
 
   def self.assemble(public_key, project_id, name: nil, size: "n1-standard-2",
     unix_user: "lantern", location: "us-central1", boot_image: "ubuntu-2204-jammy-v20240319",
-    storage_size_gib: nil, arch: "x64", domain: nil)
+    storage_size_gib: nil, arch: "x64", labels: {})
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -29,21 +29,18 @@ class Prog::GcpVm::Nexus < Prog::Base
     Validation.validate_name(name)
     Validation.validate_os_user_name(unix_user)
 
-    if !domain.nil?
-      Validation.validate_domain(domain)
-    end
-
     DB.transaction do
       cores = vm_size.vcpu
       vm = GcpVm.create(name: name, public_key: public_key, unix_user: unix_user,
         family: vm_size.family, cores: cores, location: location,
-        boot_image: boot_image, arch: arch, storage_size_gib: storage_size_gib, domain: domain) { _1.id = ubid.to_uuid }
+        boot_image: boot_image, arch: arch, storage_size_gib: storage_size_gib) { _1.id = ubid.to_uuid }
 
       vm.associate_with_project(project)
 
       Strand.create(
         prog: "GcpVm::Nexus",
-        label: "start"
+        label: "start",
+        stack: [{labels: labels}]
       ) { _1.id = vm.id }
     end
   end
@@ -89,8 +86,16 @@ class Prog::GcpVm::Nexus < Prog::Base
 
   label def start
     gcp_client = Hosting::GcpApis.new
-    gcp_client.create_vm(gcp_vm.name, "#{gcp_vm.location}-a", gcp_vm.boot_image, gcp_vm.public_key, gcp_vm.unix_user, "#{gcp_vm.family}-#{gcp_vm.cores}", gcp_vm.storage_size_gib)
+    labels = frame["labels"]
+    gcp_client.create_vm(gcp_vm.name, "#{gcp_vm.location}-a", gcp_vm.boot_image, gcp_vm.public_key, gcp_vm.unix_user, "#{gcp_vm.family}-#{gcp_vm.cores}", gcp_vm.storage_size_gib, labels: labels)
     register_deadline(:wait, 10 * 60)
+
+    # remove labels from stack
+    current_frame = strand.stack.first
+    current_frame.delete("labels")
+    strand.modified!(:stack)
+    strand.save_changes
+
     hop_wait_create_vm
   end
 

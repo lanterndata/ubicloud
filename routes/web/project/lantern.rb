@@ -4,11 +4,11 @@ class CloverWeb
   hash_branch(:project_prefix, "lantern") do |r|
     @serializer = Serializers::Web::Lantern
 
-    timeline_servers = @project.lantern_servers_dataset.join_table(:inner, Sequel[:lantern_timeline], {id: Sequel[:lantern_server][:timeline_id]}, {table_alias: "timeline"}).select(Sequel[:lantern_server][:name], Sequel[:timeline][:id])
+    timeline_servers = @project.lantern_resources_dataset.all
     @timelines = [["", ""]] + timeline_servers.map { |server| [server.id, server.name] }
 
     r.get true do
-      @lantern_databases = serialize(@project.lantern_servers_dataset.authorized(@current_user.id, "Postgres:view").eager(:strand, :gcp_vm).all)
+      @lantern_databases = serialize(@project.lantern_resources_dataset.authorized(@current_user.id, "Postgres:view").eager(:strand).all)
 
       view "lantern/index"
     end
@@ -16,30 +16,29 @@ class CloverWeb
     r.post true do
       Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
       parsed_size = Validation.validate_lantern_size(r.params["size"])
-      timeline_id = r.params["timeline_id"].empty? ? nil : r.params["timeline_id"]
+      parent_id = r.params["parent_id"].empty? ? nil : r.params["parent_id"]
       restore_target = r.params["restore_target"].empty? ? nil : Time.new("#{r.params["restore_target"]}:00 UTC")
 
-      st = Prog::Lantern::LanternServerNexus.assemble(
+      st = Prog::Lantern::LanternResourceNexus.assemble(
         project_id: @project.id,
         location: r.params["location"],
         name: r.params["name"],
         org_id: r.params["org_id"],
-        instance_type: "writer",
         target_vm_size: parsed_size.vm_size,
-        storage_size_gib: parsed_size.storage_size_gib,
+        target_storage_size_gib: parsed_size.storage_size_gib,
         lantern_version: r.params["lantern_version"],
         extras_version: r.params["extras_version"],
         minor_version: r.params["minor_version"],
         domain: r.params["domain"].empty? ? nil : r.params["domain"],
         db_name: r.params["db_name"],
         db_user: r.params["db_user"],
-        timeline_id: timeline_id,
+        parent_id: parent_id,
         restore_target: restore_target
       )
 
       flash["notice"] = "'#{r.params["name"]}' will be ready in a few minutes"
 
-      r.redirect "#{@project.path}#{LanternServer[st.id].path}"
+      r.redirect "#{@project.path}#{LanternResource[st.id].path}"
     end
 
     r.on "create" do

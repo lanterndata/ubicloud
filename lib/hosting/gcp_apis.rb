@@ -39,7 +39,7 @@ class Hosting::GcpApis
     zone[..-3]
   end
 
-  def create_vm(name, zone, image, ssh_key, user, machine_type, disk_size_gb)
+  def create_vm(name, zone, image, ssh_key, user, machine_type, disk_size_gb, labels: {})
     region = get_region_from_zone(zone)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
     instance = {
@@ -70,7 +70,7 @@ class Hosting::GcpApis
       keyRevocationActionType: "NONE",
       labels: {
         "lantern-self-hosted": "1"
-      },
+      }.merge(labels),
       machineType: "projects/#{@project}/zones/#{zone}/machineTypes/#{machine_type}",
       metadata: {
         items: [

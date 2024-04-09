@@ -12,14 +12,18 @@ Sequel.migration do
       column :latest_backup_started_at, :timestamptz
       column :earliest_backup_completed_at, :timestamptz
     end
-    alter_table(:lantern_server) do
+    alter_table(:lantern_resource) do
       add_column :restore_target, :timestamptz, null: true
+    end
+    alter_table(:lantern_server) do
       add_foreign_key :timeline_id, :lantern_timeline, type: :uuid, null: true
     end
   end
   down do
-    alter_table(:lantern_server) do
+    alter_table(:lantern_resource) do
       drop_column :restore_target
+    end
+    alter_table(:lantern_server) do
       drop_column :timeline_id
     end
     drop_table(:lantern_timeline)

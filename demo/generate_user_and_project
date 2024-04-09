@@ -1,0 +1,30 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../loader"
+require "argon2"
+
+email = ARGV[0]
+
+account = Account[email: email]
+
+if !account.nil?
+  puts "Account already exists"
+  exit
+end
+
+account = Account.create_with_id(email: email, status_id: 2)
+pass = SecureRandom.urlsafe_base64(15)
+hash = Argon2::Password.new({
+  t_cost: 1,
+  m_cost: 5,
+  secret: Config.clover_session_secret
+}).create(pass)
+
+DB[:account_password_hashes].insert(id: account.id, password_hash: hash)
+
+account.create_project_with_default_policy("Default")
+
+puts "Account created with credentials: \n"
+puts "Email - #{email}"
+puts "Password - #{pass}"

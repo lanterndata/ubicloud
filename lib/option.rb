@@ -41,10 +41,10 @@ module Option
     LanternSize.new("n1-standard-#{_1}", "n1-standard-#{_1}", "n1-standard", _1, _1 * 4, (_1 / 2) * 128)
   }.freeze
 
-  # PostgresHaOption = Struct.new(:name, :standby_count, :title, :explanation)
-  # PostgresHaOptions = [[PostgresResource::HaType::NONE, 0, "No Standbys", "No replication"],
-  #   [PostgresResource::HaType::ASYNC, 1, "1 Standby", "Asyncronous replication"],
-  #   [PostgresResource::HaType::SYNC, 2, "2 Standbys", "Syncronous replication with quorum"]].map {
-  #   PostgresHaOption.new(*_1)
-  # }.freeze
+  LanternHaOption = Struct.new(:name, :standby_count, :title, :explanation)
+  LanternHaOptions = [[LanternResource::HaType::NONE, 0, "No Standbys", "No replication"],
+    [LanternResource::HaType::ASYNC, 1, "1 Standby", "Asyncronous replication"],
+    [LanternResource::HaType::SYNC, 2, "2 Standbys", "Syncronous replication with quorum"]].map {
+    LanternHaOption.new(*_1)
+  }.freeze
 end

@@ -12,55 +12,21 @@ RSpec.describe LanternTimeline do
   end
 
   describe "#generate_walg_config" do
-    it "fails to generate walg config" do
-      expect(lantern_timeline).to receive(:leader).and_return(nil)
-      expect(lantern_timeline).to receive(:parent).and_return(nil)
-
-      expect { lantern_timeline.generate_walg_config }.to raise_error "standby instance without parent timeline"
-    end
-
-    it "generates walg config for reader" do
-      expect(lantern_timeline).to receive(:leader).and_return(nil)
-      parent = instance_double(described_class, id: "c068cac7-ed45-82db-bf38-a003582b36ed", gcp_creds_b64: "test-parent-creds", bucket_name: "parent-bucket-name")
-      expect(lantern_timeline).to receive(:parent).and_return(parent).exactly(4).times
-
+    it "generates walg config" do
+      expect(lantern_timeline).to receive(:gcp_creds_b64).and_return("test-creds")
       config = {
-        gcp_creds_walg_push_b64: nil,
-        walg_gs_push_prefix: nil,
-        gcp_creds_walg_pull_b64: "test-parent-creds",
-        walg_gs_pull_prefix: "parent-bucket-name"
+        gcp_creds_b64: "test-creds",
+        walg_gs_prefix: "gs://lantern-wal-g-backups/pvr1mcnhzd8p0qwwa00tr5cvex"
       }
 
       expect(lantern_timeline.generate_walg_config).to eq(config)
     end
+  end
 
-    it "generates walg config for writer" do
-      expect(lantern_timeline).to receive(:leader).and_return(instance_double(LanternServer)).twice
-      expect(lantern_timeline).to receive(:parent).and_return(nil).twice
-
-      config = {
-        gcp_creds_walg_push_b64: lantern_timeline.gcp_creds_b64,
-        walg_gs_push_prefix: lantern_timeline.bucket_name,
-        gcp_creds_walg_pull_b64: nil,
-        walg_gs_pull_prefix: nil
-      }
-
-      expect(lantern_timeline.generate_walg_config).to eq(config)
-    end
-
-    it "generates walg config for writer with parent" do
-      expect(lantern_timeline).to receive(:leader).and_return(instance_double(LanternServer))
-      parent = instance_double(described_class, id: "c068cac7-ed45-82db-bf38-a003582b36ed", gcp_creds_b64: "test-parent-creds", bucket_name: "parent-bucket-name")
-      expect(lantern_timeline).to receive(:parent).and_return(parent).exactly(4).times
-
-      config = {
-        gcp_creds_walg_push_b64: lantern_timeline.gcp_creds_b64,
-        walg_gs_push_prefix: lantern_timeline.bucket_name,
-        gcp_creds_walg_pull_b64: "test-parent-creds",
-        walg_gs_pull_prefix: "parent-bucket-name"
-      }
-
-      expect(lantern_timeline.generate_walg_config).to eq(config)
+  describe "#latest_restore_time" do
+    it "returns current time" do
+      diff = lantern_timeline.latest_restore_time - Time.now
+      expect(diff < 1000).to be(true)
     end
   end
 

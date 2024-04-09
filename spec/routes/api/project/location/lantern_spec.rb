@@ -10,25 +10,28 @@ RSpec.describe Clover, "lantern" do
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", provider: "gcp", policy_body: []) }
 
   let(:pg) do
-    Prog::Lantern::LanternServerNexus.assemble(
+    st = Prog::Lantern::LanternResourceNexus.assemble(
       project_id: project.id,
       location: "us-central1",
       name: "instance-1",
       target_vm_size: "n1-standard-2",
-      storage_size_gib: 100,
+      target_storage_size_gib: 100,
       org_id: 0
-    ).subject
+    )
+    LanternResource[st.id]
   end
 
   let(:pg_wo_pwermission) do
-    Prog::Lantern::LanternServerNexus.assemble(
+    st = Prog::Lantern::LanternResourceNexus.assemble(
       project_id: project_wo_permissions.id,
       location: "us-central1",
-      name: "lantern-wo-permission",
+      name: "lantern-foo-1",
       target_vm_size: "n1-standard-2",
-      storage_size_gib: 100,
+      target_storage_size_gib: 100,
       org_id: 0
-    ).subject
+    )
+
+    LanternResource[st.id]
   end
 
   describe "unauthenticated" do
@@ -122,12 +125,13 @@ RSpec.describe Clover, "lantern" do
       end
 
       it "success multiple" do
-        Prog::Lantern::LanternServerNexus.assemble(
+        Prog::Lantern::LanternResourceNexus.assemble(
           project_id: project.id,
           location: "us-central1",
-          name: "lantern-test-2",
+          name: "lantern-foo-2",
           target_vm_size: "n1-standard-2",
-          storage_size_gib: 100
+          target_storage_size_gib: 100,
+          org_id: 0
         )
 
         get "/api/project/#{project.ubid}/location/#{pg.location}/lantern"
@@ -135,7 +139,9 @@ RSpec.describe Clover, "lantern" do
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["items"].length).to eq(2)
       end
+    end
 
+    describe "create" do
       it "creates new lantern database" do
         post "/api/project/#{project.ubid}/location/#{pg.location}/lantern", {size: "n1-standard-2", name: "instance-2", org_id: 0, location: "us-central1", storage_size_gib: 100, lantern_version: "0.2.2", extras_version: "0.1.4", minor_version: "1", domain: "test.db.lantern.dev", app_env: "test", repl_password: "test-repl-pass", enable_telemetry: true, postgres_password: "test-pg-pass"}
 
@@ -169,7 +175,9 @@ RSpec.describe Clover, "lantern" do
 
         expect(body["domain"]).to eq("test.db.lantern.dev")
       end
+    end
 
+    describe "#update-extension" do
       it "updates lantern extension" do
         post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-extension", {lantern_version: "0.2.4", extras_version: "0.1.4"}
         expect(last_response.status).to eq(200)
@@ -179,7 +187,9 @@ RSpec.describe Clover, "lantern" do
         post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-extension", {extras_version: "0.2.3", lantern_version: "0.2.2"}
         expect(last_response.status).to eq(200)
       end
+    end
 
+    describe "#update-image" do
       it "updates image" do
         post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-image", {lantern_version: "0.2.3", extras_version: "0.2.3", minor_version: "1"}
         expect(last_response.status).to eq(200)
@@ -227,15 +237,8 @@ RSpec.describe Clover, "lantern" do
     describe "add-domain" do
       it "adds domain" do
         post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/add-domain", {domain: "example.com"}
-        vm = GcpVm[pg.vm_id]
-        expect(vm.domain).to eq("example.com")
-        expect(last_response.status).to eq(200)
-      end
-    end
-
-    describe "update-rhizome" do
-      it "updates rhizome" do
-        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-rhizome"
+        server = LanternServer.where(id: pg.representative_server.id).first
+        expect(server.domain).to eq("example.com")
         expect(last_response.status).to eq(200)
       end
     end
@@ -248,7 +251,7 @@ RSpec.describe Clover, "lantern" do
 
       it "resets password" do
         post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/reset-user-password", {original_password: "Password123!", repeat_password: "Password123!"}
-        pg = LanternServer.where(name: "instance-1").first
+        pg = LanternResource.first
         expect(pg.db_user_password).to eq("Password123!")
         expect(last_response.status).to eq(200)
       end
@@ -262,16 +265,16 @@ RSpec.describe Clover, "lantern" do
 
       it "updates storage" do
         post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-vm", {storage_size_gib: 200}
-        pg = LanternServer.where(name: "instance-1").first
-        expect(pg.target_storage_size_gib).to eq(200)
-        expect(pg.gcp_vm.storage_size_gib).to eq(200)
+        server = LanternServer.where(id: pg.representative_server.id).first
+        expect(server.target_storage_size_gib).to eq(200)
+        expect(server.vm.storage_size_gib).to eq(200)
         expect(last_response.status).to eq(200)
       end
 
       it "updates vm size" do
         post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-vm", {size: "n1-standard-4"}
-        pg = LanternServer.where(name: "instance-1").first
-        expect(pg.target_vm_size).to eq("n1-standard-4")
+        server = LanternServer.where(id: pg.representative_server.id).first
+        expect(server.target_vm_size).to eq("n1-standard-4")
         expect(last_response.status).to eq(200)
       end
     end

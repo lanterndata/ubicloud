@@ -8,16 +8,16 @@ class Serializers::Web::Lantern < Serializers::Base
       path: pg.path,
       name: pg.name,
       state: pg.display_state,
-      primary?: pg.instance_type == "writer",
-      instance_type: pg.instance_type,
+      primary?: pg.representative_server&.primary?,
+      instance_type: pg.representative_server&.instance_type,
       location: pg.location,
-      lantern_version: pg.lantern_version,
-      extras_version: pg.extras_version,
-      minor_version: pg.minor_version,
+      lantern_version: pg.representative_server&.lantern_version,
+      extras_version: pg.representative_server&.extras_version,
+      minor_version: pg.representative_server&.minor_version,
       org_id: pg.org_id,
-      vm_size: pg.target_vm_size,
-      storage_size_gib: pg.target_storage_size_gib,
-      domain: pg.gcp_vm.domain
+      vm_size: pg.representative_server&.target_vm_size,
+      storage_size_gib: pg.representative_server&.target_storage_size_gib,
+      domain: pg.representative_server&.domain
     }
   end
 
@@ -27,7 +27,22 @@ class Serializers::Web::Lantern < Serializers::Base
 
   structure(:detailed) do |pg|
     base(pg).merge({
-      connection_string: pg.connection_string
+      connection_string: pg.connection_string,
+      servers: pg.servers.map {
+                 {
+                   id: _1.id,
+                   ubid: _1.ubid,
+                   state: _1.display_state,
+                   primary: _1.primary?,
+                   instance_type: _1.instance_type,
+                   lantern_version: _1.lantern_version,
+                   extras_version: _1.extras_version,
+                   minor_version: _1.minor_version,
+                   vm_size: _1.target_vm_size,
+                   storage_size_gib: _1.target_storage_size_gib,
+                   connection_string: _1.connection_string
+                 }
+               }
     })
   end
 end
