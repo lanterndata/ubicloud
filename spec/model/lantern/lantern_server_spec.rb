@@ -38,12 +38,23 @@ RSpec.describe LanternServer do
     expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait_db_available")).exactly(4).times
     expect(lantern_server.display_state).to eq("unavailable")
   end
+
   it "returns name from ubid" do
-    expect(LanternServer.ubid_to_name(lantern_server.id)).to eq("c068cac7")
+    expect(described_class.ubid_to_name(lantern_server.id)).to eq("c068cac7")
   end
 
   it "runs query on vm" do
     expect(lantern_server.gcp_vm.sshable).to receive(:cmd).with("sudo lantern/bin/exec", stdin: "SELECT 1").and_return("1\n")
     expect(lantern_server.run_query("SELECT 1")).to eq("1")
+  end
+
+  it "#standby? - false" do
+    expect(lantern_server).to receive(:instance_type).and_return("writer")
+    expect(lantern_server.standby?).to be(false)
+  end
+
+  it "#standby? - true" do
+    expect(lantern_server).to receive(:instance_type).and_return("reader")
+    expect(lantern_server.standby?).to be(true)
   end
 end

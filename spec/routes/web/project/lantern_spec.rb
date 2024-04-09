@@ -81,6 +81,7 @@ RSpec.describe Clover, "lantern" do
         fill_in "Name", with: name
         choose option: "us-central1"
         choose option: "n1-standard-2"
+        find_by_id("timeline_id").find(:xpath, "option[1]").select_option
 
         click_button "Create"
 
@@ -99,12 +100,42 @@ RSpec.describe Clover, "lantern" do
         fill_in "Domain", with: "example.com"
         choose option: "us-central1"
         choose option: "n1-standard-2"
+        find_by_id("timeline_id").find(:xpath, "option[1]").select_option
 
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_content "'#{name}' will be ready in a few minutes"
         expect(LanternServer.count).to eq(1)
+        expect(LanternServer.first.projects.first.id).to eq(project.id)
+      end
+
+      it "can create new Lantern database from backup" do
+        Prog::Lantern::LanternServerNexus.assemble(
+          project_id: project.id,
+          location: "us-central1",
+          name: "pg-with-permission-2",
+          target_vm_size: "n1-standard-2",
+          storage_size_gib: 100,
+          lantern_version: "0.2.2",
+          extras_version: "0.1.4",
+          minor_version: "1"
+        ).subject
+        visit "#{project.path}/lantern/create"
+
+        expect(page.title).to eq("Ubicloud - Create Lantern Database")
+        name = "new-pg-db"
+        fill_in "Name", with: name
+        choose option: "us-central1"
+        choose option: "n1-standard-2"
+        find_by_id("timeline_id").find(:xpath, "option[2]").select_option
+        find_by_id("restore_target", visible: :all).set("2024-04-08 10:10")
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_content "'#{name}' will be ready in a few minutes"
+        expect(LanternServer.count).to eq(2)
         expect(LanternServer.first.projects.first.id).to eq(project.id)
       end
 
@@ -116,6 +147,7 @@ RSpec.describe Clover, "lantern" do
         fill_in "Name", with: "invalid name"
         choose option: "us-central1"
         choose option: "n1-standard-2"
+        find_by_id("timeline_id").find(:xpath, "option[1]").select_option
 
         click_button "Create"
 
@@ -132,6 +164,7 @@ RSpec.describe Clover, "lantern" do
         fill_in "Name", with: pg.name
         choose option: "us-central1"
         choose option: "n1-standard-2"
+        find_by_id("timeline_id").find(:xpath, "option[1]").select_option
 
         click_button "Create"
 
@@ -139,7 +172,7 @@ RSpec.describe Clover, "lantern" do
         expect(page).to have_content "name is already taken"
       end
 
-      it "can not create PostgreSQL database in a project when does not have permissions" do
+      it "can not create Lantern database in a project when does not have permissions" do
         project_wo_permissions
         visit "#{project_wo_permissions.path}/lantern/create"
 
@@ -147,176 +180,176 @@ RSpec.describe Clover, "lantern" do
         expect(page.status_code).to eq(403)
         expect(page).to have_content "Forbidden"
       end
+    end
 
-      describe "show" do
-        it "can show Lantern database details" do
-          pg
-          visit "#{project.path}/lantern"
+    describe "show" do
+      it "can show Lantern database details" do
+        pg
+        visit "#{project.path}/lantern"
 
-          expect(page.title).to eq("Ubicloud - Lantern Databases")
-          expect(page).to have_content pg.name
+        expect(page.title).to eq("Ubicloud - Lantern Databases")
+        expect(page).to have_content pg.name
 
-          click_link "Show", href: "#{project.path}#{pg.path}"
+        click_link "Show", href: "#{project.path}#{pg.path}"
 
-          expect(page.title).to eq("Ubicloud - #{pg.name}")
-          expect(page).to have_content pg.name
-        end
-
-        it "raises forbidden when does not have permissions" do
-          visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
-
-          expect(page.title).to eq("Ubicloud - Forbidden")
-          expect(page.status_code).to eq(403)
-          expect(page).to have_content "Forbidden"
-        end
-
-        it "raises not found when Lantern database not exists" do
-          visit "#{project.path}/location/us-central1/lantern/08s56d4kaj94xsmrnf5v5m3mav"
-
-          expect(page.title).to eq("Ubicloud - Resource not found")
-          expect(page.status_code).to eq(404)
-          expect(page).to have_content "Resource not found"
-        end
+        expect(page.title).to eq("Ubicloud - #{pg.name}")
+        expect(page).to have_content pg.name
       end
 
-      describe "reset-user-password" do
-        it "can update user password" do
-          visit "#{project.path}#{pg.path}"
-          expect(page).to have_content "Reset user password"
+      it "raises forbidden when does not have permissions" do
+        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
 
-          fill_in "New password", with: "DummyPassword123"
-          fill_in "New password (repeat)", with: "DummyPassword123"
-          click_button "Reset"
-
-          expect(page.status_code).to eq(200)
-        end
-
-        it "does not show reset user password for reader" do
-          pg.update(instance_type: "reader")
-
-          visit "#{project.path}#{pg.path}"
-          expect(page).to have_no_content "Reset user password"
-          expect(page.status_code).to eq(200)
-        end
+        expect(page.title).to eq("Ubicloud - Forbidden")
+        expect(page.status_code).to eq(403)
+        expect(page).to have_content "Forbidden"
       end
 
-      describe "delete" do
-        it "can delete Lantern database" do
-          visit "#{project.path}#{pg.path}"
+      it "raises not found when Lantern database not exists" do
+        visit "#{project.path}/location/us-central1/lantern/08s56d4kaj94xsmrnf5v5m3mav"
 
-          # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-          # UI tests run without a JavaScript enginer.
-          btn = find "#postgres-delete-#{pg.ubid} .delete-btn"
-          page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        expect(page.title).to eq("Ubicloud - Resource not found")
+        expect(page.status_code).to eq(404)
+        expect(page).to have_content "Resource not found"
+      end
+    end
 
-          expect(page.body).to eq({message: "Deleting #{pg.name}"}.to_json)
-          expect(SemSnap.new(pg.id).set?("destroy")).to be true
-        end
+    describe "reset-user-password" do
+      it "can update user password" do
+        visit "#{project.path}#{pg.path}"
+        expect(page).to have_content "Reset user password"
 
-        it "can not delete Lantern database when does not have permissions" do
-          # Give permission to view, so we can see the detail page
-          project_wo_permissions.access_policies.first.update(body: {
-            acls: [
-              {subjects: user.hyper_tag_name, actions: ["Postgres:view"], objects: project_wo_permissions.hyper_tag_name}
-            ]
-          })
+        fill_in "New password", with: "DummyPassword123"
+        fill_in "New password (repeat)", with: "DummyPassword123"
+        click_button "Reset"
 
-          visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
-
-          expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
-        end
+        expect(page.status_code).to eq(200)
       end
 
-      describe "update-extension" do
-        it "can update lantern extension" do
-          visit "#{project.path}#{pg.path}"
-          fill_in "lantern_version", with: "0.2.1"
-          click_button "Update Extensions"
-          pg = LanternServer.first
-          expect(pg.lantern_version).to eq("0.2.1")
-          expect(pg.extras_version).to eq("0.1.4")
-          expect(page.status_code).to eq(200)
-        end
+      it "does not show reset user password for reader" do
+        pg.update(instance_type: "reader")
 
-        it "can update lantern_extras extension" do
-          visit "#{project.path}#{pg.path}"
-          fill_in "extras_version", with: "0.1.1"
-          click_button "Update Extensions"
-          pg = LanternServer.first
-          expect(pg.lantern_version).to eq("0.2.2")
-          expect(pg.extras_version).to eq("0.1.1")
-          expect(page.status_code).to eq(200)
-        end
+        visit "#{project.path}#{pg.path}"
+        expect(page).to have_no_content "Reset user password"
+        expect(page.status_code).to eq(200)
+      end
+    end
 
-        it "can update both extension" do
-          visit "#{project.path}#{pg.path}"
-          fill_in "lantern_version", with: "0.2.0"
-          fill_in "extras_version", with: "0.1.0"
-          click_button "Update Extensions"
-          pg = LanternServer.first
-          expect(pg.lantern_version).to eq("0.2.0")
-          expect(pg.extras_version).to eq("0.1.0")
-          expect(page.status_code).to eq(200)
-        end
+    describe "delete" do
+      it "can delete Lantern database" do
+        visit "#{project.path}#{pg.path}"
+
+        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
+        # UI tests run without a JavaScript enginer.
+        btn = find "#postgres-delete-#{pg.ubid} .delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+
+        expect(page.body).to eq({message: "Deleting #{pg.name}"}.to_json)
+        expect(SemSnap.new(pg.id).set?("destroy")).to be true
       end
 
-      describe "update-image" do
-        it "can update image" do
-          visit "#{project.path}#{pg.path}"
-          fill_in "img_lantern_version", with: "0.2.0"
-          fill_in "img_extras_version", with: "0.1.0"
-          fill_in "img_minor_version", with: "2"
-          click_button "Update Image"
-          pg = LanternServer.first
-          expect(pg.lantern_version).to eq("0.2.0")
-          expect(pg.extras_version).to eq("0.1.0")
-          expect(pg.minor_version).to eq("2")
-          expect(page.status_code).to eq(200)
-        end
+      it "can not delete Lantern database when does not have permissions" do
+        # Give permission to view, so we can see the detail page
+        project_wo_permissions.access_policies.first.update(body: {
+          acls: [
+            {subjects: user.hyper_tag_name, actions: ["Postgres:view"], objects: project_wo_permissions.hyper_tag_name}
+          ]
+        })
+
+        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
+
+        expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
+      end
+    end
+
+    describe "update-extension" do
+      it "can update lantern extension" do
+        visit "#{project.path}#{pg.path}"
+        fill_in "lantern_version", with: "0.2.1"
+        click_button "Update Extensions"
+        pg = LanternServer.first
+        expect(pg.lantern_version).to eq("0.2.1")
+        expect(pg.extras_version).to eq("0.1.4")
+        expect(page.status_code).to eq(200)
       end
 
-      describe "add-domain" do
-        it "can add domain" do
-          visit "#{project.path}#{pg.path}"
-          fill_in "domain", with: "example.com"
-          click_button "Add domain"
-          pg = LanternServer.first
-          expect(pg.gcp_vm.domain).to eq("example.com")
-        end
+      it "can update lantern_extras extension" do
+        visit "#{project.path}#{pg.path}"
+        fill_in "extras_version", with: "0.1.1"
+        click_button "Update Extensions"
+        pg = LanternServer.first
+        expect(pg.lantern_version).to eq("0.2.2")
+        expect(pg.extras_version).to eq("0.1.1")
+        expect(page.status_code).to eq(200)
       end
 
-      describe "update-rhizome" do
-        it "can update rhizome" do
-          visit "#{project.path}#{pg.path}"
-          click_button "Update rhizome"
-          sem = Semaphore.first
-          expect(sem.name).to eq("update_rhizome")
-          expect(page.status_code).to eq(200)
-        end
+      it "can update both extension" do
+        visit "#{project.path}#{pg.path}"
+        fill_in "lantern_version", with: "0.2.0"
+        fill_in "extras_version", with: "0.1.0"
+        click_button "Update Extensions"
+        pg = LanternServer.first
+        expect(pg.lantern_version).to eq("0.2.0")
+        expect(pg.extras_version).to eq("0.1.0")
+        expect(page.status_code).to eq(200)
+      end
+    end
+
+    describe "update-image" do
+      it "can update image" do
+        visit "#{project.path}#{pg.path}"
+        fill_in "img_lantern_version", with: "0.2.0"
+        fill_in "img_extras_version", with: "0.1.0"
+        fill_in "img_minor_version", with: "2"
+        click_button "Update Image"
+        pg = LanternServer.first
+        expect(pg.lantern_version).to eq("0.2.0")
+        expect(pg.extras_version).to eq("0.1.0")
+        expect(pg.minor_version).to eq("2")
+        expect(page.status_code).to eq(200)
+      end
+    end
+
+    describe "add-domain" do
+      it "can add domain" do
+        visit "#{project.path}#{pg.path}"
+        fill_in "domain", with: "example.com"
+        click_button "Add domain"
+        pg = LanternServer.first
+        expect(pg.gcp_vm.domain).to eq("example.com")
+      end
+    end
+
+    describe "update-rhizome" do
+      it "can update rhizome" do
+        visit "#{project.path}#{pg.path}"
+        click_button "Update rhizome"
+        sem = Semaphore.first
+        expect(sem.name).to eq("update_rhizome")
+        expect(page.status_code).to eq(200)
+      end
+    end
+
+    describe "update-vm" do
+      it "fails validation" do
+        visit "#{project.path}#{pg.path}"
+        fill_in "storage_size_gib", with: "1"
+        click_button "Update VM"
+        expect(page).to have_content "storage_size_gib can not be smaller than "
+        expect(page.status_code).to eq(200)
       end
 
-      describe "update-vm" do
-        it "should fail validation" do
-          visit "#{project.path}#{pg.path}"
-          fill_in "storage_size_gib", with: "1"
-          click_button "Update VM"
-          expect(page).to have_content "storage_size_gib can not be smaller than "
-          expect(page.status_code).to eq(200)
-        end
+      it "updates validation" do
+        visit "#{project.path}#{pg.path}"
+        fill_in "storage_size_gib", with: "200"
+        click_button "Update VM"
+        expect(page.status_code).to eq(200)
+      end
 
-        it "should update validation" do
-          visit "#{project.path}#{pg.path}"
-          fill_in "storage_size_gib", with: "200"
-          click_button "Update VM"
-          expect(page.status_code).to eq(200)
-        end
-
-        it "should update vm size" do
-          visit "#{project.path}#{pg.path}"
-          select "n1-standard-4", from: "size"
-          click_button "Update VM"
-          expect(page.status_code).to eq(200)
-        end
+      it "updates vm size" do
+        visit "#{project.path}#{pg.path}"
+        select "n1-standard-4", from: "size"
+        click_button "Update VM"
+        expect(page.status_code).to eq(200)
       end
     end
   end

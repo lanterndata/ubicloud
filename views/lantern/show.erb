@@ -35,7 +35,7 @@
     ["Compute", @pg[:vm_size]],
     ["Storage", "#{@pg[:storage_size_gib]} GB"]
   ]
-
+  
   if @pg[:connection_string] == ""
     data.push(["Connection String", "Waiting for host to be ready..."])
   else
@@ -149,7 +149,10 @@
                   }
                 ) %>
               </div>
-              <div id="lantern-extension-update-<%=@pg[:ubid]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+              <div
+                id="lantern-extension-update-<%=@pg[:ubid]%>"
+                class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center"
+              >
                 <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
                   <%== render("components/form/submit_button", locals: { text: "Update Extensions", extra_class: "update-btn" }) %>
                 </div>
@@ -218,38 +221,38 @@
           </form>
         </div>
         <% if !@pg[:domain?] %>
-        <div class="px-4 py-5 sm:p-6">
-          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/add-domain" %>" role="form" method="POST">
-            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/add-domain") %>
-            <div class="sm:flex sm:items-center sm:justify-between">
-              <div>
-                <h3 class="text-base font-semibold leading-6 text-gray-900">Add Domain</h3>
-                <div class="mt-2 text-sm text-gray-500">
-                  <p>This action will create DNS record and obtain SSL certificate via acme</p>
+          <div class="px-4 py-5 sm:p-6">
+            <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/add-domain" %>" role="form" method="POST">
+              <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/add-domain") %>
+              <div class="sm:flex sm:items-center sm:justify-between">
+                <div>
+                  <h3 class="text-base font-semibold leading-6 text-gray-900">Add Domain</h3>
+                  <div class="mt-2 text-sm text-gray-500">
+                    <p>This action will create DNS record and obtain SSL certificate via acme</p>
+                  </div>
                 </div>
-              </div>
-              <div class="col-span-12 sm:col-span-5">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    label: "Domain",
-                    name: "domain",
-                    type: "text",
-                    attributes: {
-                      required: true,
-                      value: @pg[:domain] || "#{@pg[:name]}-#{@pg[:org_id]}.#{Config.lantern_top_domain}"
+                <div class="col-span-12 sm:col-span-5">
+                  <%== render(
+                    "components/form/text",
+                    locals: {
+                      label: "Domain",
+                      name: "domain",
+                      type: "text",
+                      attributes: {
+                        required: true,
+                        value: @pg[:domain] || "#{@pg[:name]}-#{@pg[:org_id]}.#{Config.lantern_top_domain}"
+                      }
                     }
-                  }
-                ) %>
-              </div>
-              <div id="lantern-ssl-<%=@pg[:ubid]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-                <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
-                  <%== render("components/form/submit_button", locals: { text: "Add domain", extra_class: "update-btn" }) %>
+                  ) %>
+                </div>
+                <div id="lantern-ssl-<%=@pg[:ubid]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+                  <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                    <%== render("components/form/submit_button", locals: { text: "Add domain", extra_class: "update-btn" }) %>
+                  </div>
                 </div>
               </div>
-            </div>
-          </form>
-        </div>
+            </form>
+          </div>
         <% end %>
         <div class="px-4 py-5 sm:p-6">
           <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/update-rhizome" %>" role="form" method="POST">
@@ -270,47 +273,47 @@
           </form>
         </div>
       <% end %>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <div class="px-4 py-5 sm:p-6">
-        <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/update-vm" %>" role="form" method="POST">
-          <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/update-vm") %>
-          <div class="space-y-4">
-            <div>
-              <h2 class="text-lg font-medium leading-6 text-gray-900">Update VM Size and Storage</h2>
-            </div>
-            <div class="grid grid-cols-12 gap-6">
-              <div class="col-span-12 sm:col-span-5">
-                <%== render(
-                  "components/form/select",
-                  locals: {
-                    name: "size",
-                    label: "VM Size",
-                    options: Option::LanternSizes.map { [_1[:vm_size], _1[:vm_size]] }.to_h,
-                    selected: @pg[:vm_size]
-                  }
-                ) %>
+      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+        <div class="px-4 py-5 sm:p-6">
+          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/update-vm" %>" role="form" method="POST">
+            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/update-vm") %>
+            <div class="space-y-4">
+              <div>
+                <h2 class="text-lg font-medium leading-6 text-gray-900">Update VM Size and Storage</h2>
               </div>
-              <div class="col-span-12 sm:col-span-5">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    label: "Storage (Gib)",
-                    name: "storage_size_gib",
-                    type: "text",
-                    attributes: {
-                      value: @pg[:storage_size_gib]
+              <div class="grid grid-cols-12 gap-6">
+                <div class="col-span-12 sm:col-span-5">
+                  <%== render(
+                    "components/form/select",
+                    locals: {
+                      name: "size",
+                      label: "VM Size",
+                      options: Option::LanternSizes.map { [_1[:vm_size], _1[:vm_size]] }.to_h,
+                      selected: @pg[:vm_size]
                     }
-                  }
-                ) %>
-              </div>
-              <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
-                <%== render("components/form/submit_button", locals: { text: "Update VM" }) %>
+                  ) %>
+                </div>
+                <div class="col-span-12 sm:col-span-5">
+                  <%== render(
+                    "components/form/text",
+                    locals: {
+                      label: "Storage (Gib)",
+                      name: "storage_size_gib",
+                      type: "text",
+                      attributes: {
+                        value: @pg[:storage_size_gib]
+                      }
+                    }
+                  ) %>
+                </div>
+                <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                  <%== render("components/form/submit_button", locals: { text: "Update VM" }) %>
+                </div>
               </div>
             </div>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
-    </div>
       <!-- Delete Card -->
       <% if Authorization.has_permission?(@current_user.id, "Postgres:delete", @pg[:id]) %>
         <div class="px-4 py-5 sm:p-6">

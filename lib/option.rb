@@ -10,7 +10,7 @@ module Option
 
   Location = Struct.new(:provider, :name, :display_name, :visible)
   Locations = [
-    [Providers[Provider::GCP], "us-central1", "US Central", true],
+    [Providers[Provider::GCP], "us-central1", "US Central", true]
   ].map { |args| Location.new(*args) }.freeze
 
   def self.locations_for_provider(provider, only_visible: true)
@@ -23,7 +23,7 @@ module Option
 
   BootImage = Struct.new(:name, :display_name)
   BootImages = [
-    ["ubuntu-2204-jammy-v20240319", "Ubuntu Jammy 22.04 LTS (GCP)"],
+    ["ubuntu-2204-jammy-v20240319", "Ubuntu Jammy 22.04 LTS (GCP)"]
   ].map { |args| BootImage.new(*args) }.freeze
 
   VmSize = Struct.new(:name, :family, :vcpu, :memory, :storage_size_gib) do

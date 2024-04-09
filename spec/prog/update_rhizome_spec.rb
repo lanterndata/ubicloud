@@ -15,14 +15,14 @@ RSpec.describe Prog::UpdateRhizome do
     end
   end
 
-  describe ".user (root) " do
-    it "should return root" do
+  describe ".user (root)" do
+    it "returns root" do
       expect(br.user).to eq("root")
     end
   end
 
   describe ".user (lantern)" do
-    it "should return lantern" do
+    it "returns lantern" do
       st = instance_double(Strand, id: "c39ae087-6ec4-033a-d440-b7a821061caf", prog: "UpdateRhizome", stack: [{"user" => "lantern"}])
       br = described_class.new(st)
       expect(br.user).to eq("lantern")

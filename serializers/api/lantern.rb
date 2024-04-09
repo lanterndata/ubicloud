@@ -26,7 +26,7 @@ class Serializers::Api::Lantern < Serializers::Base
       db_user: pg.db_user,
       db_user_password: pg.db_user_password,
       repl_user: pg.repl_user,
-      repl_password: pg.repl_password,
+      repl_password: pg.repl_password
     }
   end
 

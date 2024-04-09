@@ -2,16 +2,16 @@
 # frozen_string_literal: true
 
 require "json"
-require 'yaml'
+require "yaml"
 require_relative "../../common/lib/util"
 require_relative "../lib/common"
 
 $configure_hash = JSON.parse($stdin.read)
-File.open("test.json", 'a') do |f|
-  f.puts($configure_hash.to_s)
+File.open("test.json", "a") do |f|
+  f.puts($configure_hash.to_json)
 end
 
-def install_dependencies()
+def install_dependencies
   # Install dependencies
   r "sudo apt update -qq && sudo apt install software-properties-common make -y -qq >/dev/null"
   r "curl -fsSL https://get.docker.com > /tmp/get-docker.sh"
@@ -21,7 +21,7 @@ def install_dependencies()
   r "sudo service docker restart"
 end
 
-def setup_fs()
+def setup_fs
   # Setup FS
   r "sudo mkdir -p #{$datadir}"
   r "sudo chown -R 1001:1001 #{$datadir}"
@@ -34,10 +34,10 @@ def setup_fs()
   end
 end
 
-def setup_env()
+def setup_env
   # Setup env file
   unless File.file?($env_file)
-    File.open($env_file, 'a') do |f|
+    File.open($env_file, "a") do |f|
       f.puts("ORGANIZATION_ID=#{$configure_hash["org_id"]}")
       f.puts("INSTANCE_ID=#{$configure_hash["instance_id"]}")
       f.puts("INSTANCE_TYPE=#{$configure_hash["instance_type"]}")
@@ -58,7 +58,12 @@ def setup_env()
       f.puts("POSTGRESQL_ENABLE_COREDUMPS=#{$configure_hash["enable_coredumps"]}")
       f.puts("ENABLE_TELEMETRY=#{$configure_hash["enable_telemetry"]}")
       f.puts("GOOGLE_APPLICATION_CREDENTIALS_B64=#{$configure_hash["gcp_creds_coredumps_b64"]}")
-      f.puts("GOOGLE_APPLICATION_CREDENTIALS_WALG_B64=#{$configure_hash["gcp_creds_walg_b64"]}")
+      f.puts("GOOGLE_APPLICATION_CREDENTIALS_WALG_PUSH_B64=#{$configure_hash["gcp_creds_walg_push_b64"]}")
+      f.puts("WALG_GS_PUSH_PREFIX=#{$configure_hash["walg_gs_push_prefix"]}")
+      f.puts("GOOGLE_APPLICATION_CREDENTIALS_WALG_PULL_B64=#{$configure_hash["gcp_creds_walg_pull_b64"]}")
+      f.puts("WALG_GS_PULL_PREFIX=#{$configure_hash["walg_gs_pull_prefix"]}")
+      f.puts("POSTGRESQL_RECOVER_FROM_BACKUP=#{$configure_hash["postgresql_recover_from_backup"]}")
+      f.puts("POSTGRESQL_RECOVERY_TARGET_TIME=#{$configure_hash["postgresql_recovery_target_time"]}")
       f.puts("POSTGRESQL_LOG_LINE_PREFIX=lantern-logline: app: %a user: %u time: %t proc_start: %s pid: %p linenumber: %l === ")
       f.puts("POSTGRESQL_LOG_DURATION=true")
       f.puts("POSTGRESQL_LOG_MIN_DURATION_STATEMENT=250ms")
@@ -76,9 +81,9 @@ def setup_env()
   end
 end
 
-def setup_initial_compose_file()
+def setup_initial_compose_file
   # setup_initial_compose_file
-  memory_sizes = calculate_memory_sizes()
+  memory_sizes = calculate_memory_sizes
 
   map = {
     "services" => {
@@ -99,7 +104,7 @@ def setup_initial_compose_file()
   if $configure_hash["gcp_creds_logging_b64"]
     r "echo #{$configure_hash["gcp_creds_logging_b64"]} | base64 -d > #{$workdir}/logging_creds.json"
     gcp_project = r "cat #{$workdir}/logging_creds.json | jq -r '.project_id'"
-    r "sudo sed -i \"/\[Service\]/a Environment=\"GOOGLE_APPLICATION_CREDENTIALS=#{$workdir}/logging_creds.json\"\" /usr/lib/systemd/system/docker.service"
+    r "sudo sed -i \"/[Service]/a Environment=\"GOOGLE_APPLICATION_CREDENTIALS=#{$workdir}/logging_creds.json\"\" /usr/lib/systemd/system/docker.service"
     r "sudo sed -i \"/BASE=docker/a export GOOGLE_APPLICATION_CREDENTIALS=#{$workdir}/logging_creds.json\" /etc/init.d/docker"
     r "sudo systemctl daemon-reload 2>/dev/null || echo 'No systemctl in host'"
 
@@ -116,9 +121,7 @@ def setup_initial_compose_file()
   end
 
   unless File.file?($compose_file)
-    File.open($compose_file, 'w') do |f|
-      f.write(map.to_yaml)
-    end
+    File.write($compose_file, map.to_yaml)
   end
 end
 

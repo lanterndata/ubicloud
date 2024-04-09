@@ -21,7 +21,7 @@ RSpec.describe Serializers::Api::Lantern do
       db_user: "test-user",
       db_user_password: "test-user-pass",
       repl_user: "repl-user",
-      repl_password: "repl-pass",
+      repl_password: "repl-pass"
     ).tap { _1.id = "69c0f4cd-99c1-8ed0-acfe-7b013ce2fa0b" }
   }
 
@@ -52,14 +52,14 @@ RSpec.describe Serializers::Api::Lantern do
     data = described_class.new(:detailed).serialize(lantern)
 
     expect(data[:state]).to eq("creating")
-    expect(data[:connection_string]).to eq(nil)
+    expect(data[:connection_string]).to be_nil
     expect(data[:vm_size]).to eq("standard-2")
-    expect(data[:host]).to eq(nil)
+    expect(data[:host]).to be_nil
   end
 
-  it "should serialize array" do
+  it "serializes array" do
     gcp_vm = instance_double(GcpVm, domain: nil)
-    expect(gcp_vm).to receive(:location).and_return("us-central1").exactly(2).times
+    expect(gcp_vm).to receive(:location).and_return("us-central1").twice
     sshable = instance_double(Sshable, host: "temp_test")
     expect(gcp_vm).to receive(:sshable).and_return(sshable).exactly(6).times
     expect(lantern).to receive(:gcp_vm).and_return(gcp_vm).exactly(10).times
@@ -70,7 +70,7 @@ RSpec.describe Serializers::Api::Lantern do
 
     expect(data[0][:state]).to eq("creating")
     expect(data[1][:state]).to eq("creating")
-    expect(data[0][:connection_string]).to eq(nil)
-    expect(data[1][:connection_string]).to eq(nil)
+    expect(data[0][:connection_string]).to be_nil
+    expect(data[1][:connection_string]).to be_nil
   end
 end

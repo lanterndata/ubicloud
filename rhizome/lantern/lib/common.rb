@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
-require 'yaml'
+require "yaml"
 require_relative "../../common/lib/util"
 
 $workdir = "/var/lib/lantern"
@@ -16,15 +16,15 @@ def configure_gcr(gcp_creds_gcr_b64, container_image)
   r "sudo docker pull #{container_image}"
 end
 
-def update_extensions_in_sql()
+def update_extensions_in_sql
   all_dbs = (r "docker compose -f #{$compose_file} exec postgresql psql -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'").strip!.split("\n")
-  for db in all_dbs do
+  all_dbs.each do |db|
     r "docker compose -f #{$compose_file} exec postgresql psql -U postgres -f /lantern-init.sql #{db}"
   end
 end
 
-def wait_for_pg()
-  until r "docker exec #{$container_name} pg_isready -U postgres 2>/dev/null;" do
+def wait_for_pg
+  until r "docker exec #{$container_name} pg_isready -U postgres 2>/dev/null;"
     sleep 1
   end
 end
@@ -36,7 +36,7 @@ def run_database(container_image)
   r "sudo rm -rf #{$pg_mount_path}"
   data = YAML.load_file $compose_file
   data["services"]["postgresql"]["volumes"] = data["services"]["postgresql"]["volumes"].select { |i| i != volume_mount }
-  File.open($compose_file, 'w') { |f| YAML.dump(data, f) }
+  File.open($compose_file, "w") { |f| YAML.dump(data, f) }
   r "sudo docker rm -f tc 2>/dev/null || true"
   r "sudo docker create --name tc #{container_image}"
   r "sudo docker cp tc:/opt/bitnami/postgresql #{$pg_mount_path}"
@@ -44,7 +44,7 @@ def run_database(container_image)
   r "sudo chown -R 1001:1001 #{$pg_mount_path}"
   # Mount extension dir, so we can make automatic updates from host
   data["services"]["postgresql"]["volumes"].push(volume_mount)
-  File.open($compose_file, 'w') { |f| YAML.dump(data, f) }
+  File.open($compose_file, "w") { |f| YAML.dump(data, f) }
   r "sudo docker compose -f #{$compose_file} up -d"
   # Wait 10 seconds for initdb
   sleep(10)
@@ -53,18 +53,18 @@ def run_database(container_image)
   update_extensions_in_sql
 end
 
-def restart_if_needed()
+def restart_if_needed
   r "docker compose -f #{$compose_file} up -d"
 end
 
-def force_restart()
+def force_restart
   r "docker compose -f #{$compose_file} restart postgresql"
 end
 
 def append_env(env_arr)
   # Setup env file
-  File.open($env_file, 'a') do |f|
-    for env_map in env_arr do
+  File.open($env_file, "a") do |f|
+    env_arr.each do |env_map|
       f.puts("#{env_map[0]}=#{env_map[1]}")
     end
   end
@@ -73,12 +73,10 @@ end
 def configure_tls(domain, email, dns_token, dns_zone_id, provider)
   puts "Configuring TLS for domain #{domain}"
   r "curl -s https://get.acme.sh | sh -s email=#{email}"
-
-  env = ""
-  if provider == "dns_cf"
-    env = "CF_Token='#{dns_token}' CF_Zone_ID='#{dns_zone_id}'"
+  env = if provider == "dns_cf"
+    "CF_Token='#{dns_token}' CF_Zone_ID='#{dns_zone_id}'"
   else
-    env = "GOOGLEDOMAINS_ACCESS_TOKEN='#{dns_token}'"
+    "GOOGLEDOMAINS_ACCESS_TOKEN='#{dns_token}'"
   end
 
   r "#{env} /root/.acme.sh/acme.sh --server letsencrypt --issue --dns #{provider} -d #{domain}"
@@ -91,13 +89,13 @@ def configure_tls(domain, email, dns_token, dns_zone_id, provider)
   append_env([
     ["POSTGRESQL_ENABLE_TLS", "yes"],
     ["POSTGRESQL_TLS_CERT_FILE", "/bitnami/postgresql/server.crt"],
-    ["POSTGRESQL_TLS_KEY_FILE", "/bitnami/postgresql/server.key"],
+    ["POSTGRESQL_TLS_KEY_FILE", "/bitnami/postgresql/server.key"]
   ])
 
-  restart_if_needed()
+  restart_if_needed
 end
 
-def calculate_memory_sizes()
+def calculate_memory_sizes
   total_ram = (r "free -tk | awk 'NR == 2 {print $2}'")
   # Calculate 95% of the total RAM in kilobytes
   shared_buf_mb = (total_ram.to_i * 0.95 / 1024).round
@@ -106,5 +104,5 @@ def calculate_memory_sizes()
   mem_limit_buf = "#{shared_buf_mb}MB"
   mem_limit_shm = "#{shm_size_mb}MB"
 
-  return {:shm_size => mem_limit_shm, :shared_bufs => mem_limit_buf}
+  {shm_size: mem_limit_shm, shared_bufs: mem_limit_buf}
 end

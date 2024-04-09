@@ -12,7 +12,7 @@ class Hosting::GcpApis
       fail "Please set GCP_PROJECT_ID env variable"
     end
 
-    scopes = ['https://www.googleapis.com/auth/cloud-platform', 'https://www.googleapis.com/auth/compute']
+    scopes = ["https://www.googleapis.com/auth/cloud-platform", "https://www.googleapis.com/auth/compute"]
     begin
       @authorization = Google::Auth.get_application_default(scopes)
     rescue => e
@@ -21,8 +21,8 @@ class Hosting::GcpApis
     end
 
     @host = {
-      :connection_string => "https://compute.googleapis.com",
-      :headers => @authorization.apply({:"Content-Type" => "application/json"})
+      connection_string: "https://compute.googleapis.com",
+      headers: @authorization.apply({"Content-Type": "application/json"})
     }
   end
 
@@ -49,7 +49,7 @@ class Hosting::GcpApis
         enableConfidentialCompute: false
       },
       deletionProtection: false,
-      description: '',
+      description: "",
       disks: [
         {
           autoDelete: true,
@@ -60,22 +60,22 @@ class Hosting::GcpApis
             diskType: "projects/#{@project}/zones/#{zone}/diskTypes/pd-ssd",
             sourceImage: "projects/ubuntu-os-cloud/global/images/#{image}"
           },
-          mode: 'READ_WRITE',
-          type: 'PERSISTENT'
+          mode: "READ_WRITE",
+          type: "PERSISTENT"
         }
       ],
       displayDevice: {
         enableDisplay: false
       },
-      keyRevocationActionType: 'NONE',
+      keyRevocationActionType: "NONE",
       labels: {
-        'lantern-self-hosted': '1'
+        "lantern-self-hosted": "1"
       },
       machineType: "projects/#{@project}/zones/#{zone}/machineTypes/#{machine_type}",
       metadata: {
         items: [
           {
-            key: 'ssh-keys',
+            key: "ssh-keys",
             value: "#{user}:#{ssh_key} #{user}@lantern.dev"
           }
         ]
@@ -85,32 +85,32 @@ class Hosting::GcpApis
         {
           accessConfigs: [
             {
-              name: 'External NAT',
-              networkTier: 'PREMIUM'
+              name: "External NAT",
+              networkTier: "PREMIUM"
             }
           ],
-          stackType: 'IPV4_ONLY',
+          stackType: "IPV4_ONLY",
           subnetwork: "projects/#{@project}/regions/#{region}/subnetworks/default"
         }
       ],
       reservationAffinity: {
-        consumeReservationType: 'ANY_RESERVATION'
+        consumeReservationType: "ANY_RESERVATION"
       },
       scheduling: {
         automaticRestart: true,
-        onHostMaintenance: 'MIGRATE',
-        provisioningModel: 'STANDARD'
+        onHostMaintenance: "MIGRATE",
+        provisioningModel: "STANDARD"
       },
       serviceAccounts: [
         {
-          email: '511682212298-compute@developer.gserviceaccount.com',
+          email: "511682212298-compute@developer.gserviceaccount.com",
           scopes: [
-            'https://www.googleapis.com/auth/devstorage.read_only',
-            'https://www.googleapis.com/auth/logging.write',
-            'https://www.googleapis.com/auth/monitoring.write',
-            'https://www.googleapis.com/auth/servicecontrol',
-            'https://www.googleapis.com/auth/service.management.readonly',
-            'https://www.googleapis.com/auth/trace.append'
+            "https://www.googleapis.com/auth/devstorage.read_only",
+            "https://www.googleapis.com/auth/logging.write",
+            "https://www.googleapis.com/auth/monitoring.write",
+            "https://www.googleapis.com/auth/servicecontrol",
+            "https://www.googleapis.com/auth/service.management.readonly",
+            "https://www.googleapis.com/auth/trace.append"
           ]
         }
       ],
@@ -136,9 +136,9 @@ class Hosting::GcpApis
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
     address_name = "#{vm_name}-addr"
     body = {
-      "name": address_name,
-      "networkTier": "PREMIUM",
-      "region": "projects/#{@project}/regions/#{region}"
+      name: address_name,
+      networkTier: "PREMIUM",
+      region: "projects/#{@project}/regions/#{region}"
     }
     connection.post(path: "/compute/v1/projects/#{@project}/regions/#{region}/addresses", body: JSON.dump(body), expects: 200)
   end
@@ -208,5 +208,19 @@ class Hosting::GcpApis
     path = URI.parse(disk_source).path
     response = connection.post(path: "#{path}/resize", body: JSON.dump(body), expects: [200, 400])
     Hosting::GcpApis.check_errors(response)
+  end
+
+  def list_objects(bucket, prefix)
+    connection = Excon.new("https://storage.googleapis.com", headers: @host[:headers])
+    query = {prefix: prefix}
+    response = connection.get(path: "/storage/v1/b/#{bucket}/o", query: query, expects: [200, 400])
+    Hosting::GcpApis.check_errors(response)
+    data = JSON.parse(response.body)
+
+    if data["items"].nil?
+      return []
+    end
+
+    data["items"].map { |hsh| {key: hsh["name"], last_modified: Time.new(hsh["updated"])} }
   end
 end

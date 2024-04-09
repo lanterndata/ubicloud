@@ -4,6 +4,9 @@ class CloverWeb
   hash_branch(:project_prefix, "lantern") do |r|
     @serializer = Serializers::Web::Lantern
 
+    timeline_servers = @project.lantern_servers_dataset.join_table(:inner, Sequel[:lantern_timeline], {id: Sequel[:lantern_server][:timeline_id]}, {table_alias: "timeline"}).select(Sequel[:lantern_server][:name], Sequel[:timeline][:id])
+    @timelines = [["", ""]] + timeline_servers.map { |server| [server.id, server.name] }
+
     r.get true do
       @lantern_databases = serialize(@project.lantern_servers_dataset.authorized(@current_user.id, "Postgres:view").eager(:strand, :gcp_vm).all)
 
@@ -13,6 +16,9 @@ class CloverWeb
     r.post true do
       Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
       parsed_size = Validation.validate_lantern_size(r.params["size"])
+      timeline_id = r.params["timeline_id"].empty? ? nil : r.params["timeline_id"]
+      restore_target = r.params["restore_target"].empty? ? nil : Time.new("#{r.params["restore_target"]}:00 UTC")
+
       st = Prog::Lantern::LanternServerNexus.assemble(
         project_id: @project.id,
         location: r.params["location"],
@@ -26,7 +32,9 @@ class CloverWeb
         minor_version: r.params["minor_version"],
         domain: r.params["domain"].empty? ? nil : r.params["domain"],
         db_name: r.params["db_name"],
-        db_user: r.params["db_user"]
+        db_user: r.params["db_user"],
+        timeline_id: timeline_id,
+        restore_target: restore_target
       )
 
       flash["notice"] = "'#{r.params["name"]}' will be ready in a few minutes"

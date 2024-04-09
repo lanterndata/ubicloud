@@ -54,7 +54,7 @@ RSpec.describe Validation do
     describe "#validate_location" do
       it "valid locations" do
         [
-          ["us-central1", "gcp"],
+          ["us-central1", "gcp"]
         ].each do |location, provider|
           expect(described_class.validate_location(location, provider)).to be_nil
         end

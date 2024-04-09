@@ -110,7 +110,7 @@ class Prog::Test < Prog::Base
   end
 
   label def before_run
-    return
+    nil
   end
 
   label def bad_pop

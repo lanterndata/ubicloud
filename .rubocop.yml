@@ -42,7 +42,7 @@ Layout/HeredocIndentation:
 
 Layout/SpaceInsideHashLiteralBraces:
   Exclude:
-    - 'views/**/*.erb'
+    - "views/**/*.erb"
 
 RSpec/ExampleLength:
   Enabled: false
@@ -73,7 +73,7 @@ RSpec/FilePath:
 
 RSpec/SpecFilePathFormat:
   Exclude:
-    - 'spec/routes/**/*.rb'
+    - "spec/routes/**/*.rb"
 
 Sequel/ColumnDefault:
   Enabled: false
@@ -82,4 +82,7 @@ Capybara/ClickLinkOrButtonStyle:
   EnforcedStyle: strict
 
 RSpec/Rails/HaveHttpStatus:
+  Enabled: false
+
+Style/GlobalVars:
   Enabled: false

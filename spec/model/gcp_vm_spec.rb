@@ -27,11 +27,11 @@ RSpec.describe GcpVm do
 
     it ".host when no host" do
       expect(gcp_vm).to receive(:sshable).and_return(nil)
-      expect(gcp_vm.host).to eq(nil)
+      expect(gcp_vm.host).to be_nil
     end
 
     it ".display_state" do
-      expect(gcp_vm.display_state).to eq(nil)
+      expect(gcp_vm.display_state).to be_nil
     end
 
     it ".display_state when destroy set" do

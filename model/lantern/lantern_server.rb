@@ -6,6 +6,7 @@ require_relative "../../model"
 class LanternServer < Sequel::Model
   one_to_one :strand, key: :id
   one_to_one :gcp_vm, key: :id, primary_key: :vm_id
+  many_to_one :timeline, class: LanternTimeline, key: :timeline_id
 
   dataset_module Authorization::Dataset
   dataset_module Pagination
@@ -32,7 +33,7 @@ class LanternServer < Sequel::Model
   end
 
   def connection_string
-    return nil unless (gcp_vm.sshable.host && !gcp_vm.sshable.host.start_with?("temp"))
+    return nil unless gcp_vm.sshable.host && !gcp_vm.sshable.host.start_with?("temp")
     URI::Generic.build2(
       scheme: "postgres",
       userinfo: "postgres:#{URI.encode_uri_component(postgres_password)}",
@@ -53,5 +54,9 @@ class LanternServer < Sequel::Model
     return "running" if ["wait"].include?(strand.label)
     return "deleting" if destroy_set? || strand.label == "destroy"
     "creating"
+  end
+
+  def standby?
+    instance_type == "reader"
   end
 end

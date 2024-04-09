@@ -13,14 +13,14 @@ class Dns::Cloudflare
     end
 
     @host = {
-      :connection_string => "https://api.cloudflare.com",
-      :headers => {:'Authorization' => "Bearer #{@token}", :'Content-Type' => 'application/json'}
+      connection_string: "https://api.cloudflare.com",
+      headers: {Authorization: "Bearer #{@token}", "Content-Type": "application/json"}
     }
   end
 
   def get_dns_record(domain)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
-    response = connection.get(path: "/client/v4/zones/#{@zone_id}/dns_records", query: {:name => domain}, expects: 200)
+    response = connection.get(path: "/client/v4/zones/#{@zone_id}/dns_records", query: {name: domain}, expects: 200)
 
     body = JSON.parse(response.body)
 
@@ -34,12 +34,12 @@ class Dns::Cloudflare
   def insert_dns_record(domain, ip)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
     body = {
-      :content => ip,
-      :name => domain,
-      :proxied => false,
-      :type => "A",
-      :comment => "dns record for lantern cloud db",
-      :ttl => 60
+      content: ip,
+      name: domain,
+      proxied: false,
+      type: "A",
+      comment: "dns record for lantern cloud db",
+      ttl: 60
     }
 
     connection.post(path: "/client/v4/zones/#{@zone_id}/dns_records", body: JSON.dump(body), expects: 200)
@@ -48,12 +48,12 @@ class Dns::Cloudflare
   def update_dns_record(record_id, domain, ip)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
     body = {
-      :content => ip,
-      :name => domain,
-      :proxied => false,
-      :type => "A",
-      :comment => "dns record for lantern cloud db",
-      :ttl => 60
+      content: ip,
+      name: domain,
+      proxied: false,
+      type: "A",
+      comment: "dns record for lantern cloud db",
+      ttl: 60
     }
 
     connection.patch(path: "/client/v4/zones/#{@zone_id}/dns_records/#{record_id}", body: JSON.dump(body), expects: 200)
@@ -62,7 +62,7 @@ class Dns::Cloudflare
   def upsert_dns_record(domain, ip)
     record = get_dns_record(domain)
 
-    if record == nil
+    if record.nil?
       return insert_dns_record(domain, ip)
     end
 
@@ -72,7 +72,7 @@ class Dns::Cloudflare
   def delete_dns_record(domain)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
     record = get_dns_record(domain)
-    if record == nil
+    if record.nil?
       return
     end
     connection.delete(path: "/client/v4/zones/#{@zone_id}/dns_records/#{record["id"]}", expects: 200)

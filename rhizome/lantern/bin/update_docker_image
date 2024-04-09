@@ -2,7 +2,7 @@
 # frozen_string_literal: true
 
 require "json"
-require 'yaml'
+require "yaml"
 require_relative "../../common/lib/util"
 require_relative "../lib/common"
 
@@ -15,6 +15,6 @@ configure_gcr(gcp_creds_gcr_b64, container_image)
 map = YAML.load_file $compose_file
 map["services"]["postgresql"]["image"] = container_image
 
-File.open($compose_file, 'w') { |f| YAML.dump(map, f) }
+File.open($compose_file, "w") { |f| YAML.dump(map, f) }
 
 run_database(container_image)

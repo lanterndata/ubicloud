@@ -2,8 +2,7 @@
 # frozen_string_literal: true
 
 require "json"
-require "yaml"
 require_relative "../../common/lib/util"
 require_relative "../lib/common"
 
-$stdout.puts r "docker compose -f #{$compose_file} exec -T postgresql psql -U postgres -t --csv", stdin: $stdin
+r "docker compose -f #{$compose_file} exec -T -u root postgresql bash -c '/tmp/wal-g-base-backup.sh'"

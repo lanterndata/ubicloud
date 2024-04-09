@@ -33,6 +33,7 @@ class UBID
   # types
   TYPE_GCP_VM = "gm"
   TYPE_LANTERN_SERVER = "1s"
+  TYPE_LANTERN_TIMELINE = "1t"
   TYPE_PROJECT = "pj"
   TYPE_ACCESS_TAG = "tg"
   TYPE_ACCESS_POLICY = "pc"

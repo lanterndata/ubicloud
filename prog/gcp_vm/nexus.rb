@@ -29,7 +29,7 @@ class Prog::GcpVm::Nexus < Prog::Base
     Validation.validate_name(name)
     Validation.validate_os_user_name(unix_user)
 
-    if domain != nil
+    if !domain.nil?
       Validation.validate_domain(domain)
     end
 
@@ -63,7 +63,7 @@ class Prog::GcpVm::Nexus < Prog::Base
   end
 
   label def wait_ipv4
-    gcp_client = Hosting::GcpApis::new
+    gcp_client = Hosting::GcpApis.new
     addr_info = gcp_client.get_static_ipv4(gcp_vm.name, gcp_vm.location)
     if addr_info["status"] == "RESERVED"
       gcp_client.delete_ephermal_ipv4(gcp_vm.name, "#{gcp_vm.location}-a")
@@ -76,7 +76,7 @@ class Prog::GcpVm::Nexus < Prog::Base
   end
 
   label def wait_create_vm
-    gcp_client = Hosting::GcpApis::new
+    gcp_client = Hosting::GcpApis.new
     vm = gcp_client.get_vm(gcp_vm.name, "#{gcp_vm.location}-a")
     if vm["status"] == "RUNNING"
       gcp_client.create_static_ipv4(gcp_vm.name, gcp_vm.location)
@@ -88,7 +88,7 @@ class Prog::GcpVm::Nexus < Prog::Base
   end
 
   label def start
-    gcp_client = Hosting::GcpApis::new
+    gcp_client = Hosting::GcpApis.new
     gcp_client.create_vm(gcp_vm.name, "#{gcp_vm.location}-a", gcp_vm.boot_image, gcp_vm.public_key, gcp_vm.unix_user, "#{gcp_vm.family}-#{gcp_vm.cores}", gcp_vm.storage_size_gib)
     register_deadline(:wait, 10 * 60)
     hop_wait_create_vm
@@ -142,7 +142,7 @@ class Prog::GcpVm::Nexus < Prog::Base
   end
 
   label def wait_vm_stopped
-    gcp_client = Hosting::GcpApis::new
+    gcp_client = Hosting::GcpApis.new
     vm = gcp_client.get_vm(gcp_vm.name, "#{gcp_vm.location}-a")
     if vm["status"] == "TERMINATED"
       gcp_vm.update(display_state: "stopped")
@@ -154,7 +154,7 @@ class Prog::GcpVm::Nexus < Prog::Base
   label def stop_vm
     gcp_vm.update(display_state: "stopping")
 
-    gcp_client = Hosting::GcpApis::new
+    gcp_client = Hosting::GcpApis.new
     gcp_client.stop_vm(gcp_vm.name, "#{gcp_vm.location}-a")
 
     decr_stop_vm
@@ -165,7 +165,7 @@ class Prog::GcpVm::Nexus < Prog::Base
   label def start_vm
     gcp_vm.update(display_state: "starting")
 
-    gcp_client = Hosting::GcpApis::new
+    gcp_client = Hosting::GcpApis.new
     res = gcp_client.start_vm(gcp_vm.name, "#{gcp_vm.location}-a")
 
     if !["DONE"].include?(res["status"])
@@ -186,7 +186,7 @@ class Prog::GcpVm::Nexus < Prog::Base
     decr_update_storage
     register_deadline(:wait, 5 * 60)
     gcp_vm.update(display_state: "updating")
-    gcp_client = Hosting::GcpApis::new
+    gcp_client = Hosting::GcpApis.new
     zone = "#{gcp_vm.location}-a"
     vm = gcp_client.get_vm(gcp_vm.name, zone)
     disk_source = vm["disks"][0]["source"]
@@ -206,7 +206,7 @@ class Prog::GcpVm::Nexus < Prog::Base
     decr_update_size
     register_deadline(:wait, 5 * 60)
     gcp_vm.update(display_state: "updating")
-    gcp_client = Hosting::GcpApis::new
+    gcp_client = Hosting::GcpApis.new
     gcp_client.update_vm_type(gcp_vm.name, "#{gcp_vm.location}-a", gcp_vm.display_size)
 
     when_update_storage_set? do
@@ -219,7 +219,7 @@ class Prog::GcpVm::Nexus < Prog::Base
   label def destroy
     DB.transaction do
       gcp_vm.update(display_state: "deleting")
-      gcp_client = Hosting::GcpApis::new
+      gcp_client = Hosting::GcpApis.new
       gcp_client.delete_vm(gcp_vm.name, "#{gcp_vm.location}-a")
       if gcp_vm.has_static_ipv4
         gcp_client.release_ipv4(gcp_vm.name, gcp_vm.location)

@@ -130,6 +130,7 @@ module Config
   # Lantern
   override :lantern_top_domain, "db.lantern.dev", string
   override :lantern_dns_email, "varik@lantern.dev", string
+  override :lantern_backup_bucket, "lantern-wal-g-backups"
 
   # GCP
   override :gcp_project_id, "ringed-griffin-394922", string

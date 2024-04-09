@@ -129,6 +129,7 @@ RSpec.describe UBID do
       expect(max_ubid - min_ubid).to be < (1 << 83)
     }
   end
+
   #
   # it "uses canonical type characters" do
   #   # In crockford's base32 multiple characters can map to a single number,

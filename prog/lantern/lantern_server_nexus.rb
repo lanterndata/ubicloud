@@ -20,7 +20,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     location: "us-central1", target_vm_size: nil, storage_size_gib: 50,
     postgres_password: nil, master_host: nil, master_port: nil, domain: nil,
     app_env: Config.rack_env, repl_password: nil, enable_telemetry: Config.production?,
-    enable_debug: false, repl_user: "repl_user"
+    enable_debug: false, repl_user: "repl_user", timeline_id: nil, restore_target: nil
   )
 
     DB.transaction do
@@ -33,24 +33,24 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       enable_debug ||= false
       repl_user ||= "repl_user"
 
-      Validation::validate_name(name)
+      Validation.validate_name(name)
       if db_user
-        Validation::validate_name(db_user)
+        Validation.validate_name(db_user)
       else
         db_user = "postgres"
       end
 
       if db_name
-        Validation::validate_name(db_name)
+        Validation.validate_name(db_name)
       else
         db_name = "postgres"
       end
 
-      if postgres_password == nil
+      if postgres_password.nil?
         postgres_password = SecureRandom.urlsafe_base64(15)
       end
 
-      if db_user != "postgres" && db_user_password == nil
+      if db_user != "postgres" && db_user_password.nil?
         db_user_password = SecureRandom.urlsafe_base64(15)
       end
 
@@ -64,6 +64,18 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
         boot_image: "ubuntu-2204-jammy-v20240319",
         domain: domain
       )
+
+      st = Prog::Lantern::LanternTimelineNexus.assemble(parent_id: timeline_id)
+      timeline = LanternTimeline[st.id]
+
+      if !timeline.parent.nil?
+        db_name = timeline.parent.leader.db_name
+        db_user = timeline.parent.leader.db_user
+        db_user_password = timeline.parent.leader.db_user_password
+        postgres_password = timeline.parent.leader.postgres_password
+        repl_user = timeline.parent.leader.repl_user
+        repl_password = timeline.parent.leader.repl_password
+      end
 
       lantern_server = LanternServer.create(
         project_id: project_id,
@@ -87,8 +99,11 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
         debug: enable_debug,
         enable_telemetry: enable_telemetry,
         repl_user: repl_user,
-        repl_password: repl_password
+        repl_password: repl_password,
+        restore_target: restore_target,
+        timeline_id: timeline.id
       ) { _1.id = ubid.to_uuid }
+
       lantern_server.associate_with_project(project)
 
       Strand.create(prog: "Lantern::LanternServerNexus", label: "start") { _1.id = lantern_server.id }
@@ -145,47 +160,73 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       raise "GCP_CREDS_GCR_B64 is required to setup docker stack for Lantern"
     end
 
-    gcp_vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/configure' configure_lantern", stdin: JSON.generate({
-      enable_coredumps: true,
-      org_id: lantern_server.org_id,
-      instance_id: lantern_server.name,
-      instance_type: lantern_server.instance_type,
-      app_env: lantern_server.app_env,
-      enable_debug: lantern_server.debug,
-      enable_telemetry: lantern_server.enable_telemetry,
-      repl_user: lantern_server.repl_user,
-      repl_password: lantern_server.repl_password,
-      replication_mode: lantern_server.instance_type == "writer" ? "master" : "slave",
-      db_name: lantern_server.db_name,
-      db_user: lantern_server.db_user,
-      db_user_password: lantern_server.db_user_password,
-      postgres_password: lantern_server.postgres_password,
-      master_host: lantern_server.master_host,
-      master_port: lantern_server.master_port,
-      prom_password: Config.prom_password,
-      gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
-      gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
-      gcp_creds_walg_b64: Config.gcp_creds_walg_b64,
-      container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}"
-    }))
+    case gcp_vm.sshable.cmd("common/bin/daemonizer --check configure_lantern")
+    when "Succeeded"
+      gcp_vm.sshable.cmd("common/bin/daemonizer --clean configure_lantern")
+      if !gcp_vm.domain.nil?
+        lantern_server.incr_add_domain
+      end
+      hop_wait_db_available
+    when "Failed", "NotStarted"
+      walg_config = lantern_server.timeline.generate_walg_config
+      backup_label = ""
+      restore_target = lantern_server.standby? ? "" : lantern_server.restore_target || ""
 
-    if gcp_vm.domain != nil
-      lantern_server.incr_add_domain
+      # Set backup_label if the database is being initialized from backup
+      if !lantern_server.timeline.parent.nil?
+        backup_label = if lantern_server.standby? || lantern_server.restore_target.nil?
+          "LATEST"
+        else
+          lantern_server.timeline.parent.latest_backup_label_before_target(lantern_server.restore_target)
+        end
+      end
+
+      gcp_vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/configure' configure_lantern", stdin: JSON.generate({
+        enable_coredumps: true,
+        org_id: lantern_server.org_id,
+        instance_id: lantern_server.name,
+        instance_type: lantern_server.instance_type,
+        app_env: lantern_server.app_env,
+        enable_debug: lantern_server.debug,
+        enable_telemetry: lantern_server.enable_telemetry,
+        repl_user: lantern_server.repl_user,
+        repl_password: lantern_server.repl_password,
+        replication_mode: lantern_server.standby? ? "slave" : "master",
+        db_name: lantern_server.db_name,
+        db_user: lantern_server.db_user,
+        db_user_password: lantern_server.db_user_password,
+        postgres_password: lantern_server.postgres_password,
+        master_host: lantern_server.master_host,
+        master_port: lantern_server.master_port,
+        prom_password: Config.prom_password,
+        gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
+        gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
+        gcp_creds_walg_push_b64: walg_config[:gcp_creds_walg_push_b64],
+        walg_gs_push_prefix: walg_config[:walg_gs_push_prefix],
+        gcp_creds_walg_pull_b64: walg_config[:gcp_creds_walg_pull_b64],
+        walg_gs_pull_prefix: walg_config[:walg_gs_pull_prefix],
+        container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}",
+        postgresql_recover_from_backup: backup_label,
+        postgresql_recovery_target_time: restore_target
+      }))
     end
-    hop_wait_db_available
+
+    nap 5
   end
 
   label def wait_db_available
-    if available?
-      when_update_memory_limits_set? do
-        gcp_vm.sshable.cmd("sudo lantern/bin/update_memory_limits")
-        decr_update_memory_limits
-      end
+    nap 10 if !available?
 
-      hop_wait
+    when_initial_provisioning_set? do
+      decr_initial_provisioning
     end
 
-    nap 10
+    when_update_memory_limits_set? do
+      gcp_vm.sshable.cmd("sudo lantern/bin/update_memory_limits")
+      decr_update_memory_limits
+    end
+
+    hop_wait
   end
 
   label def update_lantern_extension
@@ -214,7 +255,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   end
 
   label def add_domain
-    cf_client = Dns::Cloudflare::new
+    cf_client = Dns::Cloudflare.new
     begin
       cf_client.upsert_dns_record(lantern_server.gcp_vm.domain, lantern_server.gcp_vm.sshable.host)
     rescue => e
@@ -229,7 +270,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   end
 
   def destroy_domain
-    cf_client = Dns::Cloudflare::new
+    cf_client = Dns::Cloudflare.new
     cf_client.delete_dns_record(lantern_server.gcp_vm.domain)
   end
 
@@ -238,7 +279,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       dns_token: Config.cf_token,
       dns_zone_id: Config.cf_zone_id,
       dns_email: Config.lantern_dns_email,
-      domain: lantern_server.gcp_vm.domain,
+      domain: lantern_server.gcp_vm.domain
     }))
     decr_setup_ssl
     hop_wait_db_available
@@ -269,8 +310,6 @@ SQL
   end
 
   label def wait
-    decr_initial_provisioning
-
     if gcp_vm.strand.label != "wait"
       hop_wait_db_available
     end
@@ -348,11 +387,13 @@ SQL
     DB.transaction do
       strand.children.each { _1.destroy }
 
-      if gcp_vm.domain != nil
+      if !gcp_vm.domain.nil?
         destroy_domain
       end
 
       lantern_server.projects.map { lantern_server.dissociate_with_project(_1) }
+
+      lantern_server.timeline.incr_destroy
       lantern_server.destroy
 
       gcp_vm.incr_destroy

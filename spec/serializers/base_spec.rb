@@ -16,7 +16,7 @@ RSpec.describe Serializers::Base do
     expect(described_class.serialize(nil)).to eq({})
   end
 
-  it "should return when nil is passed" do
-    expect(described_class.serialize(nil)).to eq(nil)
+  it "returns when nil is passed" do
+    expect(described_class.serialize(nil)).to be_nil
   end
 end

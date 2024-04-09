@@ -137,6 +137,7 @@ RSpec.describe Authorization do
 
     expect { c.new.hyper_tag_name }.to raise_error NoMethodError
   end
+
   #
   #   it "hyper_tag methods" do
   #     project = Project.create_with_id(name: "test")

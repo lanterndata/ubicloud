@@ -160,7 +160,7 @@ class CloverApi
 
       domain = r.params["domain"]
 
-      if domain == nil && r.params["subdomain"]
+      if domain.nil? && r.params["subdomain"]
         domain = "#{r.params["subdomain"]}.#{Config.lantern_top_domain}"
       end
 
