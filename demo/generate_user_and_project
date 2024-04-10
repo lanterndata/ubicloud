@@ -14,7 +14,7 @@ if !account.nil?
 end
 
 account = Account.create_with_id(email: email, status_id: 2)
-pass = SecureRandom.urlsafe_base64(15)
+pass = ARGV[1] || SecureRandom.urlsafe_base64(15)
 hash = Argon2::Password.new({
   t_cost: 1,
   m_cost: 5,
@@ -28,3 +28,4 @@ account.create_project_with_default_policy("Default")
 puts "Account created with credentials: \n"
 puts "Email - #{email}"
 puts "Password - #{pass}"
+puts "ProjectID - #{Project.first.id}"
