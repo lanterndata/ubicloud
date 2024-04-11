@@ -101,7 +101,7 @@ def setup_initial_compose_file
 
   if $configure_hash["gcp_creds_logging_b64"]
     r "echo #{$configure_hash["gcp_creds_logging_b64"]} | base64 -d > #{$workdir}/logging_creds.json"
-    gcp_project = r "cat #{$workdir}/logging_creds.json | jq -r '.project_id'"
+    gcp_project = JSON.parse(File.read("#{$workdir}/logging_creds.json"))["project_id"]
     r "sudo sed -i \"/[Service]/a Environment=\"GOOGLE_APPLICATION_CREDENTIALS=#{$workdir}/logging_creds.json\"\" /usr/lib/systemd/system/docker.service"
     r "sudo sed -i \"/BASE=docker/a export GOOGLE_APPLICATION_CREDENTIALS=#{$workdir}/logging_creds.json\" /etc/init.d/docker"
     r "sudo systemctl daemon-reload 2>/dev/null || echo 'No systemctl in host'"

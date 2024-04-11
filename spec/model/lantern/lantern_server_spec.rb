@@ -190,6 +190,7 @@ RSpec.describe LanternServer do
         restore_target: nil)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
       expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
+      expect(Config).to receive(:gcp_creds_logging_b64).and_return("test-creds").at_least(:once)
       expect(timeline).to receive(:generate_walg_config).and_return({gcp_creds_b64: "test-creds-push", walg_gs_prefix: "test-bucket-push"}).at_least(:once)
       expect(lantern_server).to receive(:resource).and_return(resource).at_least(:once)
       expect(lantern_server).to receive(:timeline).and_return(timeline).at_least(:once)
@@ -217,6 +218,8 @@ RSpec.describe LanternServer do
         prom_password: Config.prom_password,
         gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
         gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
+        gcp_creds_logging_b64: Config.gcp_creds_logging_b64,
+
         container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}",
         postgresql_recover_from_backup: "",
         postgresql_recovery_target_time: resource.restore_target || "",
@@ -245,6 +248,7 @@ RSpec.describe LanternServer do
         restore_target: Time.now)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
       expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
+      expect(Config).to receive(:gcp_creds_logging_b64).and_return("test-creds").at_least(:once)
       expect(timeline).to receive(:latest_backup_label_before_target).and_return("test-label").at_least(:once)
       expect(timeline).to receive(:generate_walg_config).and_return({gcp_creds_b64: "test-creds-push", walg_gs_prefix: "test-bucket-push"}).at_least(:once)
       expect(lantern_server).to receive(:resource).and_return(resource).at_least(:once)
@@ -273,6 +277,7 @@ RSpec.describe LanternServer do
         prom_password: Config.prom_password,
         gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
         gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
+        gcp_creds_logging_b64: Config.gcp_creds_logging_b64,
         container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}",
         postgresql_recover_from_backup: "test-label",
         postgresql_recovery_target_time: resource.restore_target || "",
@@ -301,6 +306,7 @@ RSpec.describe LanternServer do
         restore_target: nil)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
       expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
+      expect(Config).to receive(:gcp_creds_logging_b64).and_return("test-creds").at_least(:once)
       expect(timeline).to receive(:generate_walg_config).and_return({gcp_creds_b64: "test-creds-push", walg_gs_prefix: "test-bucket-push"}).at_least(:once)
       expect(lantern_server).to receive(:resource).and_return(resource).at_least(:once)
       expect(lantern_server).to receive(:timeline).and_return(timeline).at_least(:once)
@@ -328,6 +334,7 @@ RSpec.describe LanternServer do
         prom_password: Config.prom_password,
         gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
         gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
+        gcp_creds_logging_b64: Config.gcp_creds_logging_b64,
         container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}",
         postgresql_recover_from_backup: "LATEST",
         postgresql_recovery_target_time: resource.restore_target || "",
@@ -356,6 +363,8 @@ RSpec.describe LanternServer do
         restore_target: Time.now)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
       expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
+      expect(Config).to receive(:gcp_creds_logging_b64).and_return("test-creds").at_least(:once)
+
       expect(timeline).to receive(:generate_walg_config).and_return({gcp_creds_b64: "test-creds-push", walg_gs_prefix: "test-bucket-push"}).at_least(:once)
       expect(lantern_server).to receive(:resource).and_return(resource).at_least(:once)
       expect(lantern_server).to receive(:timeline).and_return(timeline).at_least(:once)
@@ -383,6 +392,8 @@ RSpec.describe LanternServer do
         prom_password: Config.prom_password,
         gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
         gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
+        gcp_creds_logging_b64: Config.gcp_creds_logging_b64,
+
         container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}",
         postgresql_recover_from_backup: "LATEST",
         postgresql_recovery_target_time: resource.restore_target || "",

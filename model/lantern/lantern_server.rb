@@ -110,6 +110,7 @@ class LanternServer < Sequel::Model
       prom_password: Config.prom_password,
       gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
       gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
+      gcp_creds_logging_b64: Config.gcp_creds_logging_b64,
       container_image: "#{Config.gcr_image}:lantern-#{lantern_version}-extras-#{extras_version}-minor-#{minor_version}",
       postgresql_recover_from_backup: backup_label,
       postgresql_recovery_target_time: resource.restore_target || "",

@@ -135,6 +135,7 @@ module Config
   # GCP
   override :gcp_project_id, "ringed-griffin-394922", string
   optional :gcp_creds_gcr_b64, string
+  optional :gcp_creds_logging_b64, string
   optional :gcp_creds_coredumps_b64, string
   optional :gcp_creds_walg_b64, string
   optional :prom_password, string
