@@ -243,8 +243,12 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
     it "calls init_sql if failed" do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check init_sql").and_return("Failed")
-      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/init_sql' init_sql")
-      expect { nx.init_sql }.to nap(5)
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean init_sql")
+      expect(lantern_server).to receive(:ubid).and_return("test-ubid").at_least(:once)
+      expect(lantern_server).to receive(:container_image).and_return("test-image").at_least(:once)
+      expect(lantern_server.resource).to receive(:ubid).and_return("test-ubid").at_least(:once)
+      expect(Prog::PageNexus).to receive(:assemble).with("Lantern init sql failed!", [lantern_server.resource.ubid, lantern_server.ubid], "LanternInitSQLFailed", lantern_server.container_image)
+      expect { nx.init_sql }.to hop("wait")
     end
 
     it "hops to wait_db_available" do
@@ -408,7 +412,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check update_lantern").and_return("Succeeded")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean update_lantern")
       expect(nx).to receive(:decr_update_lantern_extension)
-      expect { nx.update_lantern_extension }.to hop("wait_db_available")
+      expect { nx.update_lantern_extension }.to hop("init_sql")
     end
 
     it "updates lantern extension and fails" do
@@ -419,7 +423,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean update_lantern")
       expect(nx).to receive(:decr_update_lantern_extension)
       expect(Prog::PageNexus).to receive(:assemble).with("Lantern v0.2.0 update failed!", [lantern_server.resource.ubid, lantern_server.ubid], "LanternUpdateFailed", lantern_server.lantern_version)
-      expect { nx.update_lantern_extension }.to hop("wait_db_available")
+      expect { nx.update_lantern_extension }.to hop("wait")
     end
   end
 
@@ -442,7 +446,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check update_extras").and_return("Succeeded")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean update_extras")
       expect(nx).to receive(:decr_update_extras_extension)
-      expect { nx.update_extras_extension }.to hop("wait_db_available")
+      expect { nx.update_extras_extension }.to hop("init_sql")
     end
 
     it "updates lantern extras extension and fails" do
@@ -453,7 +457,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean update_extras")
       expect(nx).to receive(:decr_update_extras_extension)
       expect(Prog::PageNexus).to receive(:assemble).with("Lantern Extras v0.2.0 update failed!", [lantern_server.resource.ubid, lantern_server.ubid], "LanternUpdateFailed", lantern_server.extras_version)
-      expect { nx.update_extras_extension }.to hop("wait_db_available")
+      expect { nx.update_extras_extension }.to hop("wait")
     end
   end
 
@@ -478,7 +482,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check update_docker_image").and_return("Succeeded")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean update_docker_image")
       expect(nx).to receive(:decr_update_image)
-      expect { nx.update_image }.to hop("wait_db_available")
+      expect { nx.update_image }.to hop("init_sql")
     end
 
     it "updates image and fails" do
@@ -489,7 +493,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean update_docker_image")
       expect(nx).to receive(:decr_update_image)
       expect(Prog::PageNexus).to receive(:assemble).with("Lantern Image test-image update failed!", [lantern_server.resource.ubid, lantern_server.ubid], "LanternUpdateFailed", lantern_server.container_image)
-      expect { nx.update_image }.to hop("wait_db_available")
+      expect { nx.update_image }.to hop("wait")
     end
   end
 
