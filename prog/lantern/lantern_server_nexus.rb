@@ -222,6 +222,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/update_lantern' update_lantern", stdin: JSON.generate({version: lantern_server.lantern_version}))
     when "Failed"
       Prog::PageNexus.assemble("Lantern v#{lantern_server.lantern_version} update failed!", [lantern_server.resource.ubid, lantern_server.ubid], "LanternUpdateFailed", lantern_server.lantern_version)
+      vm.sshable.cmd("common/bin/daemonizer --clean update_lantern")
       decr_update_lantern_extension
       hop_wait_db_available
     end
@@ -238,6 +239,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/update_extras' update_lantern", stdin: JSON.generate({version: lantern_server.extras_version}))
     when "Failed"
       Prog::PageNexus.assemble("Lantern Extras v#{lantern_server.extras_version} update failed!", [lantern_server.resource.ubid, lantern_server.ubid], "LanternUpdateFailed", lantern_server.extras_version)
+      vm.sshable.cmd("common/bin/daemonizer --clean update_extras")
       decr_update_extras_extension
       hop_wait_db_available
     end
@@ -245,18 +247,19 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   end
 
   label def update_image
-    case vm.sshable.cmd("common/bin/daemonizer --check update_image")
+    case vm.sshable.cmd("common/bin/daemonizer --check update_docker_image")
     when "Succeeded"
-      vm.sshable.cmd("common/bin/daemonizer --clean update_image")
+      vm.sshable.cmd("common/bin/daemonizer --clean update_docker_image")
       decr_update_image
       hop_wait_db_available
     when "NotStarted"
-      vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/update_image' update_image", stdin: JSON.generate({
+      vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/update_docker_image' update_docker_image", stdin: JSON.generate({
         gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
         container_image: lantern_server.container_image
       }))
     when "Failed"
       Prog::PageNexus.assemble("Lantern Image #{lantern_server.container_image} update failed!", [lantern_server.resource.ubid, lantern_server.ubid], "LanternUpdateFailed", lantern_server.container_image)
+      vm.sshable.cmd("common/bin/daemonizer --clean update_docker_image")
       decr_update_image
       hop_wait_db_available
     end
