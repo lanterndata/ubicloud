@@ -23,5 +23,3 @@ r "sudo docker exec -u root #{$container_name} bash -c 'cd /tmp/lantern && git s
 r "sudo docker exec -u root #{$container_name} bash -c 'cd /tmp/lantern/build && cmake -DBUILD_FOR_DISTRIBUTING=YES -DMARCH_NATIVE=YES ..'"
 r "sudo docker exec -u root #{$container_name} bash -c 'cd /tmp/lantern/build && make install'"
 r "sudo docker exec -u root #{$container_name} bash -c 'rm -rf /tmp/lantern'"
-
-update_extensions_in_sql

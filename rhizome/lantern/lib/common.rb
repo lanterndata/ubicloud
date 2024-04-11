@@ -19,7 +19,7 @@ end
 def update_extensions_in_sql
   all_dbs = (r "docker compose -f #{$compose_file} exec postgresql psql -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'").strip!.split("\n")
   all_dbs.each do |db|
-    r "docker compose -f #{$compose_file} exec postgresql psql -U postgres -f /lantern-init.sql #{db}"
+    $stdout.puts r "docker compose -f #{$compose_file} exec postgresql psql -U postgres -f /lantern-init.sql #{db}"
   end
 end
 
