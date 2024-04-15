@@ -15,9 +15,9 @@ set -ueo pipefail
 sudo apt update && sudo apt-get -y install ruby-bundler
 sudo userdel -rf #{username} || true
 sudo adduser --disabled-password --gecos '' #{username}
-echo '#{username} ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-rhizome
-sudo install -d -o #{username} -g rhizome -m 0700 /home/rhizome/.ssh
-sudo install -o #{username} -g rhizome -m 0600 /dev/null /home/rhizome/.ssh/authorized_keys
+echo '#{username} ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-#{username}
+sudo install -d -o #{username} -g #{username} -m 0700 /home/#{username}/.ssh
+sudo install -o #{username} -g #{username} -m 0600 /dev/null /home/#{username}/.ssh/authorized_keys
 echo #{sshable.keys.map(&:public_key).join("\n").shellescape} | sudo tee /home/#{username}/.ssh/authorized_keys > /dev/null
 SH
 end
