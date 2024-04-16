@@ -17,7 +17,7 @@ class LanternServer < Sequel::Model
   include SemaphoreMethods
 
   semaphore :initial_provisioning, :update_user_password, :update_lantern_extension, :update_extras_extension, :update_image, :setup_ssl, :add_domain, :update_rhizome, :checkup
-  semaphore :start_server, :stop_server, :restart_server, :take_over, :destroy, :update_storage_size, :update_vm_size, :update_memory_limits, :init_sql
+  semaphore :start_server, :stop_server, :restart_server, :take_over, :destroy, :update_storage_size, :update_vm_size, :update_memory_limits, :init_sql, :restart
 
   def self.ubid_to_name(id)
     id.to_s[0..7]
@@ -131,4 +131,42 @@ class LanternServer < Sequel::Model
   def container_image
     "#{Config.gcr_image}:lantern-#{lantern_version}-extras-#{extras_version}-minor-#{minor_version}"
   end
+
+  def init_health_monitor_session
+    {
+      db_connection: nil
+    }
+  end
+
+  def check_pulse(session:, previous_pulse:)
+    reading = begin
+      session[:db_connection] ||= Sequel.connect(connection_string)
+      lsn_function = primary? ? "pg_current_wal_lsn()" : "pg_last_wal_receive_lsn()"
+      last_known_lsn = session[:db_connection]["SELECT #{lsn_function} AS lsn"].first[:lsn]
+      "up"
+    rescue
+      "down"
+    end
+    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading, data: {last_known_lsn: last_known_lsn})
+
+    DB.transaction do
+      if pulse[:reading] == "up" && pulse[:reading_rpt] % 12 == 1
+        LanternLsnMonitor.new(last_known_lsn: last_known_lsn) { _1.lantern_server_id = id }
+          .insert_conflict(
+            target: :lantern_server_id,
+            update: {last_known_lsn: last_known_lsn}
+          ).save_changes
+      end
+
+      if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30
+        incr_checkup
+      end
+    end
+
+    pulse
+  end
+
+  # def failover_target
+  #   nil
+  # end
 end

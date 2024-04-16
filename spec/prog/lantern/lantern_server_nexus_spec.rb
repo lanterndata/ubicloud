@@ -11,6 +11,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     instance_double(
       LanternServer,
       ubid: "6ae7e513-c34a-8039-a72a-7be45b53f2a0",
+      id: "6ae7e513-c34a-8039-a72a-7be45b53f2a0",
       domain: nil,
       resource: instance_double(LanternResource,
         org_id: 0,
@@ -561,66 +562,64 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
   describe "#wait" do
     it "hops to update_user_password" do
-      expect(lantern_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       nx.incr_update_user_password
       expect { nx.wait }.to hop("update_user_password")
     end
 
     it "hops to restart_server" do
-      expect(lantern_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       nx.incr_restart_server
       expect { nx.wait }.to hop("restart_server")
     end
 
     it "hops to start_server" do
-      expect(lantern_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       nx.incr_start_server
       expect { nx.wait }.to hop("start_server")
     end
 
     it "hops to stop_server" do
-      expect(lantern_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       nx.incr_stop_server
       expect { nx.wait }.to hop("stop_server")
     end
 
     it "hops to add_domain" do
-      expect(lantern_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       nx.incr_add_domain
       expect { nx.wait }.to hop("add_domain")
     end
 
     it "hops to update_rhizome" do
-      expect(lantern_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       nx.incr_update_rhizome
       expect { nx.wait }.to hop("update_rhizome")
     end
 
     it "hops to destroy" do
-      expect(lantern_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       nx.incr_destroy
       expect { nx.wait }.to hop("destroy")
     end
 
     it "hops to update_storage_size" do
-      expect(lantern_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       nx.incr_update_storage_size
       expect { nx.wait }.to hop("update_storage_size")
     end
 
     it "hops to update_vm_size" do
-      expect(lantern_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       nx.incr_update_vm_size
       expect { nx.wait }.to hop("update_vm_size")
     end
 
-    it "hops to wait_db_available" do
-      expect(lantern_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "updating"))
-      expect { nx.wait }.to hop("wait_db_available")
+    it "hops to unavailable" do
+      nx.incr_checkup
+      expect(nx).to receive(:available?).and_return(false)
+      expect { nx.wait }.to hop("unavailable")
+    end
+
+    it "decrements checkup" do
+      nx.incr_checkup
+      expect(nx).to receive(:available?).and_return(true)
+      expect(nx).to receive(:decr_checkup)
+      expect { nx.wait }.to nap(30)
     end
 
     it "naps 30" do
-      expect(lantern_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect { nx.wait }.to nap(30)
     end
   end
@@ -715,6 +714,59 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     it "calls update_vm_size on vm" do
       expect(lantern_server.vm).to receive(:incr_update_size)
       expect { nx.update_vm_size }.to hop("wait")
+    end
+  end
+
+  describe "#unavailable" do
+    it "naps if restarting" do
+      expect(nx).to receive(:register_deadline)
+      expect(nx).to receive(:reap)
+      expect(nx.strand).to receive(:children).and_return([instance_double(Strand, prog: "Lantern::LanternServerNexus", label: "restart")])
+      expect { nx.unavailable }.to nap(5)
+    end
+
+    it "hops to wait if available" do
+      expect(nx).to receive(:register_deadline)
+      expect(nx).to receive(:reap)
+      expect(nx).to receive(:available?).and_return(true)
+      expect(nx).to receive(:decr_checkup)
+      expect { nx.unavailable }.to hop("wait")
+    end
+
+    it "hops to wait if available and resolves page" do
+      expect(nx).to receive(:register_deadline)
+      expect(nx).to receive(:reap)
+      expect(nx).to receive(:available?).and_return(true)
+      expect(nx).to receive(:decr_checkup)
+      page = instance_double(Page)
+      expect(Page).to receive(:from_tag_parts).with("DBUnavailable", lantern_server.id).and_return(page)
+      expect(page).to receive(:incr_resolve)
+      expect { nx.unavailable }.to hop("wait")
+    end
+
+    it "buds restart" do
+      expect(nx).to receive(:register_deadline)
+      expect(nx).to receive(:reap)
+      expect(nx).to receive(:available?).and_return(false)
+      expect(nx).to receive(:bud).with(described_class, {}, :restart)
+      expect(Prog::PageNexus).to receive(:assemble).with("DB #{lantern_server.resource.name} is unavailable!", [lantern_server.ubid], "DBUnavailable", lantern_server.id)
+      expect { nx.unavailable }.to nap(5)
+    end
+
+    it "naps if already alerted" do
+      expect(nx).to receive(:register_deadline)
+      expect(nx).to receive(:reap)
+      expect(nx).to receive(:available?).and_return(false)
+      page = instance_double(Page)
+      expect(Page).to receive(:from_tag_parts).with("DBUnavailable", lantern_server.id).and_return(page)
+      expect { nx.unavailable }.to nap(5)
+    end
+  end
+
+  describe "#restart" do
+    it "restarts docker container" do
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo lantern/bin/restart")
+      expect { nx.restart }.to exit({"msg" => "lantern server is restarted"})
     end
   end
 end

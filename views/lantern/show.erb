@@ -240,7 +240,7 @@
                       type: "text",
                       attributes: {
                         required: true,
-                        value: @pg[:domain] || "#{@pg[:name]}-#{@pg[:org_id]}.#{Config.lantern_top_domain}"
+                        placeholder: @pg[:domain] || "#{@pg[:org_id]}-#{@pg[:name]}.#{Config.lantern_top_domain}"
                       }
                     }
                   ) %>

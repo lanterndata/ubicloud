@@ -3,9 +3,7 @@
 
 require_relative "../loader"
 
-# TODO
-# MONITORABLE_RESOURCE_TYPES = [LanternServer]
-MONITORABLE_RESOURCE_TYPES = []
+MONITORABLE_RESOURCE_TYPES = [LanternServer]
 
 sessions = {}
 ssh_threads = {}
@@ -23,7 +21,7 @@ loop do
         sessions[r.id] = r.init_health_monitor_session
 
         loop do
-          sessions[r.id][:ssh_session].process
+          sessions[r.id][:ssh_session]&.process
         rescue => ex
           Clog.emit("Processing SSH session is failed. Trying to reestablish the connection") { {health_monitor_ssh_failure: {ubid: r.ubid, exception: Util.exception_to_hash(ex)}} }
           break

@@ -429,4 +429,54 @@ RSpec.describe LanternServer do
       expect(lantern_server.container_image).to eq("test-image:lantern-0.2.2-extras-0.1.4-minor-2")
     end
   end
+
+  describe "Lsn monitor" do
+    it "initiates a new health monitor session" do
+      expect(lantern_server.init_health_monitor_session).to eq({db_connection: nil})
+    end
+
+    it "checks pulse" do
+      session = {
+        db_connection: DB
+      }
+      pulse = {
+        reading: "down",
+        reading_rpt: 5,
+        reading_chg: Time.now - 30
+      }
+
+      expect(lantern_server).not_to receive(:incr_checkup)
+      lantern_server.check_pulse(session: session, previous_pulse: pulse)
+    end
+
+    it "checks pulse on primary" do
+      session = {
+        db_connection: DB
+      }
+      pulse = {
+        reading: "down",
+        reading_rpt: 5,
+        reading_chg: Time.now - 30
+      }
+
+      expect(lantern_server).to receive(:primary?).and_return(true)
+      expect(lantern_server).not_to receive(:incr_checkup)
+      lantern_server.check_pulse(session: session, previous_pulse: pulse)
+    end
+
+    it "increments checkup semaphore if pulse is down for a while" do
+      session = {
+        db_connection: instance_double(Sequel::Postgres::Database)
+      }
+      pulse = {
+        reading: "down",
+        reading_rpt: 5,
+        reading_chg: Time.now - 30
+      }
+
+      expect(session[:db_connection]).to receive(:[]).and_raise(Sequel::DatabaseConnectionError)
+      expect(lantern_server).to receive(:incr_checkup)
+      lantern_server.check_pulse(session: session, previous_pulse: pulse)
+    end
+  end
 end

@@ -53,7 +53,7 @@ def restart_if_needed
 end
 
 def force_restart
-  r "docker compose -f #{$compose_file} restart postgresql"
+  r "docker compose -f #{$compose_file} down && docker compose -f #{$compose_file} up -d"
 end
 
 def append_env(env_arr)

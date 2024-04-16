@@ -11,7 +11,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   def_delegators :lantern_server, :vm
 
   semaphore :initial_provisioning, :update_user_password, :update_lantern_extension, :update_extras_extension, :update_image, :add_domain, :update_rhizome, :checkup
-  semaphore :start_server, :stop_server, :restart_server, :take_over, :destroy, :update_storage_size, :update_vm_size, :update_memory_limits, :init_sql
+  semaphore :start_server, :stop_server, :restart_server, :take_over, :destroy, :update_storage_size, :update_vm_size, :update_memory_limits, :init_sql, :restart
 
   def self.assemble(
     resource_id: nil, lantern_version: "0.2.2", extras_version: "0.1.4", minor_version: "1", domain: nil,
@@ -325,17 +325,15 @@ SQL
   end
 
   label def wait
-    if vm.strand.label != "wait"
-      hop_wait_db_available
+    when_checkup_set? do
+      hop_unavailable if !available?
+      decr_checkup
     end
 
     when_update_user_password_set? do
       hop_update_user_password
     end
 
-    # when_checkup_set? do
-    #   hop_unavailable if !available?
-    # end
     when_destroy_set? do
       hop_destroy
     end
@@ -371,26 +369,35 @@ SQL
     nap 30
   end
 
-  # label def unavailable
-  #   register_deadline(:wait, 10 * 60)
+  label def unavailable
+    register_deadline(:wait, 5 * 60)
 
-  # if postgres_server.primary? && (standby = postgres_server.failover_target)
-  #   standby.incr_take_over
-  #   postgres_server.incr_destroy
-  #   nap 0
-  # end
+    # TODO
+    # if postgres_server.primary? && (standby = postgres_server.failover_target)
+    #   standby.incr_take_over
+    #   postgres_server.incr_destroy
+    #   nap 0
+    # end
 
-  #   reap
-  #   nap 5 unless strand.children.select { _1.prog == "Lantern::LanternServerNexus" && _1.label == "restart" }.empty?
-  #
-  #   if available?
-  #     decr_checkup
-  #     hop_wait
-  #   end
-  #
-  #   bud self.class, frame, :restart
-  #   nap 5
-  # end
+    reap
+    nap 5 unless strand.children.select { _1.prog == "Lantern::LanternServerNexus" && _1.label == "restart" }.empty?
+
+    page = Page.from_tag_parts("DBUnavailable", lantern_server.id)
+    if available?
+      decr_checkup
+      page&.incr_resolve
+      hop_wait
+    end
+
+    if page.nil?
+      Prog::PageNexus.assemble("DB #{lantern_server.resource.name} is unavailable!", [lantern_server.ubid], "DBUnavailable", lantern_server.id)
+    else
+      nap 5
+    end
+
+    bud self.class, frame, :restart
+    nap 5
+  end
 
   label def destroy
     decr_destroy
@@ -408,6 +415,12 @@ SQL
       vm.incr_destroy
     end
     pop "lantern server was deleted"
+  end
+
+  label def restart
+    decr_restart
+    vm.sshable.cmd("sudo lantern/bin/restart")
+    pop "lantern server is restarted"
   end
 
   label def stop_server

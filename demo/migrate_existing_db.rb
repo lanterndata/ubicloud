@@ -1,8 +1,10 @@
+# frozen_string_literal: true
+
 require_relative "../loader"
 
 def continue_story
   puts "press any key to continue or 'q' to exit"
-  char = STDIN.getch
+  char = $stdin.getch
   puts "            \r"
   if char == "q"
     raise "Cancelled"
@@ -10,7 +12,7 @@ def continue_story
 end
 
 def setup_user(username, sshable, unix_user, key_data)
-    Util.rootish_ssh(sshable.host, unix_user, key_data, <<SH)
+  Util.rootish_ssh(sshable.host, unix_user, key_data, <<SH)
 set -ueo pipefail
 sudo apt update && sudo apt-get -y install ruby-bundler
 sudo userdel -rf #{username} || true
@@ -52,7 +54,6 @@ def install_rhizome(sshable, target_folder: "lantern", user: "lantern")
   sshable.cmd("bundle install")
   puts "installed rhizome"
 end
-
 
 def migrate_existing_db(
   location: "us-central1",
@@ -105,7 +106,8 @@ def migrate_existing_db(
       public_key: ssh_key.public_key,
       unix_user: unix_user,
       family: family, cores: cores, location: location,
-      boot_image: "ubuntu-2204-jammy-v20240319", arch: arch, storage_size_gib: storage_size_gib)
+      boot_image: "ubuntu-2204-jammy-v20240319", arch: arch, storage_size_gib: storage_size_gib
+    )
     sshable = Sshable.create(unix_user: unix_user, host: vm_host, raw_private_key_1: ssh_key.keypair) {
       _1.id = vm.id
     }
@@ -139,15 +141,15 @@ def migrate_existing_db(
 
     # Strands
     puts "Add the following public key to gcp_vm under #{root_user}"
-    puts "#{ssh_key.public_key}"
+    puts ssh_key.public_key
     continue_story
 
     key_data = sshable.keys.map(&:private_key)
 
     if root_user != "lantern"
-    # Setup lantern user
-    setup_user("lantern", sshable, root_user, key_data)
-    puts "lantern user created"
+      # Setup lantern user
+      setup_user("lantern", sshable, root_user, key_data)
+      puts "lantern user created"
     end
 
     # Setup Rhizome user
@@ -166,7 +168,7 @@ def migrate_existing_db(
     continue_story
     sshable.cmd("sudo lantern/bin/update_env", stdin: JSON.generate([
       ["WALG_GS_PREFIX", walg_config[:walg_gs_prefix]],
-      ["GOOGLE_APPLICATION_CREDENTIALS_WALG_B64", walg_config[:gcp_creds_b64]],
+      ["GOOGLE_APPLICATION_CREDENTIALS_WALG_B64", walg_config[:gcp_creds_b64]]
     ]))
     Strand.create(prog: "Lantern::LanternTimelineNexus", label: "wait") { _1.id = lantern_timeline.id }
     puts "walg prefix updated"
