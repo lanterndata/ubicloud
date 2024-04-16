@@ -157,15 +157,16 @@ def migrate_existing_db(
     install_rhizome(sshable)
     puts "rhizome installed"
     Strand.create(prog: "GcpVm::Nexus", label: "wait") { _1.id = vm.id }
-    Strand.create(prog: "LanternResource::Nexus", label: "wait") { _1.id = lantern_resource.id }
-    Strand.create(prog: "LanternServer::Nexus", label: "wait") { _1.id = lantern_server.id }
+    Strand.create(prog: "Lantern::LanternResourceNexus", label: "wait") { _1.id = lantern_resource.id }
+    Strand.create(prog: "Lantern::LanternServerNexus", label: "wait") { _1.id = lantern_server.id }
     puts "strands created"
 
     walg_config = lantern_timeline.generate_walg_config
     puts "Updating WALG_GS_PREFIX to #{walg_config[:walg_gs_prefix]} to enable backups..."
     continue_story
     sshable.cmd("sudo lantern/bin/update_env", stdin: JSON.generate([
-      ["WALG_GS_PREFIX", walg_config[:walg_gs_prefix]]
+      ["WALG_GS_PREFIX", walg_config[:walg_gs_prefix]],
+      ["GOOGLE_APPLICATION_CREDENTIALS_WALG_B64", walg_config[:gcp_creds_b64]],
     ]))
     Strand.create(prog: "Lantern::LanternTimelineNexus", label: "wait") { _1.id = lantern_timeline.id }
     puts "walg prefix updated"
