@@ -106,7 +106,7 @@ RSpec.describe Clover, "lantern" do
         name = "new-pg-db"
         fill_in "Name", with: name
         fill_in "Domain", with: "example.com"
-        choose option: "us-central1"
+        choose option: "us-west2"
         choose option: "n1-standard-2"
         find_by_id("parent_id").find(:xpath, "option[1]").select_option
 

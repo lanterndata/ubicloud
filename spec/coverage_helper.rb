@@ -21,6 +21,7 @@ if (suite = ENV.delete("COVERAGE"))
     add_filter "/model.rb"
     add_filter "/loader.rb"
     add_filter "/.env.rb"
+    add_filter "/demo/migrate_existing_db.rb"
 
     add_group("Missing") { |src| src.covered_percent < 100 }
     add_group("Covered") { |src| src.covered_percent == 100 }

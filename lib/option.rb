@@ -10,7 +10,8 @@ module Option
 
   Location = Struct.new(:provider, :name, :display_name, :visible)
   Locations = [
-    [Providers[Provider::GCP], "us-central1", "US Central", true]
+    [Providers[Provider::GCP], "us-central1", "US Central", true],
+    [Providers[Provider::GCP], "us-west2", "US West", true]
   ].map { |args| Location.new(*args) }.freeze
 
   def self.locations_for_provider(provider, only_visible: true)
@@ -18,7 +19,7 @@ module Option
   end
 
   def self.lantern_locations_for_provider(provider)
-    Option::Locations.select { _1.name == "us-central1" }
+    Option::Locations.select { _1.provider.name == provider }
   end
 
   BootImage = Struct.new(:name, :display_name)

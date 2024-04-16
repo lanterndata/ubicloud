@@ -33,3 +33,38 @@
     location: us-central1,
     unit_price: 0.000002810,
   }
+- {
+    id: 2acc2bbf-d451-49c6-93de-db8d15311044,
+    resource_type: VmCores,
+    resource_family: n1-standard,
+    location: us-west2,
+    unit_price: 0.000595982,
+  }
+- {
+    id: 36b3883a-a72a-4c08-a4c6-482f4f91e249,
+    resource_type: PostgresCores,
+    resource_family: n1-standard,
+    location: us-west2,
+    unit_price: 0.001252425,
+  }
+- {
+    id: 36b3883a-a72a-4c08-a4c6-482f4f91e250,
+    resource_type: PostgresStandbyCores,
+    resource_family: n1-standard,
+    location: us-west2,
+    unit_price: 0.001252425,
+  }
+- {
+    id: 36b3883a-a72a-4c08-a4c6-482f4f91e251,
+    resource_type: PostgresStorage,
+    resource_family: n1-standard,
+    location: us-west2,
+    unit_price: 0.000002810,
+  }
+- {
+    id: 36b3883a-a72a-4c08-a4c6-482f4f91e452,
+    resource_type: PostgresStandbyStorage,
+    resource_family: n1-standard,
+    location: us-west2,
+    unit_price: 0.000002810,
+  }
