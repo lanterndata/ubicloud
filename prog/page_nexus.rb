@@ -14,6 +14,16 @@ class Prog::PageNexus < Prog::Base
     end
   end
 
+  def self.assemble_with_logs(summary, related_resources, logs, *tag_parts)
+    DB.transaction do
+      pg = Page.from_tag_parts(tag_parts)
+      unless pg
+        pg = Page.create_with_id(summary: summary, details: {"related_resources" => related_resources, "logs" => logs}, tag: Page.generate_tag(tag_parts))
+        Strand.create(prog: "PageNexus", label: "start") { _1.id = pg.id }
+      end
+    end
+  end
+
   label def start
     page.trigger
     hop_wait

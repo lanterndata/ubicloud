@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "json"
 
 require_relative "../lib/util"
 
@@ -37,6 +38,22 @@ end
 if ARGV[0] == "--check"
   name = ARGV[1]
   print(get_state(name))
+elsif ARGV[0] == "--logs"
+  name = ARGV[1]
+  dir = Dir.pwd
+  output = {"stdout" => "", "stderr" => ""}
+
+  begin
+    output["stdout"] = File.read("#{dir}/var/log/#{name}.stdout")
+  rescue
+  end
+
+  begin
+    output["stderr"] = File.read("#{dir}/var/log/#{name}.stderr")
+  rescue
+  end
+
+  print(JSON.generate(output))
 elsif ARGV[0] == "--clean"
   name = ARGV[1]
   clean(name)

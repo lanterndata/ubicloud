@@ -421,9 +421,11 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server).to receive(:ubid).and_return("test-ubid").at_least(:once)
       expect(lantern_server.resource).to receive(:ubid).and_return("test-ubid").at_least(:once)
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check update_lantern").and_return("Failed")
+      logs = {"stdout" => "", "stderr" => "oom"}
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --logs update_lantern").and_return(JSON.generate(logs))
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean update_lantern")
       expect(nx).to receive(:decr_update_lantern_extension)
-      expect(Prog::PageNexus).to receive(:assemble).with("Lantern v0.2.0 update failed!", [lantern_server.resource.ubid, lantern_server.ubid], "LanternUpdateFailed", lantern_server.lantern_version)
+      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Lantern v0.2.0 update failed!", [lantern_server.resource.ubid, lantern_server.ubid], logs, "LanternUpdateFailed", lantern_server.ubid)
       expect { nx.update_lantern_extension }.to hop("wait")
     end
   end
@@ -432,7 +434,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     it "updates lantern extras extension and naps" do
       expect(lantern_server).to receive(:extras_version).and_return("0.2.0").at_least(:once)
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check update_extras").and_return("NotStarted")
-      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/update_extras' update_lantern", stdin: JSON.generate({
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/update_extras' update_extras", stdin: JSON.generate({
         version: lantern_server.extras_version
       }))
       expect { nx.update_extras_extension }.to nap(10)
@@ -455,9 +457,11 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server).to receive(:ubid).and_return("test-ubid").at_least(:once)
       expect(lantern_server.resource).to receive(:ubid).and_return("test-ubid").at_least(:once)
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check update_extras").and_return("Failed")
+      logs = {"stdout" => "", "stderr" => "oom"}
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --logs update_extras").and_return(JSON.generate(logs))
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean update_extras")
       expect(nx).to receive(:decr_update_extras_extension)
-      expect(Prog::PageNexus).to receive(:assemble).with("Lantern Extras v0.2.0 update failed!", [lantern_server.resource.ubid, lantern_server.ubid], "LanternUpdateFailed", lantern_server.extras_version)
+      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Lantern Extras v0.2.0 update failed!", [lantern_server.resource.ubid, lantern_server.ubid], logs, "LanternExtrasUpdateFailed", lantern_server.ubid)
       expect { nx.update_extras_extension }.to hop("wait")
     end
   end
@@ -491,9 +495,11 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server).to receive(:ubid).and_return("test-ubid").at_least(:once)
       expect(lantern_server.resource).to receive(:ubid).and_return("test-ubid").at_least(:once)
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check update_docker_image").and_return("Failed")
+      logs = {"stdout" => "", "stderr" => "oom"}
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --logs update_docker_image").and_return(JSON.generate(logs))
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean update_docker_image")
       expect(nx).to receive(:decr_update_image)
-      expect(Prog::PageNexus).to receive(:assemble).with("Lantern Image test-image update failed!", [lantern_server.resource.ubid, lantern_server.ubid], "LanternUpdateFailed", lantern_server.container_image)
+      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Lantern Image test-image update failed!", [lantern_server.resource.ubid, lantern_server.ubid], logs, "LanternImageUpdateFailed", lantern_server.ubid)
       expect { nx.update_image }.to hop("wait")
     end
   end
@@ -749,7 +755,8 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(nx).to receive(:reap)
       expect(nx).to receive(:available?).and_return(false)
       expect(nx).to receive(:bud).with(described_class, {}, :restart)
-      expect(Prog::PageNexus).to receive(:assemble).with("DB #{lantern_server.resource.name} is unavailable!", [lantern_server.ubid], "DBUnavailable", lantern_server.id)
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo lantern/bin/logs --tail 10").and_return("test logs")
+      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("DB #{lantern_server.resource.name} is unavailable!", [lantern_server.ubid], {"stderr" => "", "stdout" => "test logs"}, "DBUnavailable", lantern_server.id)
       expect { nx.unavailable }.to nap(5)
     end
 

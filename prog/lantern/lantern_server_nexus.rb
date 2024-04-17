@@ -225,7 +225,9 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     when "NotStarted"
       vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/update_lantern' update_lantern", stdin: JSON.generate({version: lantern_server.lantern_version}))
     when "Failed"
-      Prog::PageNexus.assemble("Lantern v#{lantern_server.lantern_version} update failed!", [lantern_server.resource.ubid, lantern_server.ubid], "LanternUpdateFailed", lantern_server.lantern_version)
+      logs = JSON.parse(vm.sshable.cmd("common/bin/daemonizer --logs update_lantern"))
+      Clog.emit("Lantern update failed") { {logs: logs, name: lantern_server.resource.name, lantern_server: lantern_server.id} }
+      Prog::PageNexus.assemble_with_logs("Lantern v#{lantern_server.lantern_version} update failed!", [lantern_server.resource.ubid, lantern_server.ubid], logs, "LanternUpdateFailed", lantern_server.ubid)
       vm.sshable.cmd("common/bin/daemonizer --clean update_lantern")
       decr_update_lantern_extension
       hop_wait
@@ -240,9 +242,11 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       decr_update_extras_extension
       hop_init_sql
     when "NotStarted"
-      vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/update_extras' update_lantern", stdin: JSON.generate({version: lantern_server.extras_version}))
+      vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/update_extras' update_extras", stdin: JSON.generate({version: lantern_server.extras_version}))
     when "Failed"
-      Prog::PageNexus.assemble("Lantern Extras v#{lantern_server.extras_version} update failed!", [lantern_server.resource.ubid, lantern_server.ubid], "LanternUpdateFailed", lantern_server.extras_version)
+      logs = JSON.parse(vm.sshable.cmd("common/bin/daemonizer --logs update_extras"))
+      Clog.emit("Lantern extras update failed") { {logs: logs, name: lantern_server.resource.name, lantern_server: lantern_server.id} }
+      Prog::PageNexus.assemble_with_logs("Lantern Extras v#{lantern_server.extras_version} update failed!", [lantern_server.resource.ubid, lantern_server.ubid], logs, "LanternExtrasUpdateFailed", lantern_server.ubid)
       vm.sshable.cmd("common/bin/daemonizer --clean update_extras")
       decr_update_extras_extension
       hop_wait
@@ -262,7 +266,9 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
         container_image: lantern_server.container_image
       }))
     when "Failed"
-      Prog::PageNexus.assemble("Lantern Image #{lantern_server.container_image} update failed!", [lantern_server.resource.ubid, lantern_server.ubid], "LanternUpdateFailed", lantern_server.container_image)
+      logs = JSON.parse(vm.sshable.cmd("common/bin/daemonizer --logs update_docker_image"))
+      Clog.emit("Lantern image update failed") { {logs: logs, name: lantern_server.resource.name, lantern_server: lantern_server.id} }
+      Prog::PageNexus.assemble_with_logs("Lantern Image #{lantern_server.container_image} update failed!", [lantern_server.resource.ubid, lantern_server.ubid], logs, "LanternImageUpdateFailed", lantern_server.ubid)
       vm.sshable.cmd("common/bin/daemonizer --clean update_docker_image")
       decr_update_image
       hop_wait
@@ -390,7 +396,15 @@ SQL
     end
 
     if page.nil?
-      Prog::PageNexus.assemble("DB #{lantern_server.resource.name} is unavailable!", [lantern_server.ubid], "DBUnavailable", lantern_server.id)
+
+      logs = {"stdout" => "", "stderr" => ""}
+      begin
+        logs["stdout"] = vm.sshable.cmd("sudo lantern/bin/logs --tail 10")
+      rescue
+      end
+
+      Clog.emit("Database unavailable") { {logs: logs, name: lantern_server.resource.name, lantern_server: lantern_server.id} }
+      Prog::PageNexus.assemble_with_logs("DB #{lantern_server.resource.name} is unavailable!", [lantern_server.ubid], logs, "DBUnavailable", lantern_server.id)
     else
       nap 5
     end
