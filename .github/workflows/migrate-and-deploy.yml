@@ -1,4 +1,4 @@
-name: Run Database Migrations
+name: Run Database Migrations & Deploy
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
       - lantern-staging
 jobs:
   migrate:
-    name: Migrate Database
+    name: Migrate Database & Deploy
     runs-on: ubicloud
 
     steps:
@@ -28,14 +28,19 @@ jobs:
           bundler-cache: true
       - name: Install dependencies
         run: bundle install
-      - name: Run Migrate in staging
+      - name: Run Migrate & Deploy in staging
         if: steps.set_branch.outputs.branch == 'staging'
         env:
           CLOVER_DATABASE_URL: ${{ secrets.DATABASE_URL_STAGING }}
-        run: bundle exec rake prod_up
-      - name: Run Migrate in production
+          WEBHOOK_URL: ${{ secrets.CLOUD_RUN_WEBHOOK_STAGING }}
+        run: |
+          bundle exec rake prod_up && \
+          curl -X POST -H "Content-type: application/json" "${WEBHOOK_URL}" -d "{}"
+      - name: Run Migrate & Deploy in production
         if: steps.set_branch.outputs.branch == 'production'
         env:
           CLOVER_DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+          WEBHOOK_URL: ${{ secrets.CLOUD_RUN_WEBHOOK_PRODUCTION }}
         run: |
-          run: bundle exec rake prod_up
+          bundle exec rake prod_up && \
+          curl -X POST -H "Content-type: application/json" "${WEBHOOK_URL}" -d "{}"
