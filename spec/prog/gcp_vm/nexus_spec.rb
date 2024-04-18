@@ -162,6 +162,14 @@ RSpec.describe Prog::GcpVm::Nexus do
   end
 
   describe "#destroy" do
+    it "does not delete vm if production" do
+      expect(Config).to receive(:production?).and_return(true)
+      expect(gcp_vm).to receive(:update).with({display_state: "deleting"})
+      expect(gcp_vm).to receive(:destroy)
+      expect(gcp_vm).not_to receive(:has_static_ipv4)
+      expect { nx.destroy }.to exit({"msg" => "gcp vm deleted"})
+    end
+
     it "exits after run destroy" do
       expect(gcp_vm).to receive(:has_static_ipv4).and_return(false)
       expect(gcp_vm).to receive(:update).with({display_state: "deleting"})
