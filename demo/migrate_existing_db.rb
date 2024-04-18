@@ -158,10 +158,6 @@ def migrate_existing_db(
 
     install_rhizome(sshable)
     puts "rhizome installed"
-    Strand.create(prog: "GcpVm::Nexus", label: "wait") { _1.id = vm.id }
-    Strand.create(prog: "Lantern::LanternResourceNexus", label: "wait") { _1.id = lantern_resource.id }
-    Strand.create(prog: "Lantern::LanternServerNexus", label: "wait") { _1.id = lantern_server.id }
-    puts "strands created"
 
     api = Hosting::GcpApis.new
     service_account = api.create_service_account("lt-#{lantern_timeline.ubid}", "Service Account for Timeline #{lantern_timeline.ubid}")
@@ -172,14 +168,23 @@ def migrate_existing_db(
     puts "Bucket permissions updated"
     lantern_timeline.update(service_account_name: service_account["email"], gcp_creds_b64: key)
 
-    walg_config = lantern_timeline.generate_walg_config
-    puts "Updating WALG_GS_PREFIX to #{walg_config[:walg_gs_prefix]} to enable backups..."
-    continue_story
-    sshable.cmd("sudo lantern/bin/update_env", stdin: JSON.generate([
-      ["WALG_GS_PREFIX", walg_config[:walg_gs_prefix]],
-      ["GOOGLE_APPLICATION_CREDENTIALS_WALG_B64", walg_config[:gcp_creds_b64]]
-    ]))
-    Strand.create(prog: "Lantern::LanternTimelineNexus", label: "wait") { _1.id = lantern_timeline.id }
-    puts "walg prefix updated"
+    Strand.create(prog: "GcpVm::Nexus", label: "wait") { _1.id = vm.id }
+    Strand.create(prog: "Lantern::LanternResourceNexus", label: "wait") { _1.id = lantern_resource.id }
+    Strand.create(prog: "Lantern::LanternServerNexus", label: "wait") { _1.id = lantern_server.id }
+    puts "strands created"
   end
+end
+
+def update_timline_in_server(db_name)
+  resource = LanternResource[name: db_name]
+  lantern_timeline = resource.timeline
+  walg_config = lantern_timeline.generate_walg_config
+  puts "Updating WALG_GS_PREFIX to #{walg_config[:walg_gs_prefix]} to enable backups..."
+  continue_story
+  resource.representative_server.vm.sshable.cmd("sudo lantern/bin/update_env", stdin: JSON.generate([
+    ["WALG_GS_PREFIX", walg_config[:walg_gs_prefix]],
+    ["GOOGLE_APPLICATION_CREDENTIALS_WALG_B64", walg_config[:gcp_creds_b64]]
+  ]))
+  Strand.create(prog: "Lantern::LanternTimelineNexus", label: "wait") { _1.id = lantern_timeline.id }
+  puts "walg prefix updated"
 end
