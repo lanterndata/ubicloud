@@ -31,6 +31,7 @@ class Hosting::GcpApis
 
     errors = body.fetch("error", {}).fetch("errors", [])
     if errors.size > 0
+      Clog.emit("Error received from GCP APIs") { {body: body} }
       fail errors[0]["message"]
     end
   end
@@ -122,7 +123,8 @@ class Hosting::GcpApis
       zone: "projects/#{@project}/zones/#{zone}"
     }
 
-    connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances", body: JSON.dump(instance), expects: 200)
+    response = connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances", body: JSON.dump(instance), expects: [200, 400])
+    Hosting::GcpApis.check_errors(response)
   end
 
   def get_vm(vm_name, zone)
@@ -140,7 +142,8 @@ class Hosting::GcpApis
       networkTier: "PREMIUM",
       region: "projects/#{@project}/regions/#{region}"
     }
-    connection.post(path: "/compute/v1/projects/#{@project}/regions/#{region}/addresses", body: JSON.dump(body), expects: 200)
+    response = connection.post(path: "/compute/v1/projects/#{@project}/regions/#{region}/addresses", body: JSON.dump(body), expects: [200, 400])
+    Hosting::GcpApis.check_errors(response)
   end
 
   def get_static_ipv4(vm_name, region)
@@ -153,7 +156,8 @@ class Hosting::GcpApis
   def delete_ephermal_ipv4(vm_name, zone)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
     query = {accessConfig: "External NAT", networkInterface: "nic0"}
-    connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/deleteAccessConfig", query: query, expects: [200, 404])
+    response = connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/deleteAccessConfig", query: query, expects: [200, 400, 404])
+    Hosting::GcpApis.check_errors(response)
   end
 
   def assign_static_ipv4(vm_name, addr, zone)
@@ -167,7 +171,8 @@ class Hosting::GcpApis
       type: "ONE_TO_ONE_NAT"
     }
 
-    connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/addAccessConfig", body: JSON.dump(body), query: query, expects: 200)
+    response = connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/addAccessConfig", body: JSON.dump(body), query: query, expects: [200, 400])
+    Hosting::GcpApis.check_errors(response)
   end
 
   def release_ipv4(vm_name, region)
