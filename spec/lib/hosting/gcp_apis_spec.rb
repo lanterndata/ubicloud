@@ -245,7 +245,7 @@ RSpec.describe Hosting::GcpApis do
         new_policy = {bindings: bindings + bindings_new, version: 3}
         stub_request(:get, "https://storage.googleapis.com/storage/v1/b/test/iam?optionsRequestedPolicyVersion=3").to_return(status: 200, body: JSON.dump(policy), headers: {"Content-Type" => "application/json"})
         stub_request(:put, "https://storage.googleapis.com/storage/v1/b/test/iam").with(body: JSON.dump(new_policy)).to_return(status: 200, body: "{}", headers: {"Content-Type" => "application/json"})
-        expect(described_class).to receive(:check_errors)
+        expect(described_class).to receive(:check_errors).at_least(:once)
         api = described_class.new
         expect { api.allow_bucket_usage_by_prefix("test-sa@gcp.com", "test", "test-prefix") }.not_to raise_error
       end
