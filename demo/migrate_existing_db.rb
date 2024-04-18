@@ -163,6 +163,15 @@ def migrate_existing_db(
     Strand.create(prog: "Lantern::LanternServerNexus", label: "wait") { _1.id = lantern_server.id }
     puts "strands created"
 
+    api = Hosting::GcpApis.new
+    service_account = api.create_service_account("lt-#{lantern_timeline.ubid}", "Service Account for Timeline #{lantern_timeline.ubid}")
+    puts "Service account for timeline created"
+    key = api.export_service_account_key(service_account["email"])
+    puts "Service account key exported"
+    api.allow_bucket_usage_by_prefix(service_account["email"], Config.lantern_backup_bucket, lantern_timeline.ubid)
+    puts "Bucket permissions updated"
+    lantern_timeline.update(service_account_name: service_account["email"], gcp_creds_b64: key)
+
     walg_config = lantern_timeline.generate_walg_config
     puts "Updating WALG_GS_PREFIX to #{walg_config[:walg_gs_prefix]} to enable backups..."
     continue_story

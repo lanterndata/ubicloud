@@ -266,6 +266,8 @@ class Hosting::GcpApis
     connection = Excon.new("https://storage.googleapis.com", headers: @host[:headers])
     response = connection.get(path: "/storage/v1/b/#{bucket_name}/iam", query: {"optionsRequestedPolicyVersion" => 3}, expects: [200, 400, 403])
 
+    Hosting::GcpApis.check_errors(response)
+
     policy = JSON.parse(response.body)
 
     policy["bindings"] += [
