@@ -10,6 +10,7 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
   let(:timeline) {
     instance_double(
       LanternTimeline,
+      ubid: "6ae7e513-c34a-8039-a72a-7be45b53f2a0",
       id: "6ae7e513-c34a-8039-a72a-7be45b53f2a0",
       gcp_creds_b64: "test-creds",
       service_account_name: "test-sa",
@@ -47,12 +48,20 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
     it "creates lantern timeline without parent" do
       st = described_class.assemble
       timeline = LanternTimeline[st.id]
-      expect(timeline.gcp_creds_b64).to eq(Config.gcp_creds_walg_b64)
+      expect(timeline.gcp_creds_b64).to be_nil
     end
   end
 
   describe "#start" do
     it "hops to wait leader" do
+      api = instance_double(Hosting::GcpApis)
+      allow(api).to receive(:create_service_account).and_return({"email" => "sa-email"})
+      allow(api).to receive(:export_service_account_key).with("sa-email").and_return("gcp-creds")
+      allow(api).to receive(:allow_bucket_usage_by_prefix)
+      allow(Hosting::GcpApis).to receive(:new).and_return(api)
+
+      allow(timeline).to receive(:update).with({service_account_name: "sa-email", gcp_creds_b64: "gcp-creds"})
+
       expect { nx.start }.to hop("wait_leader")
     end
   end
@@ -150,13 +159,26 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
       expect(lantern_server.timeline).to receive(:destroy)
       child = instance_double(LanternTimeline, parent_id: "test")
       children = [child]
+      api = instance_double(Hosting::GcpApis)
+      allow(api).to receive(:remove_service_account)
+      allow(Hosting::GcpApis).to receive(:new).and_return(api)
       expect(child).to receive(:parent_id=).with(nil)
       expect(child).to receive(:save_changes)
       expect(lantern_server.timeline).to receive(:children).and_return(children).twice
       expect { nx.destroy }.to exit({"msg" => "lantern timeline is deleted"})
     end
 
+    it "exits with message without deleting sa" do
+      expect(lantern_server.timeline).to receive(:destroy)
+      expect(lantern_server.timeline).to receive(:children).and_return([])
+      expect(lantern_server.timeline).to receive(:service_account_name).and_return(nil)
+      expect { nx.destroy }.to exit({"msg" => "lantern timeline is deleted"})
+    end
+
     it "exits with message" do
+      api = instance_double(Hosting::GcpApis)
+      allow(api).to receive(:remove_service_account)
+      allow(Hosting::GcpApis).to receive(:new).and_return(api)
       expect(lantern_server.timeline).to receive(:destroy)
       expect(lantern_server.timeline).to receive(:children).and_return([])
       expect { nx.destroy }.to exit({"msg" => "lantern timeline is deleted"})

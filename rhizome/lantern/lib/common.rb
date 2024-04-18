@@ -57,12 +57,17 @@ def force_restart
 end
 
 def append_env(env_arr)
-  # Setup env file
-  File.open($env_file, "a") do |f|
-    env_arr.each do |env_map|
-      f.puts("#{env_map[0]}=#{env_map[1]}")
-    end
+  existing_env = begin
+    File.readlines($env_file).grep(/^\w+=.*/).map { |line| line.chomp.split("=", 2) }.to_h
+  rescue
+    {}
   end
+
+  combined_env = existing_env.merge(env_arr.to_h) do |key, old_val, new_val|
+    new_val
+  end
+
+  File.open($env_file, "w") { |f| combined_env.each { |key, value| f.puts "#{key}=#{value}" } }
 end
 
 def configure_tls(domain, email, dns_token, dns_zone_id, provider)

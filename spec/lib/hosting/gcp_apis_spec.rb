@@ -193,5 +193,62 @@ RSpec.describe Hosting::GcpApis do
         expect(api.list_objects("test", "test")).to eq([{key: "test1", last_modified: t_str}, {key: "test2", last_modified: t_str}])
       end
     end
+
+    describe "#create_service_account" do
+      it "throws error from response" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:post, "https://iam.googleapis.com/v1/projects/test-project/serviceAccounts").to_return(status: 200, body: JSON.dump({error: {errors: [{message: "test error"}]}}), headers: {"Content-Type" => "application/json"})
+        api = described_class.new
+        expect { api.create_service_account("test", "test") }.to raise_error "test error"
+      end
+
+      it "creates service account" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:post, "https://iam.googleapis.com/v1/projects/test-project/serviceAccounts").with(body: JSON.dump({accountId: "test", serviceAccount: {displayName: "test", description: "test"}})).to_return(status: 200, body: JSON.dump({email: "test-sa@gcp.com"}), headers: {"Content-Type" => "application/json"})
+        api = described_class.new
+        expect(api.create_service_account("test", "test")).to eq({"email" => "test-sa@gcp.com"})
+      end
+    end
+
+    describe "#remove_service_account" do
+      it "throws error from response" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:delete, "https://iam.googleapis.com/v1/projects/test-project/serviceAccounts/test").to_return(status: 200, body: JSON.dump({error: {errors: [{message: "test error"}]}}), headers: {"Content-Type" => "application/json"})
+        api = described_class.new
+        expect { api.remove_service_account("test") }.to raise_error "test error"
+      end
+
+      it "removes service account" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:delete, "https://iam.googleapis.com/v1/projects/test-project/serviceAccounts/test").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        api = described_class.new
+        expect { api.remove_service_account("test") }.not_to raise_error
+      end
+    end
+
+    describe "#export_service_account_key" do
+      it "exports the key as b64" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:post, "https://iam.googleapis.com/v1/projects/test-project/serviceAccounts/test/keys").to_return(status: 200, body: JSON.dump({privateKeyData: "test-key"}), headers: {"Content-Type" => "application/json"})
+        expect(described_class).to receive(:check_errors)
+        api = described_class.new
+        expect(api.export_service_account_key("test")).to eq "test-key"
+      end
+    end
+
+    describe "#allow_bucket_usage_by_prefix" do
+      it "adds necessarry policies" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        bindings = [{role: "roles/storage.objectAdmin", members: ["serviceAccount:test-sa-old@gcp.com"]}]
+        policy = {bindings: bindings, version: 1}
+        bindings_new = [{role: "roles/storage.objectAdmin", members: ["serviceAccount:test-sa@gcp.com"], condition: {expression: "resource.name.startsWith(\"projects/_/buckets/test/objects/test-prefix\")", title: "Access backups for path test-prefix"}}]
+        new_policy = {bindings: bindings + bindings_new, version: 3}
+        stub_request(:get, "https://storage.googleapis.com/storage/v1/b/test/iam?optionsRequestedPolicyVersion=3").to_return(status: 200, body: JSON.dump(policy), headers: {"Content-Type" => "application/json"})
+        stub_request(:put, "https://storage.googleapis.com/storage/v1/b/test/iam").with(body: JSON.dump(new_policy)).to_return(status: 200, body: "{}", headers: {"Content-Type" => "application/json"})
+        expect(described_class).to receive(:check_errors)
+        api = described_class.new
+        expect { api.allow_bucket_usage_by_prefix("test-sa@gcp.com", "test", "test-prefix") }.not_to raise_error
+      end
+    end
   end
 end

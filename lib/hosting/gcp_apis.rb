@@ -223,4 +223,60 @@ class Hosting::GcpApis
 
     data["items"].map { |hsh| {key: hsh["name"], last_modified: Time.new(hsh["updated"])} }
   end
+
+  def create_service_account(name, description = "")
+    connection = Excon.new("https://iam.googleapis.com", headers: @host[:headers])
+
+    body = {
+      accountId: name,
+      serviceAccount: {
+        displayName: name,
+        description: description
+      }
+    }
+
+    response = connection.post(path: "/v1/projects/#{@project}/serviceAccounts", body: JSON.dump(body), expects: [200, 400])
+
+    Hosting::GcpApis.check_errors(response)
+
+    JSON.parse(response.body)
+  end
+
+  def remove_service_account(service_account_email)
+    connection = Excon.new("https://iam.googleapis.com", headers: @host[:headers])
+
+    response = connection.delete(path: "/v1/projects/#{@project}/serviceAccounts/#{service_account_email}", expects: [200, 400])
+    Hosting::GcpApis.check_errors(response)
+  end
+
+  def export_service_account_key(service_account_email)
+    connection = Excon.new("https://iam.googleapis.com", headers: @host[:headers])
+    response = connection.post(path: "/v1/projects/#{@project}/serviceAccounts/#{service_account_email}/keys", body: JSON.dump({}), expects: [200, 400])
+    Hosting::GcpApis.check_errors(response)
+    data = JSON.parse(response.body)
+    data["privateKeyData"]
+  end
+
+  def allow_bucket_usage_by_prefix(service_account_email, bucket_name, prefix)
+    connection = Excon.new("https://storage.googleapis.com", headers: @host[:headers])
+    response = connection.get(path: "/storage/v1/b/#{bucket_name}/iam", query: {"optionsRequestedPolicyVersion" => 3}, expects: [200, 400, 403])
+
+    policy = JSON.parse(response.body)
+
+    policy["bindings"] += [
+      {
+        role: "roles/storage.objectAdmin",
+        members: ["serviceAccount:#{service_account_email}"],
+        condition: {
+          expression: "resource.name.startsWith(\"projects/_/buckets/#{bucket_name}/objects/#{prefix}\")",
+          title: "Access backups for path #{prefix}"
+        }
+      }
+    ]
+    policy["version"] = 3
+
+    response = connection.put(path: "/storage/v1/b/#{bucket_name}/iam", body: JSON.dump(policy), expects: [200, 400, 403])
+
+    Hosting::GcpApis.check_errors(response)
+  end
 end

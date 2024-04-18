@@ -16,14 +16,9 @@ class Prog::Lantern::LanternTimelineNexus < Prog::Base
     end
 
     DB.transaction do
-      # TODO::
-      # Create new service account and export credentials json
-      # Create base64 from credentials
       lantern_timeline = LanternTimeline.create_with_id(
-        parent_id: parent_id,
-        gcp_creds_b64: Config.gcp_creds_walg_b64
+        parent_id: parent_id
       )
-      # Give access to bucket path to service account
       Strand.create(prog: "Lantern::LanternTimelineNexus", label: "start") { _1.id = lantern_timeline.id }
     end
   end
@@ -37,6 +32,11 @@ class Prog::Lantern::LanternTimelineNexus < Prog::Base
   end
 
   label def start
+    api = Hosting::GcpApis.new
+    service_account = api.create_service_account("lt-#{lantern_timeline.ubid}", "Service Account for Timeline #{lantern_timeline.ubid}")
+    key = api.export_service_account_key(service_account["email"])
+    api.allow_bucket_usage_by_prefix(service_account["email"], Config.lantern_backup_bucket, lantern_timeline.ubid)
+    lantern_timeline.update(service_account_name: service_account["email"], gcp_creds_b64: key)
     hop_wait_leader
   end
 
@@ -94,6 +94,9 @@ class Prog::Lantern::LanternTimelineNexus < Prog::Base
   def destroy_blob_storage
     # TODO
     # Remove all backups
-    # Remove service account
+    if lantern_timeline.service_account_name
+      api = Hosting::GcpApis.new
+      api.remove_service_account(lantern_timeline.service_account_name)
+    end
   end
 end
