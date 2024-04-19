@@ -166,6 +166,19 @@ class LanternServer < Sequel::Model
     pulse
   end
 
+  def prewarm_indexes
+    query = <<SQL
+    SELECT i.relname, pg_prewarm(i.relname::text)
+FROM pg_class t
+JOIN pg_index ix ON t.oid = ix.indrelid
+JOIN pg_class i ON i.oid = ix.indexrelid
+JOIN pg_am a ON i.relam = a.oid
+JOIN pg_namespace n ON n.oid = i.relnamespace
+WHERE a.amname = 'lantern_hnsw';
+SQL
+    run_query(query)
+  end
+
   # def failover_target
   #   nil
   # end

@@ -259,6 +259,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
     it "hops to wait_db_available" do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check init_sql").and_return("Succeeded")
+      expect(nx).to receive(:bud).with(described_class, {}, :prewarm_indexes)
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean init_sql")
       expect { nx.init_sql }.to hop("wait_db_available")
     end
@@ -779,6 +780,30 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     it "restarts docker container" do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo lantern/bin/restart")
       expect { nx.restart }.to exit({"msg" => "lantern server is restarted"})
+    end
+  end
+
+  describe "#prewarm_indexes" do
+    it "calls prewarm and exits" do
+      expect(lantern_server).to receive(:prewarm_indexes)
+      expect(Page).to receive(:from_tag_parts).at_least(:once)
+      expect { nx.prewarm_indexes }.to exit({"msg" => "lantern index prewarm success"})
+    end
+
+    it "calls prewarm, resolves page and exits" do
+      expect(lantern_server).to receive(:prewarm_indexes)
+      page = instance_double(Page)
+      expect(page).to receive(:incr_resolve).at_least(:once)
+      expect(Page).to receive(:from_tag_parts).at_least(:once).and_return(page)
+      expect { nx.prewarm_indexes }.to exit({"msg" => "lantern index prewarm success"})
+    end
+
+    it "calls prewarm and creates page" do
+      expect(lantern_server).to receive(:prewarm_indexes).and_raise
+      expect(lantern_server).to receive(:ubid)
+      expect(lantern_server.resource).to receive(:ubid)
+      expect(Prog::PageNexus).to receive(:assemble_with_logs).at_least(:once)
+      expect { nx.prewarm_indexes }.to exit({"msg" => "lantern index prewarm failed"})
     end
   end
 end

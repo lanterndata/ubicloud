@@ -45,15 +45,15 @@ def run_database(container_image)
   # Mount extension dir, so we can make automatic updates from host
   data["services"]["postgresql"]["volumes"].push(volume_mount)
   File.open($compose_file, "w") { |f| YAML.dump(data, f) }
-  r "sudo docker compose -f #{$compose_file} up -d"
+  r "sudo docker compose -f #{$compose_file} up -d -t 60"
 end
 
 def restart_if_needed
-  r "docker compose -f #{$compose_file} up -d"
+  r "docker compose -f #{$compose_file} up -d -t 60"
 end
 
 def force_restart
-  r "docker compose -f #{$compose_file} down && docker compose -f #{$compose_file} up -d"
+  r "docker compose -f #{$compose_file} down -t 60 && docker compose -f #{$compose_file} up -d"
 end
 
 def append_env(env_arr)

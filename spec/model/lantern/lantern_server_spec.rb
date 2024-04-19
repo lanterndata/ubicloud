@@ -479,4 +479,20 @@ RSpec.describe LanternServer do
       lantern_server.check_pulse(session: session, previous_pulse: pulse)
     end
   end
+
+  describe "#prewarm_indexes" do
+    it "calls prewarm_indexes with specified query" do
+      query = <<SQL
+    SELECT i.relname, pg_prewarm(i.relname::text)
+FROM pg_class t
+JOIN pg_index ix ON t.oid = ix.indrelid
+JOIN pg_class i ON i.oid = ix.indexrelid
+JOIN pg_am a ON i.relam = a.oid
+JOIN pg_namespace n ON n.oid = i.relnamespace
+WHERE a.amname = 'lantern_hnsw';
+SQL
+      expect(lantern_server).to receive(:run_query).with(query)
+      expect { lantern_server.prewarm_indexes }.not_to raise_error
+    end
+  end
 end

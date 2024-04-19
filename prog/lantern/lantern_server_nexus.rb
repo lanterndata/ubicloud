@@ -142,6 +142,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     case vm.sshable.cmd("common/bin/daemonizer --check init_sql")
     when "Succeeded"
       vm.sshable.cmd("common/bin/daemonizer --clean init_sql")
+      bud self.class, frame, :prewarm_indexes
       hop_wait_db_available
     when "NotStarted"
       vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/init_sql' init_sql")
@@ -331,6 +332,8 @@ SQL
   end
 
   label def wait
+    reap
+
     when_checkup_set? do
       hop_unavailable if !available?
       decr_checkup
@@ -485,5 +488,19 @@ SQL
     end
 
     false
+  end
+
+  label def prewarm_indexes
+    begin
+      lantern_server.prewarm_indexes
+    rescue => e
+      Clog.emit("Error while prewarming indexes") { {lantern_server: lantern_server.id, error: e} }
+      logs = {"stdout" => "", "stderr" => e}
+      Prog::PageNexus.assemble_with_logs("Lantern prewarm indexes failed", [lantern_server.resource.ubid, lantern_server.ubid], logs, "LanternPrewarmFailed", lantern_server.ubid)
+      pop "lantern index prewarm failed"
+    end
+
+    Page.from_tag_parts("LanternPrewarmFailed", lantern_server.id)&.incr_resolve
+    pop "lantern index prewarm success"
   end
 end
