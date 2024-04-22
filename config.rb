@@ -35,7 +35,9 @@ module Config
   end
 
   def self.e2e_test?
+    # :nocov:
     Config.e2e_test == "1"
+    # :nocov:
   end
 
   # Mandatory -- exception is raised for these variables when missing.
@@ -135,6 +137,7 @@ module Config
   override :lantern_top_domain, "db.lantern.dev", string
   override :lantern_dns_email, "varik@lantern.dev", string
   override :lantern_backup_bucket, "lantern-wal-g-backups-dev"
+  override :e2e_test, "0"
 
   # GCP
   override :gcp_project_id, "ringed-griffin-394922", string
