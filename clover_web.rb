@@ -87,7 +87,7 @@ class CloverWeb < Roda
 
   plugin :sessions,
     key: "_Clover.session",
-    cookie_options: {secure: !(Config.development? || Config.test?)},
+    cookie_options: {secure: !(Config.development? || Config.test? || Config.e2e_test?)},
     secret: Config.clover_session_secret
 
   autoload_routes("web")
