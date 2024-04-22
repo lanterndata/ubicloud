@@ -225,7 +225,7 @@ class Prog::GcpVm::Nexus < Prog::Base
     DB.transaction do
       gcp_vm.update(display_state: "deleting")
       # TODO:: disable vm deletion until stable release
-      if !Config.production?
+      if !Config.production? || Config.e2e_test?
         gcp_client = Hosting::GcpApis.new
         gcp_client.delete_vm(gcp_vm.name, "#{gcp_vm.location}-a")
         if gcp_vm.has_static_ipv4

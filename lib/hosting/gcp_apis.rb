@@ -240,7 +240,7 @@ class Hosting::GcpApis
       }
     }
 
-    response = connection.post(path: "/v1/projects/#{@project}/serviceAccounts", body: JSON.dump(body), expects: [200, 400])
+    response = connection.post(path: "/v1/projects/#{@project}/serviceAccounts", body: JSON.dump(body), expects: [200, 400, 403])
 
     Hosting::GcpApis.check_errors(response)
 
