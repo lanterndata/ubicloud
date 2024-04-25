@@ -104,7 +104,7 @@ class Hosting::GcpApis
       },
       serviceAccounts: [
         {
-          email: "511682212298-compute@developer.gserviceaccount.com",
+          email: Config.gcp_compute_service_account,
           scopes: [
             "https://www.googleapis.com/auth/devstorage.read_only",
             "https://www.googleapis.com/auth/logging.write",
@@ -129,7 +129,8 @@ class Hosting::GcpApis
 
   def get_vm(vm_name, zone)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
-    response = connection.get(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}", expects: 200)
+    response = connection.get(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}", expects: [200, 400, 404])
+    Hosting::GcpApis.check_errors(response)
 
     JSON.parse(response.body)
   end

@@ -16,7 +16,7 @@ RSpec.describe LanternTimeline do
       expect(lantern_timeline).to receive(:gcp_creds_b64).and_return("test-creds")
       config = {
         gcp_creds_b64: "test-creds",
-        walg_gs_prefix: "gs://lantern-wal-g-backups-dev/pvr1mcnhzd8p0qwwa00tr5cvex"
+        walg_gs_prefix: "gs://walg-dev-backups/pvr1mcnhzd8p0qwwa00tr5cvex"
       }
 
       expect(lantern_timeline.generate_walg_config).to eq(config)

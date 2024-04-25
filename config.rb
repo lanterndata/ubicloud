@@ -136,11 +136,12 @@ module Config
   # Lantern
   override :lantern_top_domain, "db.lantern.dev", string
   override :lantern_dns_email, "varik@lantern.dev", string
-  override :lantern_backup_bucket, "lantern-wal-g-backups-dev"
+  override :lantern_backup_bucket, "walg-dev-backups"
   override :e2e_test, "0"
 
   # GCP
-  override :gcp_project_id, "ringed-griffin-394922", string
+  override :gcp_project_id, "lantern-development", string
+  override :gcp_compute_service_account, "339254316100-compute@developer.gserviceaccount.com", string
   optional :gcp_creds_gcr_b64, string
   optional :gcp_creds_logging_b64, string
   optional :gcp_creds_coredumps_b64, string
