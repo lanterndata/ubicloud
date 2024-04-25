@@ -82,7 +82,7 @@ jobs:
       - name: Run Migrate & Deploy
         env:
           CLOVER_DATABASE_URL: ${{ ( steps.set_env.outputs.branch == 'production' && secrets.DATABASE_URL_PRODUCTION) || secrets.DATABASE_URL_STAGING }}
-          IMAGE_URL: ${{ format('{0}:{1}', steps.set_env.outputs.image, github.sha) }}
+          IMAGE_URL: ${{ format('{0}:{1}', steps.set_env.outputs.gcr_image, github.sha) }}
           SERVICE: ${{ ( steps.set_env.outputs.branch == 'production' && secrets.GCP_SERVICE_NAME_PRODUCTION) || secrets.GCP_SERVICE_NAME_STAGING }}
           REGION: ${{ secrets.GCP_REGION }}
         run: |
