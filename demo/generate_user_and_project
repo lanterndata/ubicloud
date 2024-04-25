@@ -5,6 +5,8 @@ require_relative "../loader"
 require "argon2"
 
 email = ARGV[0]
+pass = ARGV[1] || SecureRandom.urlsafe_base64(15)
+project_id = UBID.parse(ARGV[2]).to_uuid || Project.generate_ubid.to_uuid
 
 account = Account[email: email]
 
@@ -13,19 +15,29 @@ if !account.nil?
   exit
 end
 
-account = Account.create_with_id(email: email, status_id: 2)
-pass = ARGV[1] || SecureRandom.urlsafe_base64(15)
-hash = Argon2::Password.new({
-  t_cost: 1,
-  m_cost: 5,
-  secret: Config.clover_session_secret
-}).create(pass)
+DB.transaction do
+  account = Account.create_with_id(email: email, status_id: 2)
+  hash = Argon2::Password.new({
+    t_cost: 1,
+    m_cost: 5,
+    secret: Config.clover_session_secret
+  }).create(pass)
 
-DB[:account_password_hashes].insert(id: account.id, password_hash: hash)
+  DB[:account_password_hashes].insert(id: account.id, password_hash: hash)
 
-account.create_project_with_default_policy("Default")
+  # Create project
+  puts "project_id => #{project_id}"
+  project = Project.create(name: "Default", provider: Option::Provider::GCP) { _1.id = project_id }
+  project.associate_with_project(project)
+  account.associate_with_project(project)
+  project.add_access_policy(
+    id: AccessPolicy.generate_uuid,
+    name: "default",
+    body: Authorization.generate_default_acls(account.hyper_tag_name, project.hyper_tag_name)
+  )
+end
 
 puts "Account created with credentials: \n"
 puts "Email - #{email}"
 puts "Password - #{pass}"
-puts "ProjectID - #{Project.first.id}"
+puts "ProjectID - #{project_id}"
