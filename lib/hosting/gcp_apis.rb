@@ -257,7 +257,7 @@ class Hosting::GcpApis
 
   def export_service_account_key(service_account_email)
     connection = Excon.new("https://iam.googleapis.com", headers: @host[:headers])
-    response = connection.post(path: "/v1/projects/#{@project}/serviceAccounts/#{service_account_email}/keys", body: JSON.dump({}), expects: [200, 400])
+    response = connection.post(path: "/v1/projects/#{@project}/serviceAccounts/#{service_account_email}/keys", body: JSON.dump({}), expects: [200, 400, 404, 403])
     Hosting::GcpApis.check_errors(response)
     data = JSON.parse(response.body)
     data["privateKeyData"]
