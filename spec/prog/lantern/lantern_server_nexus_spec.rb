@@ -493,7 +493,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check update_docker_image").and_return("Succeeded")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean update_docker_image")
       expect(nx).to receive(:decr_update_image)
-      expect { nx.update_image }.to hop("init_sql")
+      expect { nx.update_image }.to hop("update_lantern_extension")
     end
 
     it "updates image and fails" do

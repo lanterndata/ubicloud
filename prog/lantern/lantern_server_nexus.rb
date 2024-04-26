@@ -260,7 +260,8 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     when "Succeeded"
       vm.sshable.cmd("common/bin/daemonizer --clean update_docker_image")
       decr_update_image
-      hop_init_sql
+      # Update lantern to build extension with march_native on the machine
+      hop_update_lantern_extension
     when "NotStarted"
       vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/update_docker_image' update_docker_image", stdin: JSON.generate({
         gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
