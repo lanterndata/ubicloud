@@ -7,20 +7,12 @@ require_relative "../../common/lib/util"
 require_relative "../lib/common"
 
 $configure_hash = JSON.parse($stdin.read)
-
-pg_version = r "#{$pg_mount_path}/bin/pg_config --version | sed -rn 's/PostgreSQL (.*)\\..*/\\1/p' | tr -d '\\n'"
-unless pg_version
-  raise "Could not detect Postgres Version"
-end
-
 version_tag = "v#{$configure_hash["version"]}"
 
-r "sudo docker exec -u root #{$container_name} bash -c 'apt update && apt install -y cmake postgresql-server-dev-#{pg_version}'"
-r "sudo docker exec -u root #{$container_name} bash -c 'echo \"deb http://deb.debian.org/debian/ sid main\" > /etc/apt/sources.list.d/gcc.list && apt update && apt install -t sid -y gcc-13 g++-13'"
 r "sudo docker exec -u root #{$container_name} bash -c 'cd /tmp && rm -rf lantern || true'"
 r "sudo docker exec -u root #{$container_name} bash -c 'cd /tmp && git clone https://github.com/lanterndata/lantern.git --recursive'"
 r "sudo docker exec -u root #{$container_name} bash -c 'cd /tmp/lantern && git checkout #{version_tag}'"
 r "sudo docker exec -u root #{$container_name} bash -c 'cd /tmp/lantern && git submodule update --recursive && mkdir build'"
-r "sudo docker exec -u root #{$container_name} bash -c 'cd /tmp/lantern/build && CC=/usr/bin/gcc-13 CXX=/usr/bin/g++-13 cmake -DBUILD_FOR_DISTRIBUTING=YES -DMARCH_NATIVE=ON ..'"
+r "sudo docker exec -u root #{$container_name} bash -c 'cd /tmp/lantern/build && cmake -DBUILD_FOR_DISTRIBUTING=YES -DMARCH_NATIVE=ON ..'"
 r "sudo docker exec -u root #{$container_name} bash -c 'cd /tmp/lantern/build && make install'"
 r "sudo docker exec -u root #{$container_name} bash -c 'rm -rf /tmp/lantern'"
