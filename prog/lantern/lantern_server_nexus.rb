@@ -137,7 +137,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   end
 
   label def init_sql
-    register_deadline(:wait, 5 * 60)
+    register_deadline(:wait, 40 * 60)
 
     case vm.sshable.cmd("common/bin/daemonizer --check init_sql")
     when "Succeeded"
