@@ -51,6 +51,10 @@ class LanternServer < Sequel::Model
     vm.sshable.cmd("sudo lantern/bin/exec", stdin: query).chomp
   end
 
+  def run_query_all(query)
+    vm.sshable.cmd("sudo lantern/bin/exec_all", stdin: query).chomp
+  end
+
   def display_state
     return "domain setup" if strand.label.include?("domain")
     return "ssl setup" if strand.label.include?("setup_ssl")
@@ -176,7 +180,7 @@ JOIN pg_am a ON i.relam = a.oid
 JOIN pg_namespace n ON n.oid = i.relnamespace
 WHERE a.amname = 'lantern_hnsw';
 SQL
-    run_query(query)
+    run_query_all(query)
   end
 
   # def failover_target

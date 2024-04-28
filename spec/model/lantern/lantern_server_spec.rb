@@ -84,6 +84,11 @@ RSpec.describe LanternServer do
     expect(lantern_server.run_query("SELECT 1")).to eq("1")
   end
 
+  it "runs query on vm for all databases" do
+    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo lantern/bin/exec_all", stdin: "SELECT 1").and_return("1\n")
+    expect(lantern_server.run_query_all("SELECT 1")).to eq("1")
+  end
+
   describe "#standby?" do
     it "false if timeline is push" do
       expect(lantern_server).to receive(:timeline_access).and_return("push")
@@ -491,7 +496,7 @@ JOIN pg_am a ON i.relam = a.oid
 JOIN pg_namespace n ON n.oid = i.relnamespace
 WHERE a.amname = 'lantern_hnsw';
 SQL
-      expect(lantern_server).to receive(:run_query).with(query)
+      expect(lantern_server).to receive(:run_query_all).with(query)
       expect { lantern_server.prewarm_indexes }.not_to raise_error
     end
   end
