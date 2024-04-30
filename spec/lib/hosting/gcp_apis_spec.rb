@@ -250,5 +250,22 @@ RSpec.describe Hosting::GcpApis do
         expect { api.allow_bucket_usage_by_prefix("test-sa@gcp.com", "test", "test-prefix") }.not_to raise_error
       end
     end
+
+    describe "#get_json_object" do
+      it "gets json from storage" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        response = {"test_key" => "test_val"}
+        stub_request(:get, "https://storage.googleapis.com/storage/v1/b/test/o/test?alt=media").to_return(status: 200, body: JSON.dump(response), headers: {"Content-Type" => "application/json"})
+        api = described_class.new
+        expect(api.get_json_object("test", "test")).to eq(response)
+      end
+
+      it "gets invalid json from storage" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:get, "https://storage.googleapis.com/storage/v1/b/test/o/test?alt=media").to_return(status: 200, body: "test", headers: {"Content-Type" => "application/json"})
+        api = described_class.new
+        expect(api.get_json_object("test", "test")).to be_nil
+      end
+    end
   end
 end

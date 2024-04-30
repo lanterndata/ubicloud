@@ -71,6 +71,15 @@ class LanternTimeline < Sequel::Model
       .select { _1[:key].end_with?("backup_stop_sentinel.json") }
   end
 
+  def backups_with_metadata
+    storage_client = blob_storage_client
+    backups
+      .map {
+        metadata = storage_client.get_json_object(Config.lantern_backup_bucket, _1[:key])
+        {**_1, compressed_size: metadata["CompressedSize"], uncompressed_size: metadata["UncompressedSize"]}
+      }
+  end
+
   def get_backup_label(key)
     key.delete_prefix("#{ubid}/basebackups_005/").delete_suffix("_backup_stop_sentinel.json")
   end

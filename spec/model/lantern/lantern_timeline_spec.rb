@@ -96,6 +96,17 @@ RSpec.describe LanternTimeline do
     end
   end
 
+  describe "#backups_with_metadata" do
+    it "returns backups with metadata about size" do
+      gcp_api = instance_double(Hosting::GcpApis)
+      expect(gcp_api).to receive(:list_objects).with(Config.lantern_backup_bucket, "pvr1mcnhzd8p0qwwa00tr5cvex/basebackups_005/").and_return([{key: "1_backup_stop_sentinel.json"}, {key: "2_backup_stop_sentinel.json"}])
+      expect(gcp_api).to receive(:get_json_object).with(Config.lantern_backup_bucket, "1_backup_stop_sentinel.json").and_return({"CompressedSize" => 10, "UncompressedSize" => 20})
+      expect(gcp_api).to receive(:get_json_object).with(Config.lantern_backup_bucket, "2_backup_stop_sentinel.json").and_return({"CompressedSize" => 10, "UncompressedSize" => 20})
+      expect(lantern_timeline).to receive(:blob_storage_client).and_return(gcp_api).at_least(:once)
+      expect(lantern_timeline.backups_with_metadata).to eq([{key: "1_backup_stop_sentinel.json", compressed_size: 10, uncompressed_size: 20}, {key: "2_backup_stop_sentinel.json", compressed_size: 10, uncompressed_size: 20}])
+    end
+  end
+
   describe "#latest_backup_label_before_target" do
     it "fails if no backup found" do
       expect(lantern_timeline).to receive(:backups).and_return([])

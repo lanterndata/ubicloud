@@ -285,9 +285,10 @@ RSpec.describe Clover, "lantern" do
         time2 = Time.now - 10 * 60
         ubid = LanternServer.where(id: pg.representative_server.id).first.timeline.ubid
         backups = [{last_modified: time1, key: "#{ubid}/basebackups_005/1_backup_stop_sentinel.json"}, {last_modified: time2, key: "#{ubid}/basebackups_005/2_backup_stop_sentinel.json"}]
-        res_backups = JSON.parse(JSON.generate([{"time" => time1, "label" => "1"}, {"time" => time2, "label" => "2"}]))
+        res_backups = JSON.parse(JSON.generate([{"time" => time1, "label" => "1", "compressed_size" => 10, "uncompressed_size" => 20}, {"time" => time2, "label" => "2", "compressed_size" => 10, "uncompressed_size" => 20}]))
         gcp_client = instance_double(Hosting::GcpApis)
         expect(gcp_client).to receive(:list_objects).and_return(backups)
+        expect(gcp_client).to receive(:get_json_object).and_return({"CompressedSize" => 10, "UncompressedSize" => 20}).at_least(:once)
         allow(Hosting::GcpApis).to receive(:new).and_return(gcp_client)
 
         get "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/backups"
