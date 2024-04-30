@@ -91,8 +91,15 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
       expect { nx.wait }.to hop("take_backup")
     end
 
+    it "hops to delete_old_backups if needs cleanup" do
+      expect(lantern_server.timeline).to receive(:need_backup?).and_return(false)
+      expect(lantern_server.timeline).to receive(:need_cleanup?).and_return(true)
+      expect { nx.wait }.to hop("delete_old_backups")
+    end
+
     it "puts missing backup error for 2 days" do
       expect(lantern_server.timeline).to receive(:need_backup?).and_return(false)
+      expect(lantern_server.timeline).to receive(:need_cleanup?).and_return(false)
       expect(lantern_server.timeline).to receive(:backups).and_return([{last_modified: Time.now - 3 * 24 * 60 * 60}])
       expect(lantern_server.timeline).to receive(:leader).and_return(lantern_server)
       expect(lantern_server.timeline).to receive(:ubid).and_return(lantern_server.timeline.id)
@@ -102,6 +109,7 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
 
     it "puts missing backup for less than 2 days" do
       expect(lantern_server.timeline).to receive(:need_backup?).and_return(false)
+      expect(lantern_server.timeline).to receive(:need_cleanup?).and_return(false)
       expect(lantern_server.timeline).to receive(:backups).and_return([{last_modified: Time.now - 1 * 24 * 60 * 60}])
       expect(lantern_server.timeline).to receive(:leader).and_return(lantern_server)
       expect { nx.wait }.to nap(20 * 60)
@@ -110,6 +118,7 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
 
     it "puts missing backup days if no leader" do
       expect(lantern_server.timeline).to receive(:need_backup?).and_return(false)
+      expect(lantern_server.timeline).to receive(:need_cleanup?).and_return(false)
       expect(lantern_server.timeline).to receive(:backups).and_return([])
       expect(lantern_server.timeline).to receive(:leader).and_return(nil)
       expect(lantern_server.timeline).to receive(:created_at).and_return(Time.now - 1 * 24 * 60 * 60)
@@ -179,6 +188,14 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
       expect(lantern_server.timeline).to receive(:destroy)
       expect(lantern_server.timeline).to receive(:children).and_return([])
       expect { nx.destroy }.to exit({"msg" => "lantern timeline is deleted"})
+    end
+  end
+
+  describe "#delete_old_backups" do
+    it "deletes old backups and hops to wait" do
+      expect(timeline).to receive(:leader).and_return(lantern_server)
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/delete_old_backups' delete_old_backups", stdin: JSON.generate({ retain_after: (Time.new - (24*60*60*Config.backup_retention_days)).strftime('%Y-%m-%dT%H:%M:%S.%LZ') } ))
+      expect { nx.delete_old_backups }.to hop("wait")
     end
   end
 end

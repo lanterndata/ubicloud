@@ -292,6 +292,10 @@ class Hosting::GcpApis
           expression: "resource.name.startsWith(\"projects/_/buckets/#{bucket_name}/objects/#{prefix}\")",
           title: "Access backups for path #{prefix}"
         }
+      },
+      {
+        role: "roles/storage.objectList",
+        members: ["serviceAccount:#{service_account_email}"]
       }
     ]
     policy["version"] = 3
