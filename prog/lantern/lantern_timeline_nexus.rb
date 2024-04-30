@@ -53,7 +53,9 @@ class Prog::Lantern::LanternTimelineNexus < Prog::Base
     end
 
     if lantern_timeline.need_cleanup?
-      hop_delete_old_backups
+      retain_after = (Time.new - (24*60*60*Config.backup_retention_days)).strftime('%Y-%m-%dT%H:%M:%S.%LZ')
+      cmd = "docker compose -f /var/lib/lantern/docker-compos.yaml exec -T -u root postgresql bash -c \"GOOGLE_APPLICATION_CREDENTIALS=/tmp/google-application-credentials-wal-g.json /opt/bitnami/postgresql/bin/wal-g delete retain FULL 7 --after #{retain_after} --confirm\""
+      lantern_timeline.leader.vm.sshable.cmd("common/bin/daemonizer '#{cmd}' delete_old_backups")
     end
 
     # For the purpose of missing backup pages, we act like the very first backup
@@ -77,11 +79,6 @@ class Prog::Lantern::LanternTimelineNexus < Prog::Base
       lantern_timeline.take_backup
     end
 
-    hop_wait
-  end
-
-  label def delete_old_backups
-    lantern_timeline.leader.vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/delete_old_backups' delete_old_backups", stdin: JSON.generate({ retain_after: (Time.new - (24*60*60*Config.backup_retention_days)).strftime('%Y-%m-%dT%H:%M:%S.%LZ') }))
     hop_wait
   end
 
