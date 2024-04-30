@@ -125,9 +125,9 @@ class CloverApi
       end
 
       r.get "backups" do
-        pg.timeline.backups
+        pg.timeline.backups_with_metadata
           .sort_by { |hsh| hsh[:last_modified] }
-          .map { |hsh| {time: hsh[:last_modified], label: pg.timeline.get_backup_label(hsh[:key])} }
+          .map { |hsh| {time: hsh[:last_modified], label: pg.timeline.get_backup_label(hsh[:key]), compressed_size: hsh[:compressed_size], uncompressed_size: hsh[:uncompressed_size]} }
       end
 
       r.post "push-backup" do
