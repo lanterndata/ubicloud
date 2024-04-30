@@ -129,10 +129,7 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
 
     it "calls backup command" do
       expect(lantern_server.timeline).to receive(:need_backup?).and_return(true)
-      expect(lantern_server.timeline).to receive(:leader).and_return(lantern_server)
-      expect(lantern_server.timeline).to receive(:latest_backup_started_at=)
-      expect(lantern_server.timeline).to receive(:save_changes)
-      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/take_backup' take_postgres_backup")
+      expect(lantern_server.timeline).to receive(:take_backup)
       expect { nx.take_backup }.to hop("wait")
     end
   end

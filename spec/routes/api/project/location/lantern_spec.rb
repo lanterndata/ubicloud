@@ -179,12 +179,12 @@ RSpec.describe Clover, "lantern" do
 
     describe "#update-extension" do
       it "updates lantern extension" do
-        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-extension", {lantern_version: "0.2.4", extras_version: "0.1.4"}
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-extension", {lantern_version: "0.2.4", extras_version: Config.lantern_extras_default_version}
         expect(last_response.status).to eq(200)
       end
 
       it "updates extras extension" do
-        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-extension", {extras_version: "0.2.3", lantern_version: "0.2.2"}
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-extension", {extras_version: "0.2.3", lantern_version: Config.lantern_default_version}
         expect(last_response.status).to eq(200)
       end
     end
@@ -276,6 +276,59 @@ RSpec.describe Clover, "lantern" do
         server = LanternServer.where(id: pg.representative_server.id).first
         expect(server.target_vm_size).to eq("n1-standard-4")
         expect(last_response.status).to eq(200)
+      end
+    end
+
+    describe "backups" do
+      it "maps and prettifies backup keys correctly" do
+        time1 = Time.now - 20 * 60
+        time2 = Time.now - 10 * 60
+        ubid = LanternServer.where(id: pg.representative_server.id).first.timeline.ubid
+        backups = [{last_modified: time1, key: "#{ubid}/basebackups_005/1_backup_stop_sentinel.json"}, {last_modified: time2, key: "#{ubid}/basebackups_005/2_backup_stop_sentinel.json"}]
+        res_backups = JSON.parse(JSON.generate([{"time" => time1, "label" => "1"}, {"time" => time2, "label" => "2"}]))
+        gcp_client = instance_double(Hosting::GcpApis)
+        expect(gcp_client).to receive(:list_objects).and_return(backups)
+        allow(Hosting::GcpApis).to receive(:new).and_return(gcp_client)
+
+        get "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/backups"
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)).to eq(res_backups)
+      end
+    end
+
+    describe "push-backup" do
+      it "creates new backup" do
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        query_res = class_double(LanternResource, first: pg)
+        allow(query_res).to receive(:where).and_return(query_res)
+        expect(project).to receive(:lantern_resources_dataset).and_return(query_res)
+        expect(pg.timeline).to receive(:take_manual_backup)
+
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/push-backup"
+        expect(last_response.status).to eq(200)
+      end
+
+      it "fails to create new backup" do
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        query_res = class_double(LanternResource, first: pg)
+        allow(query_res).to receive(:where).and_return(query_res)
+        expect(project).to receive(:lantern_resources_dataset).and_return(query_res)
+        expect(pg.timeline).to receive(:take_manual_backup).and_raise "Another backup is in progress please try again later"
+
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/push-backup"
+        expect(last_response.status).to eq(409)
+        expect(last_response.body).to eq("Another backup is in progress please try again later")
+      end
+
+      it "fails to create new backup with unknown" do
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        query_res = class_double(LanternResource, first: pg)
+        allow(query_res).to receive(:where).and_return(query_res)
+        expect(project).to receive(:lantern_resources_dataset).and_return(query_res)
+        expect(pg.timeline).to receive(:take_manual_backup).and_raise "Unknown error"
+
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/push-backup"
+        expect(last_response.status).to eq(400)
       end
     end
   end

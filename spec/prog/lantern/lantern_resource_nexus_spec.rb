@@ -83,7 +83,7 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(LanternResource).to receive(:[]).with(parent.id).and_return(parent)
       expect(Prog::Lantern::LanternServerNexus).to receive(:assemble).with(hash_including(timeline_id: parent.timeline.id, timeline_access: "fetch", domain: nil, lantern_version: "0.2.2", extras_version: "0.1.4", minor_version: "2"))
 
-      described_class.assemble(project_id: lantern_project.id, location: "us-central1", name: "pg-name-2", target_vm_size: "n1-standard-2", target_storage_size_gib: 100, parent_id: parent.id, restore_target: restore_target)
+      described_class.assemble(project_id: lantern_project.id, location: "us-central1", name: "pg-name-2", target_vm_size: "n1-standard-2", target_storage_size_gib: 100, parent_id: parent.id, restore_target: restore_target, lantern_version: "0.2.2", extras_version: "0.1.4", minor_version: "2")
     end
 
     it "creates additional servers for HA" do

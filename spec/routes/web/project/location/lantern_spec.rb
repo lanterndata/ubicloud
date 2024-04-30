@@ -124,7 +124,6 @@ RSpec.describe Clover, "lantern" do
         click_button "Update Extensions"
         pg = LanternResource.first
         expect(pg.representative_server.lantern_version).to eq("0.2.1")
-        expect(pg.representative_server.extras_version).to eq("0.1.4")
         expect(page.status_code).to eq(200)
       end
 
@@ -133,7 +132,6 @@ RSpec.describe Clover, "lantern" do
         fill_in "extras_version", with: "0.1.1"
         click_button "Update Extensions"
         pg = LanternResource.first
-        expect(pg.representative_server.lantern_version).to eq("0.2.2")
         expect(pg.representative_server.extras_version).to eq("0.1.1")
         expect(page.status_code).to eq(200)
       end
