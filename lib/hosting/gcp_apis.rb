@@ -230,6 +230,19 @@ class Hosting::GcpApis
     data["items"].map { |hsh| {key: hsh["name"], last_modified: Time.new(hsh["updated"])} }
   end
 
+  def get_json_object(bucket, object)
+    connection = Excon.new("https://storage.googleapis.com", headers: @host[:headers])
+    query = {alt: "media"}
+    response = connection.get(path: "/storage/v1/b/#{bucket}/o/#{CGI.escape object}", query: query, expects: 200)
+
+    begin
+      JSON.parse(response.body)
+    rescue => e
+      Clog.emit("get_json_object: could not parse json body") { {bucket: bucket, key: object, error: e} }
+      nil
+    end
+  end
+
   def create_service_account(name, description = "")
     connection = Excon.new("https://iam.googleapis.com", headers: @host[:headers])
 
