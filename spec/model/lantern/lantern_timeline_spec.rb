@@ -37,45 +37,45 @@ RSpec.describe LanternTimeline do
     end
 
     it "returns false if already running" do
-      leader = instance_double(LanternServer, gcp_vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
-      expect(leader.gcp_vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Running")
+      leader = instance_double(LanternServer, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      expect(leader.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("InProgress")
       expect(lantern_timeline).to receive(:leader).and_return(leader).twice
       expect(lantern_timeline.need_backup?).to be(false)
     end
 
     it "returns true if not started" do
-      leader = instance_double(LanternServer, gcp_vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
-      expect(leader.gcp_vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("NotStarted")
+      leader = instance_double(LanternServer, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      expect(leader.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("NotStarted")
       expect(lantern_timeline).to receive(:leader).and_return(leader).twice
       expect(lantern_timeline.need_backup?).to be(true)
     end
 
     it "returns true if failed" do
-      leader = instance_double(LanternServer, gcp_vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
-      expect(leader.gcp_vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Failed")
+      leader = instance_double(LanternServer, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      expect(leader.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Failed")
       expect(lantern_timeline).to receive(:leader).and_return(leader).twice
       expect(lantern_timeline.need_backup?).to be(true)
     end
 
     it "returns true if last backup is nil" do
-      leader = instance_double(LanternServer, gcp_vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
-      expect(leader.gcp_vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Succeeded")
+      leader = instance_double(LanternServer, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      expect(leader.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Succeeded")
       expect(lantern_timeline).to receive(:leader).and_return(leader).twice
       expect(lantern_timeline).to receive(:latest_backup_started_at).and_return(nil)
       expect(lantern_timeline.need_backup?).to be(true)
     end
 
     it "returns true if last backup is more than a day ago" do
-      leader = instance_double(LanternServer, gcp_vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
-      expect(leader.gcp_vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Succeeded")
+      leader = instance_double(LanternServer, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      expect(leader.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Succeeded")
       expect(lantern_timeline).to receive(:leader).and_return(leader).twice
       expect(lantern_timeline).to receive(:latest_backup_started_at).and_return(Time.now - 60 * 60 * 25).twice
       expect(lantern_timeline.need_backup?).to be(true)
     end
 
     it "returns false if last backup is within a day" do
-      leader = instance_double(LanternServer, gcp_vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
-      expect(leader.gcp_vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Succeeded")
+      leader = instance_double(LanternServer, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      expect(leader.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Succeeded")
       expect(lantern_timeline).to receive(:leader).and_return(leader).twice
       expect(lantern_timeline).to receive(:latest_backup_started_at).and_return(Time.now).twice
       expect(lantern_timeline.need_backup?).to be(false)
@@ -137,6 +137,71 @@ RSpec.describe LanternTimeline do
     it "returns nil" do
       expect(lantern_timeline).to receive(:refresh_earliest_backup_completion_time).and_return(nil)
       expect(lantern_timeline.earliest_restore_time).to be_nil
+    end
+  end
+
+  describe "#get_backup_label" do
+    it "slices bucket key correctly" do
+      key = "#{lantern_timeline.ubid}/basebackups_005/1_backup_stop_sentinel.json"
+      expect(lantern_timeline.get_backup_label(key)).to eq("1")
+    end
+  end
+
+  describe "#take_backup" do
+    it "creates new backup" do
+      leader = instance_double(LanternServer, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      expect(lantern_timeline).to receive(:leader).and_return(leader)
+      expect(leader.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/take_backup' take_postgres_backup")
+      expect(lantern_timeline).to receive(:update)
+      lantern_timeline.take_backup
+    end
+  end
+
+  describe "#take_manual_backup" do
+    it "fails if in progress" do
+      leader = instance_double(LanternServer, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      expect(lantern_timeline).to receive(:leader).and_return(leader)
+      expect(leader.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("InProgress")
+      expect {
+        lantern_timeline.take_manual_backup
+      }.to raise_error "Another backup is in progress please try again later"
+    end
+
+    it "creates page if more than 5 backups" do
+      leader = instance_double(LanternServer, ubid: "test", vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      expect(lantern_timeline).to receive(:leader).and_return(leader).at_least(:once)
+      expect(leader.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("NotStarted")
+      backups = [
+        {last_modified: Time.new},
+        {last_modified: Time.new},
+        {last_modified: Time.new},
+        {last_modified: Time.new},
+        {last_modified: Time.new},
+        {last_modified: Time.new}
+      ]
+      expect(lantern_timeline).to receive(:backups).and_return(backups)
+      expect(Prog::PageNexus).to receive(:assemble_with_logs)
+      expect(lantern_timeline).to receive(:take_backup)
+      expect(leader).to receive(:resource).and_return(instance_double(LanternResource, name: "test", ubid: "test")).at_least(:once)
+      expect {
+        lantern_timeline.take_manual_backup
+      }.not_to raise_error
+    end
+
+    it "creates new backup" do
+      leader = instance_double(LanternServer, ubid: "test", vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      expect(lantern_timeline).to receive(:leader).and_return(leader).at_least(:once)
+      expect(leader.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("NotStarted")
+      backups = [
+        {last_modified: Time.new},
+        {last_modified: Time.new},
+        {last_modified: Time.new}
+      ]
+      expect(lantern_timeline).to receive(:backups).and_return(backups)
+      expect(lantern_timeline).to receive(:take_backup)
+      expect {
+        lantern_timeline.take_manual_backup
+      }.not_to raise_error
     end
   end
 end

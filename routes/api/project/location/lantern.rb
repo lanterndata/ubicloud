@@ -123,6 +123,27 @@ class CloverApi
         response.status = 200
         r.halt
       end
+
+      r.get "backups" do
+        pg.timeline.backups
+          .sort_by { |hsh| hsh[:last_modified] }
+          .map { |hsh| {time: hsh[:last_modified], label: pg.timeline.get_backup_label(hsh[:key])} }
+      end
+
+      r.post "push-backup" do
+        pg.timeline.take_manual_backup
+        response.status = 200
+        r.halt
+      rescue => e
+        Clog.emit("Error while pushing backup") { {error: e} }
+        if e.message.include? "Another backup"
+          response.status = 409
+          response.write e.message
+        else
+          response.status = 400
+        end
+        r.halt
+      end
     end
 
     r.get true do

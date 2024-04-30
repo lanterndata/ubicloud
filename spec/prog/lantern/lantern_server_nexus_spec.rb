@@ -431,7 +431,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --logs update_lantern").and_return(JSON.generate(logs))
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean update_lantern")
       expect(nx).to receive(:decr_update_lantern_extension)
-      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Lantern v0.2.0 update failed!", [lantern_server.resource.ubid, lantern_server.ubid], logs, "LanternUpdateFailed", lantern_server.ubid)
+      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Lantern v0.2.0 update failed!", [lantern_server.resource.ubid, lantern_server.ubid], logs, "critical", "LanternUpdateFailed", lantern_server.ubid)
       expect { nx.update_lantern_extension }.to hop("wait")
     end
   end
@@ -467,7 +467,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --logs update_extras").and_return(JSON.generate(logs))
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean update_extras")
       expect(nx).to receive(:decr_update_extras_extension)
-      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Lantern Extras v0.2.0 update failed!", [lantern_server.resource.ubid, lantern_server.ubid], logs, "LanternExtrasUpdateFailed", lantern_server.ubid)
+      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Lantern Extras v0.2.0 update failed!", [lantern_server.resource.ubid, lantern_server.ubid], logs, "critical", "LanternExtrasUpdateFailed", lantern_server.ubid)
       expect { nx.update_extras_extension }.to hop("wait")
     end
   end
@@ -505,7 +505,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --logs update_docker_image").and_return(JSON.generate(logs))
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean update_docker_image")
       expect(nx).to receive(:decr_update_image)
-      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Lantern Image test-image update failed!", [lantern_server.resource.ubid, lantern_server.ubid], logs, "LanternImageUpdateFailed", lantern_server.ubid)
+      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Lantern Image test-image update failed!", [lantern_server.resource.ubid, lantern_server.ubid], logs, "critical", "LanternImageUpdateFailed", lantern_server.ubid)
       expect { nx.update_image }.to hop("wait")
     end
   end
@@ -541,20 +541,40 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
   end
 
   describe "#setup_ssl" do
-    it "setups ssl" do
-      expect(lantern_server).to receive(:domain).and_return("example.com")
-      expect(Config).to receive(:cf_token).and_return("test_cf_token")
-      expect(Config).to receive(:cf_zone_id).and_return("test_zone_id")
-      expect(Config).to receive(:lantern_dns_email).and_return("test@example.com")
-      expect(lantern_server.vm.sshable).to receive(:cmd) do |cmd, stdin: ""|
-        data = JSON.parse(stdin)
-        expect(data["dns_token"]).to eq("test_cf_token")
-        expect(data["dns_zone_id"]).to eq("test_zone_id")
-        expect(data["dns_email"]).to eq("test@example.com")
-        expect(data["domain"]).to eq("example.com")
-      end
+    it "calls setup ssl and naps" do
+      expect(lantern_server).to receive(:domain).and_return("example.com").at_least(:once)
+      expect(Config).to receive(:cf_token).and_return("test_cf_token").at_least(:once)
+      expect(Config).to receive(:cf_zone_id).and_return("test_zone_id").at_least(:once)
+      expect(Config).to receive(:lantern_dns_email).and_return("test@example.com").at_least(:once)
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check setup_ssl").and_return("NotStarted")
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/setup_ssl' setup_ssl", stdin: JSON.generate({
+        dns_token: Config.cf_token,
+        dns_zone_id: Config.cf_zone_id,
+        dns_email: Config.lantern_dns_email,
+        domain: lantern_server.domain
+      }))
+      expect { nx.setup_ssl }.to nap(10)
+    end
 
+    it "naps if in progress" do
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check setup_ssl").and_return("InProgress")
+      expect { nx.setup_ssl }.to nap(10)
+    end
+
+    it "sets up ssl and hops to wait_db_available" do
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check setup_ssl").and_return("Succeeded")
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean setup_ssl")
       expect { nx.setup_ssl }.to hop("wait_db_available")
+    end
+
+    it "setup ssl and fails" do
+      expect(lantern_server.resource).to receive(:ubid).and_return("test-ubid").at_least(:once)
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check setup_ssl").and_return("Failed")
+      logs = {"stdout" => "", "stderr" => "oom"}
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --logs setup_ssl").and_return(JSON.generate(logs))
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean setup_ssl")
+      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Lantern SSL Setup Failed for test", [lantern_server.resource.ubid, lantern_server.ubid], logs, "error", "LanternSSLSetupFailed", lantern_server.ubid)
+      expect { nx.setup_ssl }.to hop("wait")
     end
   end
 
@@ -762,7 +782,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(nx).to receive(:available?).and_return(false)
       expect(nx).to receive(:bud).with(described_class, {}, :restart)
       expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo lantern/bin/logs --tail 10").and_return("test logs")
-      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("DB #{lantern_server.resource.name} is unavailable!", [lantern_server.ubid], {"stderr" => "", "stdout" => "test logs"}, "DBUnavailable", lantern_server.id)
+      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("DB #{lantern_server.resource.name} is unavailable!", [lantern_server.ubid], {"stderr" => "", "stdout" => "test logs"}, "critical", "DBUnavailable", lantern_server.id)
       expect { nx.unavailable }.to nap(5)
     end
 

@@ -14,7 +14,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
 
   def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, ha_type: LanternResource::HaType::NONE, parent_id: nil, restore_target: nil,
     org_id: nil, db_name: "postgres", db_user: "postgres", db_user_password: nil, superuser_password: nil, repl_password: nil, app_env: Config.rack_env,
-    lantern_version: "0.2.2", extras_version: "0.1.4", minor_version: "2", domain: nil, enable_debug: false)
+    lantern_version: Config.lantern_default_version, extras_version: Config.lantern_extras_default_version, minor_version: Config.lantern_minor_default_version, domain: nil, enable_debug: false)
     unless (project = Project[project_id])
       fail "No existing project"
     end

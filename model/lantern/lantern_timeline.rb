@@ -35,11 +35,34 @@ class LanternTimeline < Sequel::Model
   def need_backup?
     return false if leader.nil?
 
-    status = leader.gcp_vm.sshable.cmd("common/bin/daemonizer --check take_postgres_backup")
+    status = leader.vm.sshable.cmd("common/bin/daemonizer --check take_postgres_backup")
     return true if ["Failed", "NotStarted"].include?(status)
     return true if status == "Succeeded" && (latest_backup_started_at.nil? || latest_backup_started_at < Time.now - 60 * 60 * 24)
 
     false
+  end
+
+  def take_backup
+    leader.vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/take_backup' take_postgres_backup")
+    update(latest_backup_started_at: Time.now)
+  end
+
+  def take_manual_backup
+    status = leader.vm.sshable.cmd("common/bin/daemonizer --check take_postgres_backup")
+
+    if status == "InProgress"
+      fail "Another backup is in progress please try again later"
+    end
+
+    yesterday = Time.now - 24 * 60 * 60
+
+    last_backups = backups.select { _1[:last_modified] > yesterday }
+
+    if last_backups.size > 5
+      Prog::PageNexus.assemble_with_logs("Database v#{leader.resource.name} has more than 5 backups in last day", [ubid, leader.resource.ubid, leader.ubid], {}, "info", "LanternTooMuchBackups", ubid)
+    end
+
+    take_backup
   end
 
   def backups
@@ -48,10 +71,14 @@ class LanternTimeline < Sequel::Model
       .select { _1[:key].end_with?("backup_stop_sentinel.json") }
   end
 
+  def get_backup_label(key)
+    key.delete_prefix("#{ubid}/basebackups_005/").delete_suffix("_backup_stop_sentinel.json")
+  end
+
   def latest_backup_label_before_target(target)
     backup = backups.sort_by { |hsh| hsh[:last_modified] }.reverse.find { _1[:last_modified] < target }
     fail "BUG: no backup found" unless backup
-    backup[:key].delete_prefix("#{ubid}/basebackups_005/").delete_suffix("_backup_stop_sentinel.json")
+    get_backup_label(backup[:key])
   end
 
   def refresh_earliest_backup_completion_time

@@ -44,13 +44,13 @@ def setup_env
       f.puts("APP_ENV=#{$configure_hash["app_env"]}")
       f.puts("POSTGRESQL_REPLICATION_MODE=#{$configure_hash["replication_mode"]}")
       f.puts("POSTGRESQL_REPLICATION_USER=#{$configure_hash["repl_user"]}")
-      f.puts("POSTGRESQL_REPLICATION_PASSWORD=#{$configure_hash["repl_password"]}")
+      f.puts("POSTGRESQL_REPLICATION_PASSWORD='#{$configure_hash["repl_password"]}'")
       f.puts("POSTGRESQL_MASTER_HOST=#{$configure_hash["master_host"]}")
       f.puts("POSTGRESQL_MASTER_PORT_NUMBER=#{$configure_hash["master_port"]}")
       f.puts("POSTGRESQL_LOG_HOSTNAME=true")
       f.puts("GOOGLE_CLOUD_BUCKET_NAME=client-db-coredumps")
       f.puts("POSTGRESQL_DATABASE=#{$configure_hash["db_name"]}")
-      f.puts("POSTGRESQL_POSTGRES_PASSWORD=#{$configure_hash["postgres_password"]}")
+      f.puts("POSTGRESQL_POSTGRES_PASSWORD='#{$configure_hash["postgres_password"]}'")
       f.puts("POSTGRESQL_USERNAME=#{$configure_hash["db_user"]}")
       f.puts("PROMETHEUS_WRITER_USERNAME=1296757")
       f.puts("PROMETHEUS_WRITER_PASSWORD=#{$configure_hash["prom_password"]}")
@@ -71,9 +71,9 @@ def setup_env
       end
 
       if $configure_hash["db_user"] != "postgres"
-        f.puts("POSTGRESQL_PASSWORD=#{$configure_hash["db_user_password"]}")
+        f.puts("POSTGRESQL_PASSWORD='#{$configure_hash["db_user_password"]}'")
       else
-        f.puts("POSTGRESQL_PASSWORD=#{$configure_hash["postgres_password"]}")
+        f.puts("POSTGRESQL_PASSWORD='#{$configure_hash["postgres_password"]}'")
       end
     end
   end
