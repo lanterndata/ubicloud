@@ -141,6 +141,7 @@ module Config
   override :lantern_minor_default_version, "2", string
   override :lantern_backup_bucket, "walg-dev-backups"
   override :e2e_test, "0"
+  override :backup_retention_days, 7, int
 
   # GCP
   override :gcp_project_id, "lantern-development", string

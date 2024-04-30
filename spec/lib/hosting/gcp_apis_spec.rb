@@ -241,7 +241,7 @@ RSpec.describe Hosting::GcpApis do
         stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
         bindings = [{role: "roles/storage.objectAdmin", members: ["serviceAccount:test-sa-old@gcp.com"]}]
         policy = {bindings: bindings, version: 1}
-        bindings_new = [{role: "roles/storage.objectAdmin", members: ["serviceAccount:test-sa@gcp.com"], condition: {expression: "resource.name.startsWith(\"projects/_/buckets/test/objects/test-prefix\")", title: "Access backups for path test-prefix"}}]
+        bindings_new = [{role: "roles/storage.objectAdmin", members: ["serviceAccount:test-sa@gcp.com"], condition: {expression: "resource.name.startsWith(\"projects/_/buckets/test/objects/test-prefix\")", title: "Access backups for path test-prefix"}}, {role: "roles/storage.objectList", members: ["serviceAccount:test-sa@gcp.com"]}]
         new_policy = {bindings: bindings + bindings_new, version: 3}
         stub_request(:get, "https://storage.googleapis.com/storage/v1/b/test/iam?optionsRequestedPolicyVersion=3").to_return(status: 200, body: JSON.dump(policy), headers: {"Content-Type" => "application/json"})
         stub_request(:put, "https://storage.googleapis.com/storage/v1/b/test/iam").with(body: JSON.dump(new_policy)).to_return(status: 200, body: "{}", headers: {"Content-Type" => "application/json"})

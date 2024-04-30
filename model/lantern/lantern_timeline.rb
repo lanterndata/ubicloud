@@ -42,6 +42,15 @@ class LanternTimeline < Sequel::Model
     false
   end
 
+  def need_cleanup?
+    return false if leader.nil?
+
+    status = leader.vm.sshable.cmd("common/bin/daemonizer --check delete_old_backups")
+    return true if ["Failed", "NotStarted", "Succeeded"].include?(status)
+
+    false
+  end
+
   def take_backup
     leader.vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/take_backup' take_postgres_backup")
     update(latest_backup_started_at: Time.now)

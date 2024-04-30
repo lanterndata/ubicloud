@@ -215,4 +215,40 @@ RSpec.describe LanternTimeline do
       }.not_to raise_error
     end
   end
+
+  describe "#need_cleanup?" do
+    it "returns false for reader" do
+      expect(lantern_timeline).to receive(:leader).and_return(nil)
+      expect(lantern_timeline.need_cleanup?).to be(false)
+    end
+
+    it "returns false if already running" do
+      leader = instance_double(LanternServer, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      expect(leader.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check delete_old_backups").and_return("InProgress")
+      expect(lantern_timeline).to receive(:leader).and_return(leader).twice
+      expect(lantern_timeline.need_cleanup?).to be(false)
+    end
+
+    it "returns true if not started" do
+      leader = instance_double(LanternServer, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      expect(leader.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check delete_old_backups").and_return("NotStarted")
+      expect(lantern_timeline).to receive(:leader).and_return(leader).twice
+      expect(lantern_timeline.need_cleanup?).to be(true)
+    end
+
+    it "returns true if failed" do
+      leader = instance_double(LanternServer, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      expect(leader.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check delete_old_backups").and_return("Failed")
+      expect(lantern_timeline).to receive(:leader).and_return(leader).twice
+      expect(lantern_timeline.need_cleanup?).to be(true)
+    end
+
+    it "returns true if failed" do
+      leader = instance_double(LanternServer, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      expect(leader.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check delete_old_backups").and_return("Failed")
+      expect(lantern_timeline).to receive(:leader).and_return(leader).twice
+      expect(lantern_timeline.need_cleanup?).to be(true)
+    end
+
+  end
 end
