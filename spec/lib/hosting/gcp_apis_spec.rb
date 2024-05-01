@@ -91,7 +91,8 @@ RSpec.describe Hosting::GcpApis do
     describe "#delete_ephermal_ipv4" do
       it "deletes ephermal address from vm" do
         stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
-        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm/deleteAccessConfig?accessConfig=External%20NAT&networkInterface=nic0").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm/deleteAccessConfig?accessConfig=External%20NAT&networkInterface=nic0").to_return(status: 200, body: JSON.dump({"id" => "test-op"}), headers: {"Content-Type" => "application/json"})
+        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/operations/test-op/wait").to_return(status: 200, body: JSON.dump({"status" => "DONE"}), headers: {"Content-Type" => "application/json"})
         api = described_class.new
         expect { api.delete_ephermal_ipv4("dummy-vm", "us-central1-a") }.not_to raise_error
       end
@@ -99,16 +100,20 @@ RSpec.describe Hosting::GcpApis do
 
     describe "#assign_static_ipv4" do
       it "gets in creating state" do
-        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm/addAccessConfig?networkInterface=nic0").with(body: JSON.dump({name: "External NAT", natIP: "1.1.1.1", networkTier: "PREMIUM", type: "ONE_TO_ONE_NAT"})).to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm/addAccessConfig?networkInterface=nic0").with(body: JSON.dump({name: "External NAT", natIP: "1.1.1.1", networkTier: "PREMIUM", type: "ONE_TO_ONE_NAT"})).to_return(status: 200, body: JSON.dump({"id" => "test-op"}), headers: {"Content-Type" => "application/json"})
+        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/operations/test-op/wait").to_return(status: 200, body: JSON.dump({"status" => "DONE"}), headers: {"Content-Type" => "application/json"})
         api = described_class.new
-        expect { api.assign_static_ipv4("dummy-vm", "1.1.1.1", "us-central1-a") }.not_to raise_error
+        expect {
+          api.assign_static_ipv4("dummy-vm", "1.1.1.1", "us-central1-a")
+        }.not_to raise_error
       end
     end
 
     describe "#start_vm" do
       it "starts vm" do
         stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
-        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm/start").to_return(status: 200, body: "{\"status\": \"PENDING\"}", headers: {})
+        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm/start").to_return(status: 200, body: JSON.dump({"status" => "PENDING", "id" => "test-op"}), headers: {})
+        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/operations/test-op/wait").to_return(status: 200, body: JSON.dump({"status" => "DONE"}), headers: {"Content-Type" => "application/json"})
         api = described_class.new
         expect { api.start_vm("dummy-vm", "us-central1-a") }.not_to raise_error
       end
@@ -117,7 +122,8 @@ RSpec.describe Hosting::GcpApis do
     describe "#stop_vm" do
       it "stops vm" do
         stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
-        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm/stop").to_return(status: 200, body: "", headers: {})
+        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm/stop").to_return(status: 200, body: JSON.dump({"id" => "test-op"}), headers: {})
+        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/operations/test-op/wait").to_return(status: 200, body: JSON.dump({"status" => "DONE"}), headers: {"Content-Type" => "application/json"})
         api = described_class.new
         expect { api.stop_vm("dummy-vm", "us-central1-a") }.not_to raise_error
       end
@@ -148,9 +154,10 @@ RSpec.describe Hosting::GcpApis do
           .with(
             body: '{"sizeGb":"50"}'
           )
-          .to_return(status: 200, body: "{}", headers: {})
+          .to_return(status: 200, body: JSON.dump({"id" => "test-op"}), headers: {})
+        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/operations/test-op/wait").to_return(status: 200, body: JSON.dump({"status" => "DONE"}), headers: {"Content-Type" => "application/json"})
         api = described_class.new
-        expect { api.resize_vm_disk("https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/disks/test-disk", 50) }.not_to raise_error
+        expect { api.resize_vm_disk("us-central1-a", "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/disks/test-disk", 50) }.not_to raise_error
       end
     end
 
@@ -241,7 +248,7 @@ RSpec.describe Hosting::GcpApis do
         stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
         bindings = [{role: "roles/storage.objectAdmin", members: ["serviceAccount:test-sa-old@gcp.com"]}]
         policy = {bindings: bindings, version: 1}
-        bindings_new = [{role: "roles/storage.objectAdmin", members: ["serviceAccount:test-sa@gcp.com"], condition: {expression: "resource.name.startsWith(\"projects/_/buckets/test/objects/test-prefix\")", title: "Access backups for path test-prefix"}}, {role: "roles/storage.objectList", members: ["serviceAccount:test-sa@gcp.com"]}]
+        bindings_new = [{role: "roles/storage.objectAdmin", members: ["serviceAccount:test-sa@gcp.com"], condition: {expression: "resource.name.startsWith(\"projects/_/buckets/test/objects/test-prefix\")", title: "Access backups for path test-prefix"}}, {role: "projects/test-project/roles/storage.objectList", members: ["serviceAccount:test-sa@gcp.com"]}]
         new_policy = {bindings: bindings + bindings_new, version: 3}
         stub_request(:get, "https://storage.googleapis.com/storage/v1/b/test/iam?optionsRequestedPolicyVersion=3").to_return(status: 200, body: JSON.dump(policy), headers: {"Content-Type" => "application/json"})
         stub_request(:put, "https://storage.googleapis.com/storage/v1/b/test/iam").with(body: JSON.dump(new_policy)).to_return(status: 200, body: "{}", headers: {"Content-Type" => "application/json"})
@@ -265,6 +272,26 @@ RSpec.describe Hosting::GcpApis do
         stub_request(:get, "https://storage.googleapis.com/storage/v1/b/test/o/test?alt=media").to_return(status: 200, body: "test", headers: {"Content-Type" => "application/json"})
         api = described_class.new
         expect(api.get_json_object("test", "test")).to be_nil
+      end
+    end
+
+    describe "#wait_for_operation" do
+      it "waits for operation to be done at first attempt" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/operations/test-op/wait").to_return(status: 200, body: JSON.dump({"status" => "DONE"}), headers: {"Content-Type" => "application/json"})
+
+        api = described_class.new
+        expect { api.wait_for_operation("us-central1-a", "test-op") }.not_to raise_error
+      end
+
+      it "waits for operation until done" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/operations/test-op/wait")
+          .to_return(status: 200, body: JSON.dump({"status" => "RUNNING"}), headers: {"Content-Type" => "application/json"})
+          .to_return(status: 200, body: JSON.dump({"status" => "DONE"}), headers: {"Content-Type" => "application/json"})
+
+        api = described_class.new
+        expect { api.wait_for_operation("us-central1-a", "test-op") }.not_to raise_error
       end
     end
   end

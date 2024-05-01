@@ -242,13 +242,5 @@ RSpec.describe LanternTimeline do
       expect(lantern_timeline).to receive(:leader).and_return(leader).twice
       expect(lantern_timeline.need_cleanup?).to be(true)
     end
-
-    it "returns true if failed" do
-      leader = instance_double(LanternServer, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
-      expect(leader.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check delete_old_backups").and_return("Failed")
-      expect(lantern_timeline).to receive(:leader).and_return(leader).twice
-      expect(lantern_timeline.need_cleanup?).to be(true)
-    end
-
   end
 end

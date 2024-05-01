@@ -36,6 +36,16 @@ class Hosting::GcpApis
     end
   end
 
+  def wait_for_operation(zone, operation)
+    connection = Excon.new(@host[:connection_string], headers: @host[:headers])
+
+    loop do
+      response = connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/operations/#{operation}/wait", expects: [200])
+      body = JSON.parse(response.body)
+      break unless body["status"] != "DONE"
+    end
+  end
+
   def get_region_from_zone(zone)
     zone[..-3]
   end
@@ -159,6 +169,8 @@ class Hosting::GcpApis
     query = {accessConfig: "External NAT", networkInterface: "nic0"}
     response = connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/deleteAccessConfig", query: query, expects: [200, 400, 404])
     Hosting::GcpApis.check_errors(response)
+    data = JSON.parse(response.body)
+    wait_for_operation(zone, data["id"])
   end
 
   def assign_static_ipv4(vm_name, addr, zone)
@@ -174,6 +186,8 @@ class Hosting::GcpApis
 
     response = connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/addAccessConfig", body: JSON.dump(body), query: query, expects: [200, 400])
     Hosting::GcpApis.check_errors(response)
+    data = JSON.parse(response.body)
+    wait_for_operation(zone, data["id"])
   end
 
   def release_ipv4(vm_name, region)
@@ -191,12 +205,15 @@ class Hosting::GcpApis
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
     response = connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/start", expects: 200)
     Hosting::GcpApis.check_errors(response)
-    JSON.parse(response.body)
+    data = JSON.parse(response.body)
+    wait_for_operation(zone, data["id"])
   end
 
   def stop_vm(vm_name, zone)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
-    connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/stop", expects: 200)
+    response = connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/stop", expects: 200)
+    data = JSON.parse(response.body)
+    wait_for_operation(zone, data["id"])
   end
 
   def update_vm_type(vm_name, zone, machine_type)
@@ -208,12 +225,14 @@ class Hosting::GcpApis
     Hosting::GcpApis.check_errors(response)
   end
 
-  def resize_vm_disk(disk_source, storage_size_gib)
+  def resize_vm_disk(zone, disk_source, storage_size_gib)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
     body = {sizeGb: storage_size_gib.to_s}
     path = URI.parse(disk_source).path
     response = connection.post(path: "#{path}/resize", body: JSON.dump(body), expects: [200, 400])
     Hosting::GcpApis.check_errors(response)
+    data = JSON.parse(response.body)
+    wait_for_operation(zone, data["id"])
   end
 
   def list_objects(bucket, prefix)
@@ -294,7 +313,9 @@ class Hosting::GcpApis
         }
       },
       {
-        role: "roles/storage.objectList",
+        # This role should be created manually
+        # It should only have storage.objects.list policy attached
+        role: "projects/#{@project}/roles/storage.objectList",
         members: ["serviceAccount:#{service_account_email}"]
       }
     ]
