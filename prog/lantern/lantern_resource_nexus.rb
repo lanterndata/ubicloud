@@ -66,6 +66,11 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
         superuser_password = parent.superuser_password
         repl_user = parent.repl_user
         repl_password = parent.repl_password
+        lantern_version = parent.representative_server.lantern_version
+        extras_version = parent.representative_server.extras_version
+        minor_version = parent.representative_server.minor_version
+        target_storage_size_gib = parent.representative_server.target_storage_size_gib
+
       end
 
       lantern_resource = LanternResource.create(
