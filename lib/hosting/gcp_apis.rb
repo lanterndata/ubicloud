@@ -239,6 +239,7 @@ class Hosting::GcpApis
   def list_objects(bucket, prefix)
     connection = Excon.new("https://storage.googleapis.com", headers: @host[:headers])
     query = {prefix: prefix}
+    puts "Query is #{query}"
     response = connection.get(path: "/storage/v1/b/#{bucket}/o", query: query, expects: [200, 400])
     Hosting::GcpApis.check_errors(response)
     data = JSON.parse(response.body)

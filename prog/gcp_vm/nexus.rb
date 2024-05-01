@@ -220,13 +220,10 @@ class Prog::GcpVm::Nexus < Prog::Base
   label def destroy
     DB.transaction do
       gcp_vm.update(display_state: "deleting")
-      # TODO:: disable vm deletion until stable release
-      if !Config.production? || Config.e2e_test?
-        gcp_client = Hosting::GcpApis.new
-        gcp_client.delete_vm(gcp_vm.name, "#{gcp_vm.location}-a")
-        if gcp_vm.has_static_ipv4
-          gcp_client.release_ipv4(gcp_vm.name, gcp_vm.location)
-        end
+      gcp_client = Hosting::GcpApis.new
+      gcp_client.delete_vm(gcp_vm.name, "#{gcp_vm.location}-a")
+      if gcp_vm.has_static_ipv4
+        gcp_client.release_ipv4(gcp_vm.name, gcp_vm.location)
       end
       strand.children.each { _1.destroy }
       gcp_vm.projects.map { gcp_vm.dissociate_with_project(_1) }
