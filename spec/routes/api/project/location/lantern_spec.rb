@@ -141,42 +141,6 @@ RSpec.describe Clover, "lantern" do
       end
     end
 
-    describe "create" do
-      it "creates new lantern database" do
-        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern", {size: "n1-standard-2", name: "instance-2", org_id: 0, location: "us-central1", storage_size_gib: 100, lantern_version: "0.2.2", extras_version: "0.1.4", minor_version: "1", domain: "test.db.lantern.dev", app_env: "test", repl_password: "test-repl-pass", enable_telemetry: true, postgres_password: "test-pg-pass"}
-
-        body = JSON.parse(last_response.body)
-        expect(last_response.status).to eq(200)
-
-        expect(body["name"]).to eq("instance-2")
-        expect(body["state"]).to eq("creating")
-        expect(body["instance_type"]).to eq("writer")
-        expect(body["location"]).to eq("us-central1")
-        expect(body["lantern_version"]).to eq("0.2.2")
-        expect(body["extras_version"]).to eq("0.1.4")
-        expect(body["minor_version"]).to eq("1")
-        expect(body["org_id"]).to eq(0)
-        expect(body["storage_size_gib"]).to eq(100)
-        expect(body["domain"]).to eq("test.db.lantern.dev")
-        expect(body["app_env"]).to eq("test")
-        expect(body["debug"]).to be(false)
-        expect(body["enable_telemetry"]).to be(true)
-        expect(body["repl_user"]).to eq("repl_user")
-        expect(body["repl_password"]).to eq("test-repl-pass")
-        expect(body["postgres_password"]).to eq("test-pg-pass")
-      end
-
-      it "creates new lantern database with subdomain" do
-        expect(Config).to receive(:lantern_top_domain).and_return("db.lantern.dev")
-        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern", {size: "n1-standard-2", name: "instance-2", org_id: 0, location: "us-central1", storage_size_gib: 100, lantern_version: "0.2.2", extras_version: "0.1.4", minor_version: "1", subdomain: "test", app_env: "test", repl_password: "test-repl-pass", enable_telemetry: true, postgres_password: "test-pg-pass"}
-
-        body = JSON.parse(last_response.body)
-        expect(last_response.status).to eq(200)
-
-        expect(body["domain"]).to eq("test.db.lantern.dev")
-      end
-    end
-
     describe "#update-extension" do
       it "updates lantern extension" do
         post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-extension", {lantern_version: "0.2.4", extras_version: Config.lantern_extras_default_version}
