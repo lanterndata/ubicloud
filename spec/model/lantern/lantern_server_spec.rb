@@ -436,7 +436,13 @@ RSpec.describe LanternServer do
   end
 
   describe "Lsn monitor" do
+    it "fails to initiate a new health monitor session" do
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "setup domain")).at_least(:once)
+      expect { lantern_server.init_health_monitor_session }.to raise_error "server is not ready to initialize session"
+    end
+
     it "initiates a new health monitor session" do
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait")).at_least(:once)
       expect(lantern_server.init_health_monitor_session).to eq({db_connection: nil})
     end
 

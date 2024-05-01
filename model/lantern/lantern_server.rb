@@ -137,6 +137,10 @@ class LanternServer < Sequel::Model
   end
 
   def init_health_monitor_session
+    if strand.label != "wait"
+      fail "server is not ready to initialize session"
+    end
+
     {
       db_connection: nil
     }
