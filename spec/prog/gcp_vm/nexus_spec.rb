@@ -128,14 +128,6 @@ RSpec.describe Prog::GcpVm::Nexus do
   end
 
   describe "#start_vm" do
-    it "naps 10 to retry start" do
-      expect(gcp_vm).to receive(:update).with({display_state: "starting"})
-      gcp_api = instance_double(Hosting::GcpApis)
-      expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
-      expect(gcp_api).to receive(:start_vm).with("dummy-vm", "us-central1-a").and_return({"status" => "PENDING"})
-      expect { nx.start_vm }.to nap(10)
-    end
-
     it "hops to wait_sshable after run" do
       expect(gcp_vm).to receive(:update).with({display_state: "starting"})
       expect(gcp_vm).to receive(:update).with({display_state: "running"})
@@ -247,7 +239,7 @@ RSpec.describe Prog::GcpVm::Nexus do
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
       expect(gcp_api).to receive(:get_vm).with("dummy-vm", "us-central1-a").and_return({"disks" => [{"source" => "https://compute.googleapis.com/compute/v1/projects/test/zones/us-central1-a/disks/test-disk"}]})
-      expect(gcp_api).to receive(:resize_vm_disk).with("https://compute.googleapis.com/compute/v1/projects/test/zones/us-central1-a/disks/test-disk", 50)
+      expect(gcp_api).to receive(:resize_vm_disk).with("us-central1-a", "https://compute.googleapis.com/compute/v1/projects/test/zones/us-central1-a/disks/test-disk", 50)
       expect { nx.update_storage }.to hop("start_vm")
     end
 
@@ -258,7 +250,7 @@ RSpec.describe Prog::GcpVm::Nexus do
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
       expect(gcp_api).to receive(:get_vm).with("dummy-vm", "us-central1-a").and_return({"disks" => [{"source" => "https://compute.googleapis.com/compute/v1/projects/test/zones/us-central1-a/disks/test-disk"}]})
-      expect(gcp_api).to receive(:resize_vm_disk).with("https://compute.googleapis.com/compute/v1/projects/test/zones/us-central1-a/disks/test-disk", 50)
+      expect(gcp_api).to receive(:resize_vm_disk).with("us-central1-a", "https://compute.googleapis.com/compute/v1/projects/test/zones/us-central1-a/disks/test-disk", 50)
       expect { nx.update_storage }.to hop("update_size")
     end
   end

@@ -95,7 +95,7 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
       expect(lantern_server.timeline).to receive(:need_backup?).and_return(false)
       expect(lantern_server.timeline).to receive(:need_cleanup?).and_return(true)
       expect(timeline).to receive(:leader).and_return(lantern_server)
-      retain_after = (Time.new - (24*60*60*Config.backup_retention_days)).strftime('%Y-%m-%dT%H:%M:%S.%LZ')
+      (Time.new - (24 * 60 * 60 * Config.backup_retention_days)).strftime("%Y-%m-%dT%H:%M:%S.%LZ")
       expect(lantern_server.vm.sshable).to receive(:cmd).with(a_string_matching("common/bin/daemonizer 'docker compose -f /var/lib/lantern/docker-compos.yaml exec -T -u root postgresql bash -c"))
       expect(lantern_server.timeline).to receive(:backups).and_return([{last_modified: Time.now - 1 * 24 * 60 * 60}])
       expect(lantern_server.timeline).to receive(:leader).and_return(lantern_server)

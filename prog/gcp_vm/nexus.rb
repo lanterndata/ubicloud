@@ -171,11 +171,7 @@ class Prog::GcpVm::Nexus < Prog::Base
     gcp_vm.update(display_state: "starting")
 
     gcp_client = Hosting::GcpApis.new
-    res = gcp_client.start_vm(gcp_vm.name, "#{gcp_vm.location}-a")
-
-    if !["DONE"].include?(res["status"])
-      nap 10
-    end
+    gcp_client.start_vm(gcp_vm.name, "#{gcp_vm.location}-a")
 
     gcp_vm.update(display_state: "running")
 
@@ -195,7 +191,7 @@ class Prog::GcpVm::Nexus < Prog::Base
     zone = "#{gcp_vm.location}-a"
     vm = gcp_client.get_vm(gcp_vm.name, zone)
     disk_source = vm["disks"][0]["source"]
-    gcp_client.resize_vm_disk(disk_source, gcp_vm.storage_size_gib)
+    gcp_client.resize_vm_disk(zone, disk_source, gcp_vm.storage_size_gib)
 
     when_update_size_set? do
       hop_update_size
