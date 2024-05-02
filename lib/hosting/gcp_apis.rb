@@ -248,7 +248,8 @@ class Hosting::GcpApis
       return []
     end
 
-    data["items"].map { |hsh| {key: hsh["name"], last_modified: Time.new(hsh["updated"])} }
+    # customTime will be only present when we migrate a bucket to another bucket
+    data["items"].map { |hsh| {key: hsh["name"], last_modified: Time.new(hsh["customTime"] || hsh["updated"])} }
   end
 
   def get_json_object(bucket, object)
