@@ -6,6 +6,7 @@ class LanternResource < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :project
   many_to_one :parent, key: :parent_id, class: self
+  one_to_many :forks, key: :parent_id, class: self
   one_to_many :servers, class: LanternServer, key: :resource_id
   one_to_one :representative_server, class: LanternServer, key: :resource_id, conditions: Sequel.~(representative_at: nil)
   one_through_one :timeline, class: LanternTimeline, join_table: :lantern_server, left_key: :resource_id, right_key: :timeline_id
@@ -49,6 +50,13 @@ class LanternResource < Sequel::Model
   def required_standby_count
     required_standby_count_map = {HaType::NONE => 0, HaType::ASYNC => 1, HaType::SYNC => 2}
     required_standby_count_map[ha_type]
+  end
+
+  def dissociate_forks
+    forks.each {
+      _1.update(parent_id: nil)
+      _1.timeline.update(parent_id: nil)
+    }
   end
 
   module HaType
