@@ -20,6 +20,10 @@ class CloverApi
 
       r.delete true do
         Authorization.authorize(@current_user.id, "Postgres:delete", pg.id)
+        if pg.forks.size > 0
+          response.status = 409
+          return {"error" => "Can not delete resource which has active forks"}
+        end
         pg.incr_destroy
         response.status = 200
         r.halt
@@ -136,12 +140,17 @@ class CloverApi
         r.halt
       rescue => e
         Clog.emit("Error while pushing backup") { {error: e} }
-        if e.message.include? "Another backup"
-          response.status = 409
-          response.write e.message
+        response.status = if e.message.include? "Another backup"
+          409
         else
-          response.status = 400
+          400
         end
+        return {"error" => e.message}
+      end
+
+      r.post "dissociate-forks" do
+        pg.dissociate_forks
+        response.status = 200
         r.halt
       end
     end

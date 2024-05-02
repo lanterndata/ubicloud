@@ -65,4 +65,16 @@ RSpec.describe LanternResource do
       expect(lantern_resource.required_standby_count).to eq(2)
     end
   end
+
+  describe "#dissociate_forks" do
+    it "removes parents from forks" do
+      child = instance_double(described_class, parent_id: lantern_resource.id, timeline: instance_double(LanternTimeline, parent_id: "test"))
+      forks = [child]
+      expect(lantern_resource).to receive(:forks).and_return(forks)
+      expect(child).to receive(:update).with(parent_id: nil)
+      expect(child.timeline).to receive(:update).with(parent_id: nil)
+
+      expect { lantern_resource.dissociate_forks }.not_to raise_error
+    end
+  end
 end
