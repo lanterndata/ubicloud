@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "forwardable"
 require "netaddr"
 require "json"
 require "shellwords"
@@ -10,6 +11,10 @@ require_relative "../../lib/hosting/gcp_apis"
 
 class Prog::GcpVm::Nexus < Prog::Base
   subject_is :gcp_vm
+
+  extend Forwardable
+  def_delegators :gcp_vm
+
   semaphore :destroy, :start_vm, :stop_vm, :update_storage, :update_size
 
   def self.assemble(public_key, project_id, name: nil, size: "n1-standard-2",
@@ -85,10 +90,14 @@ class Prog::GcpVm::Nexus < Prog::Base
   end
 
   label def start
+    register_deadline(:failed_provisioning, 10 * 60)
+    hop_create_vm
+  end
+
+  label def create_vm
     gcp_client = Hosting::GcpApis.new
     labels = frame["labels"]
     gcp_client.create_vm(gcp_vm.name, "#{gcp_vm.location}-a", gcp_vm.boot_image, gcp_vm.public_key, gcp_vm.unix_user, "#{gcp_vm.family}-#{gcp_vm.cores}", gcp_vm.storage_size_gib, labels: labels)
-    register_deadline(:wait, 10 * 60)
 
     # remove labels from stack
     current_frame = strand.stack.first
@@ -97,6 +106,11 @@ class Prog::GcpVm::Nexus < Prog::Base
     strand.save_changes
 
     hop_wait_create_vm
+  end
+
+  label def failed_provisioning
+    gcp_vm.update(display_state: "failed")
+    hop_wait
   end
 
   label def wait_sshable
@@ -123,23 +137,30 @@ class Prog::GcpVm::Nexus < Prog::Base
   label def wait
     when_stop_vm_set? do
       register_deadline(:wait, 5 * 60)
+      gcp_vm.update(display_state: "stopping")
       hop_stop_vm
     end
 
     when_start_vm_set? do
       register_deadline(:wait, 5 * 60)
+      gcp_vm.update(display_state: "starting")
       hop_start_vm
     end
 
     when_destroy_set? do
+      gcp_vm.update(display_state: "deleting")
       hop_destroy
     end
 
     when_update_size_set? do
+      register_deadline(:wait, 5 * 60)
+      gcp_vm.update(display_state: "updating")
       hop_update_size
     end
 
     when_update_storage_set? do
+      register_deadline(:wait, 5 * 60)
+      gcp_vm.update(display_state: "updating")
       hop_update_storage
     end
 
@@ -157,8 +178,6 @@ class Prog::GcpVm::Nexus < Prog::Base
   end
 
   label def stop_vm
-    gcp_vm.update(display_state: "stopping")
-
     gcp_client = Hosting::GcpApis.new
     gcp_client.stop_vm(gcp_vm.name, "#{gcp_vm.location}-a")
 
@@ -168,12 +187,8 @@ class Prog::GcpVm::Nexus < Prog::Base
   end
 
   label def start_vm
-    gcp_vm.update(display_state: "starting")
-
     gcp_client = Hosting::GcpApis.new
     gcp_client.start_vm(gcp_vm.name, "#{gcp_vm.location}-a")
-
-    gcp_vm.update(display_state: "running")
 
     decr_start_vm
 
@@ -185,7 +200,6 @@ class Prog::GcpVm::Nexus < Prog::Base
       hop_stop_vm
     end
     decr_update_storage
-    register_deadline(:wait, 5 * 60)
     gcp_vm.update(display_state: "updating")
     gcp_client = Hosting::GcpApis.new
     zone = "#{gcp_vm.location}-a"
@@ -205,12 +219,12 @@ class Prog::GcpVm::Nexus < Prog::Base
       hop_stop_vm
     end
     decr_update_size
-    register_deadline(:wait, 5 * 60)
     gcp_vm.update(display_state: "updating")
     gcp_client = Hosting::GcpApis.new
     gcp_client.update_vm_type(gcp_vm.name, "#{gcp_vm.location}-a", gcp_vm.display_size)
 
     when_update_storage_set? do
+      register_deadline(:wait, 5 * 60)
       hop_update_storage
     end
 
@@ -219,7 +233,6 @@ class Prog::GcpVm::Nexus < Prog::Base
 
   label def destroy
     DB.transaction do
-      gcp_vm.update(display_state: "deleting")
       gcp_client = Hosting::GcpApis.new
       gcp_client.delete_vm(gcp_vm.name, "#{gcp_vm.location}-a")
       if gcp_vm.has_static_ipv4

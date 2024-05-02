@@ -30,7 +30,7 @@ module Option
   VmSize = Struct.new(:name, :family, :vcpu, :memory, :storage_size_gib) do
     alias_method :display_name, :name
   end
-  VmSizes = [2, 4, 8, 16, 32, 64].map {
+  VmSizes = [1, 2, 4, 8, 16, 32, 64].map {
     VmSize.new("n1-standard-#{_1}", "n1-standard", _1, _1 * 4, (_1 / 2) * 25)
   }.freeze
 
@@ -38,8 +38,8 @@ module Option
     alias_method :display_name, :name
   end
 
-  LanternSizes = [2, 4, 8, 16, 32, 64].map {
-    LanternSize.new("n1-standard-#{_1}", "n1-standard-#{_1}", "n1-standard", _1, _1 * 4, (_1 / 2) * 128)
+  LanternSizes = [1, 2, 4, 8, 16, 32, 64].map {
+    LanternSize.new("n1-standard-#{_1}", "n1-standard-#{_1}", "n1-standard", _1, _1 * 4, _1 * 64)
   }.freeze
 
   LanternHaOption = Struct.new(:name, :standby_count, :title, :explanation)

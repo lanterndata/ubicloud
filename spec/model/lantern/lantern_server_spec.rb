@@ -47,31 +47,65 @@ RSpec.describe LanternServer do
       expect(lantern_server.display_state).to eq("updating")
     end
 
+    it "shows updating if init_sql" do
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "init_sql")).at_least(:once)
+      expect(lantern_server.display_state).to eq("updating")
+    end
+
     it "shows running" do
+      expect(lantern_server.vm).to receive(:display_state).and_return("running").at_least(:once)
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait")).at_least(:once)
       expect(lantern_server.display_state).to eq("running")
     end
 
     it "shows deleting" do
+      expect(lantern_server.vm).to receive(:display_state).and_return("running").at_least(:once)
       expect(lantern_server).to receive(:destroy_set?).and_return(false).at_least(:once)
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "destroy")).at_least(:once)
       expect(lantern_server.display_state).to eq("deleting")
     end
 
     it "shows deleting if destroy set" do
+      expect(lantern_server.vm).to receive(:display_state).and_return("running").at_least(:once)
       expect(lantern_server).to receive(:destroy_set?).and_return(true).at_least(:once)
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "unknown")).at_least(:once)
       expect(lantern_server.display_state).to eq("deleting")
     end
 
     it "shows unavailable" do
+      expect(lantern_server.vm).to receive(:display_state).and_return("running").at_least(:once)
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait_db_available")).at_least(:once)
       expect(lantern_server.display_state).to eq("unavailable")
     end
 
     it "shows creating" do
+      expect(lantern_server.vm).to receive(:display_state).and_return("running").at_least(:once)
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "unknown")).at_least(:once)
       expect(lantern_server.display_state).to eq("creating")
+    end
+
+    it "shows starting" do
+      expect(lantern_server.vm).to receive(:display_state).and_return("starting").at_least(:once)
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "unknown")).at_least(:once)
+      expect(lantern_server.display_state).to eq("starting")
+    end
+
+    it "shows stopping" do
+      expect(lantern_server.vm).to receive(:display_state).and_return("stopping").at_least(:once)
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "unknown")).at_least(:once)
+      expect(lantern_server.display_state).to eq("stopping")
+    end
+
+    it "shows stopped" do
+      expect(lantern_server.vm).to receive(:display_state).and_return("stopped").at_least(:once)
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "unknown")).at_least(:once)
+      expect(lantern_server.display_state).to eq("stopped")
+    end
+
+    it "shows failed" do
+      expect(lantern_server.vm).to receive(:display_state).and_return("failed").at_least(:once)
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "unknown")).at_least(:once)
+      expect(lantern_server.display_state).to eq("failed")
     end
   end
 
@@ -456,6 +490,7 @@ RSpec.describe LanternServer do
         reading_chg: Time.now - 30
       }
 
+      expect(lantern_server).to receive(:display_state).and_return("running")
       expect(lantern_server).not_to receive(:incr_checkup)
       lantern_server.check_pulse(session: session, previous_pulse: pulse)
     end
@@ -470,6 +505,7 @@ RSpec.describe LanternServer do
         reading_chg: Time.now - 30
       }
 
+      expect(lantern_server).to receive(:display_state).and_return("running")
       expect(lantern_server).to receive(:primary?).and_return(true)
       expect(lantern_server).not_to receive(:incr_checkup)
       lantern_server.check_pulse(session: session, previous_pulse: pulse)
@@ -485,8 +521,22 @@ RSpec.describe LanternServer do
         reading_chg: Time.now - 30
       }
 
+      expect(lantern_server).to receive(:display_state).and_return("running")
       expect(session[:db_connection]).to receive(:[]).and_raise(Sequel::DatabaseConnectionError)
       expect(lantern_server).to receive(:incr_checkup)
+      lantern_server.check_pulse(session: session, previous_pulse: pulse)
+    end
+
+    it "does not check the pulse if not running" do
+      session = {
+        db_connection: instance_double(Sequel::Postgres::Database)
+      }
+      pulse = {
+        reading: "down",
+        reading_rpt: 5,
+        reading_chg: Time.now - 30
+      }
+      expect(lantern_server).to receive(:display_state).and_return("stopped")
       lantern_server.check_pulse(session: session, previous_pulse: pulse)
     end
   end

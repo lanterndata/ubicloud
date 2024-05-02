@@ -54,7 +54,7 @@ class Prog::Lantern::LanternTimelineNexus < Prog::Base
 
     if lantern_timeline.need_cleanup?
       retain_after = (Time.new - (24 * 60 * 60 * Config.backup_retention_days)).strftime("%Y-%m-%dT%H:%M:%S.%LZ")
-      cmd = "docker compose -f /var/lib/lantern/docker-compos.yaml exec -T -u root postgresql bash -c \"GOOGLE_APPLICATION_CREDENTIALS=/tmp/google-application-credentials-wal-g.json /opt/bitnami/postgresql/bin/wal-g delete retain FULL 7 --after #{retain_after} --confirm\""
+      cmd = "docker compose -f /var/lib/lantern/docker-compose.yaml exec -T -u root postgresql bash -c \"GOOGLE_APPLICATION_CREDENTIALS=/tmp/google-application-credentials-wal-g.json /opt/bitnami/postgresql/bin/wal-g delete retain FULL 7 --after #{retain_after} --confirm\""
       lantern_timeline.leader.vm.sshable.cmd("common/bin/daemonizer '#{cmd}' delete_old_backups")
     end
 
@@ -85,12 +85,6 @@ class Prog::Lantern::LanternTimelineNexus < Prog::Base
   label def destroy
     decr_destroy
     destroy_blob_storage
-    if !lantern_timeline.children.empty?
-      lantern_timeline.children.map do |timeline|
-        timeline.parent_id = nil
-        timeline.save_changes
-      end
-    end
     lantern_timeline.destroy
     pop "lantern timeline is deleted"
   end

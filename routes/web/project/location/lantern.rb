@@ -40,8 +40,6 @@ class CloverWeb
       r.post "update-extension" do
         Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
 
-        pg.representative_server.incr_update_rhizome
-
         if r.params["lantern_version"] != pg.representative_server.lantern_version
           pg.representative_server.update(lantern_version: r.params["lantern_version"])
           pg.representative_server.incr_update_lantern_extension
@@ -59,7 +57,6 @@ class CloverWeb
         Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
 
         pg.representative_server.update(lantern_version: r.params["img_lantern_version"] || pg.representative_server.lantern_version, extras_version: r.params["img_extras_version"] || pg.representative_server.extras_version, minor_version: r.params["img_minor_version"] || pg.representative_server.minor_version)
-        pg.representative_server.incr_update_rhizome
         pg.representative_server.incr_update_image
         r.redirect "#{@project.path}#{pg.path}"
       end
