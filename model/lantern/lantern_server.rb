@@ -59,6 +59,11 @@ class LanternServer < Sequel::Model
     return "domain setup" if strand.label.include?("domain")
     return "ssl setup" if strand.label.include?("setup_ssl")
     return "updating" if strand.label.include?("update")
+    return "updating" if strand.label.include?("init_sql")
+    return "stopped" if vm.display_state.include?("stopped")
+    return "stopping" if vm.display_state.include?("stopping")
+    return "starting" if vm.display_state.include?("starting")
+    return "failed" if vm.display_state.include?("failed")
     return "unavailable" if strand.label.include?("wait_db_available")
     return "running" if ["wait"].include?(strand.label)
     return "deleting" if destroy_set? || strand.label == "destroy"
@@ -147,6 +152,11 @@ class LanternServer < Sequel::Model
   end
 
   def check_pulse(session:, previous_pulse:)
+    if display_state != "running"
+      # if there's an operation ongoing, do not check the pulse
+      return previous_pulse
+    end
+
     reading = begin
       session[:db_connection] ||= Sequel.connect(connection_string)
       lsn_function = primary? ? "pg_current_wal_lsn()" : "pg_last_wal_receive_lsn()"

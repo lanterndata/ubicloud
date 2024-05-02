@@ -13,6 +13,8 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       ubid: "6ae7e513-c34a-8039-a72a-7be45b53f2a0",
       id: "6ae7e513-c34a-8039-a72a-7be45b53f2a0",
       domain: nil,
+      lantern_version: "0.2.5",
+      extras_version: "0.1.5",
       resource: instance_double(LanternResource,
         org_id: 0,
         name: "test",
@@ -329,23 +331,34 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
   describe "#wait_recovery_completion" do
     it "hop to wait if recovery finished" do
-      expect(lantern_server).to receive(:run_query).and_return("t", "paused", "")
+      expect(lantern_server).to receive(:run_query).and_return("t", "paused", "t", lantern_server.lantern_version, lantern_server.extras_version)
       expect(lantern_server).to receive(:timeline_id=)
       expect(lantern_server).to receive(:timeline_access=).with("push")
       expect(lantern_server).to receive(:save_changes)
-      expect(lantern_server).to receive(:update_walg_creds)
       expect(Prog::Lantern::LanternTimelineNexus).to receive(:assemble).and_return(instance_double(Strand, id: "104b0033-b3f6-8214-ae27-0cd3cef18ce5"))
-      expect { nx.wait_recovery_completion }.to hop("wait")
+      expect { nx.wait_recovery_completion }.to hop("wait_timeline_available")
     end
 
     it "hop to wait if not in recovery" do
-      expect(lantern_server).to receive(:run_query).and_return("f")
+      expect(lantern_server).to receive(:run_query).and_return("f", lantern_server.lantern_version, lantern_server.extras_version)
       expect(lantern_server).to receive(:timeline_id=)
       expect(lantern_server).to receive(:timeline_access=).with("push")
       expect(lantern_server).to receive(:save_changes)
-      expect(lantern_server).to receive(:update_walg_creds)
       expect(Prog::Lantern::LanternTimelineNexus).to receive(:assemble).and_return(instance_double(Strand, id: "104b0033-b3f6-8214-ae27-0cd3cef18ce5"))
-      expect { nx.wait_recovery_completion }.to hop("wait")
+      expect { nx.wait_recovery_completion }.to hop("wait_timeline_available")
+    end
+
+    it "update extension on version mismatch" do
+      expect(lantern_server).to receive(:run_query).and_return("t", "paused", "t", "0.2.4", "0.1.4")
+      expect(lantern_server).to receive(:timeline_id=)
+      expect(lantern_server).to receive(:timeline_access=).with("push")
+      expect(lantern_server).to receive(:save_changes)
+      expect(lantern_server).to receive(:update).with(lantern_version: "0.2.4")
+      expect(lantern_server).to receive(:update).with(extras_version: "0.1.4")
+      expect(nx).to receive(:incr_update_lantern_extension)
+      expect(nx).to receive(:incr_update_extras_extension)
+      expect(Prog::Lantern::LanternTimelineNexus).to receive(:assemble).and_return(instance_double(Strand, id: "104b0033-b3f6-8214-ae27-0cd3cef18ce5"))
+      expect { nx.wait_recovery_completion }.to hop("wait_timeline_available")
     end
 
     it "nap 5" do
@@ -623,6 +636,21 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect { nx.wait }.to hop("update_rhizome")
     end
 
+    it "hops to update_rhizome if update lantern set" do
+      nx.incr_update_lantern_extension
+      expect { nx.wait }.to hop("update_rhizome")
+    end
+
+    it "hops to update_rhizome if update extras set" do
+      nx.incr_update_extras_extension
+      expect { nx.wait }.to hop("update_rhizome")
+    end
+
+    it "hops to update_rhizome if update image set" do
+      nx.incr_update_image
+      expect { nx.wait }.to hop("update_rhizome")
+    end
+
     it "hops to destroy" do
       nx.incr_destroy
       expect { nx.wait }.to hop("destroy")
@@ -659,7 +687,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
   describe "#destroy" do
     it "destroys lantern_server and vm" do
       expect(lantern_server.vm).to receive(:incr_destroy).at_least(:once)
-      expect(lantern_server.timeline).to receive(:incr_destroy).at_least(:once)
+      expect(lantern_server).to receive(:primary?).and_return(false)
       expect(lantern_server).to receive(:domain).and_return(nil)
       expect(lantern_server).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "lantern server was deleted"})
@@ -667,6 +695,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
     it "destroys lantern_server, vm and domain" do
       expect(lantern_server.vm).to receive(:incr_destroy).at_least(:once)
+      expect(lantern_server).to receive(:primary?).and_return(true)
       expect(lantern_server.timeline).to receive(:incr_destroy).at_least(:once)
       expect(lantern_server).to receive(:domain).and_return("example.com")
       expect(nx).to receive(:destroy_domain)
@@ -751,14 +780,12 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
   describe "#unavailable" do
     it "naps if restarting" do
-      expect(nx).to receive(:register_deadline)
       expect(nx).to receive(:reap)
       expect(nx.strand).to receive(:children).and_return([instance_double(Strand, prog: "Lantern::LanternServerNexus", label: "restart")])
       expect { nx.unavailable }.to nap(5)
     end
 
     it "hops to wait if available" do
-      expect(nx).to receive(:register_deadline)
       expect(nx).to receive(:reap)
       expect(nx).to receive(:available?).and_return(true)
       expect(nx).to receive(:decr_checkup)
@@ -766,7 +793,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
 
     it "hops to wait if available and resolves page" do
-      expect(nx).to receive(:register_deadline)
       expect(nx).to receive(:reap)
       expect(nx).to receive(:available?).and_return(true)
       expect(nx).to receive(:decr_checkup)
@@ -777,7 +803,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
 
     it "buds restart" do
-      expect(nx).to receive(:register_deadline)
       expect(nx).to receive(:reap)
       expect(nx).to receive(:available?).and_return(false)
       expect(nx).to receive(:bud).with(described_class, {}, :restart)
@@ -787,7 +812,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
 
     it "naps if already alerted" do
-      expect(nx).to receive(:register_deadline)
       expect(nx).to receive(:reap)
       expect(nx).to receive(:available?).and_return(false)
       page = instance_double(Page)
@@ -824,6 +848,20 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.resource).to receive(:ubid)
       expect(Prog::PageNexus).to receive(:assemble_with_logs).at_least(:once)
       expect { nx.prewarm_indexes }.to exit({"msg" => "lantern index prewarm failed"})
+    end
+  end
+
+  describe "#wait_timeline_available" do
+    it "naps if timeline is not ready" do
+      expect(lantern_server).to receive(:timeline).and_return(instance_double(LanternTimeline, strand: instance_double(Strand, label: "start")))
+      expect { nx.wait_timeline_available }.to nap(10)
+    end
+
+    it "hops to wait_db_available" do
+      expect(lantern_server).to receive(:timeline).and_return(instance_double(LanternTimeline, strand: instance_double(Strand, label: "wait_leader")))
+      expect(lantern_server).to receive(:update_walg_creds)
+      expect(nx).to receive(:decr_initial_provisioning)
+      expect { nx.wait_timeline_available }.to hop("wait_db_available")
     end
   end
 end
