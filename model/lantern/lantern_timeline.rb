@@ -76,17 +76,24 @@ class LanternTimeline < Sequel::Model
 
   def backups
     blob_storage_client
-      .list_objects(Config.lantern_backup_bucket, "#{ubid}/basebackups_005/")
-      .select { _1[:key].end_with?("backup_stop_sentinel.json") }
+      .list_objects(Config.lantern_backup_bucket, "#{ubid}/basebackups_005/*_backup_stop_sentinel.json")
   end
 
   def backups_with_metadata
     storage_client = blob_storage_client
-    backups
-      .map {
-        metadata = storage_client.get_json_object(Config.lantern_backup_bucket, _1[:key])
-        {**_1, compressed_size: metadata["CompressedSize"], uncompressed_size: metadata["UncompressedSize"]}
-      }
+    mutex = Mutex.new
+    thread_count = 8
+    backup_list = backups
+    results = []
+    Array.new(thread_count) {
+      Thread.new(backup_list, results) do |backup_list, results|
+        while (backup = mutex.synchronize { backup_list.pop })
+          metadata = storage_client.get_json_object(Config.lantern_backup_bucket, backup[:key])
+          mutex.synchronize { results << {**backup, compressed_size: metadata["CompressedSize"], uncompressed_size: metadata["UncompressedSize"]} }
+        end
+      end
+    }.each(&:join)
+    results
   end
 
   def get_backup_label(key)
