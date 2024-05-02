@@ -62,7 +62,12 @@ RSpec.describe Prog::GcpVm::Nexus do
   end
 
   describe "#create_vm" do
-    it "Hops to wait_create_vm on start" do
+    it "Hops to create_vm on start" do
+      expect(nx).to receive(:register_deadline).with(:failed_provisioning, 10 * 60)
+      expect { nx.start }.to hop("create_vm")
+    end
+
+    it "Hops to wait_create_vm" do
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
       frame = {"labels" => {"parent" => "test-label"}}
@@ -71,7 +76,7 @@ RSpec.describe Prog::GcpVm::Nexus do
       expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
       expect(nx.strand).to receive(:modified!).with(:stack).at_least(:once)
       expect(nx.strand).to receive(:save_changes).at_least(:once)
-      expect { nx.start }.to hop("wait_create_vm")
+      expect { nx.create_vm }.to hop("wait_create_vm")
     end
 
     it "Naps 10 seconds if vm is not running" do
@@ -129,8 +134,6 @@ RSpec.describe Prog::GcpVm::Nexus do
 
   describe "#start_vm" do
     it "hops to wait_sshable after run" do
-      expect(gcp_vm).to receive(:update).with({display_state: "starting"})
-      expect(gcp_vm).to receive(:update).with({display_state: "running"})
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
       expect(gcp_api).to receive(:start_vm).with("dummy-vm", "us-central1-a").and_return({"status" => "DONE"})
@@ -140,7 +143,6 @@ RSpec.describe Prog::GcpVm::Nexus do
 
   describe "#stop_vm" do
     it "hops to wait after stop" do
-      expect(gcp_vm).to receive(:update).with({display_state: "stopping"})
       expect(gcp_vm).to receive(:update).with({display_state: "stopped"})
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api).at_least(:once)
@@ -156,7 +158,6 @@ RSpec.describe Prog::GcpVm::Nexus do
   describe "#destroy" do
     it "exits after run destroy" do
       expect(gcp_vm).to receive(:has_static_ipv4).and_return(false)
-      expect(gcp_vm).to receive(:update).with({display_state: "deleting"})
       expect(gcp_vm).to receive(:destroy)
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
@@ -166,7 +167,6 @@ RSpec.describe Prog::GcpVm::Nexus do
 
     it "release ip4 if exists" do
       expect(gcp_vm).to receive(:has_static_ipv4).and_return(true)
-      expect(gcp_vm).to receive(:update).with({display_state: "deleting"})
       expect(gcp_vm).to receive(:destroy)
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
@@ -179,25 +179,34 @@ RSpec.describe Prog::GcpVm::Nexus do
   describe "#wait" do
     it "hops to stop_vm" do
       expect(nx).to receive(:when_stop_vm_set?).and_yield
+      expect(nx).to receive(:register_deadline).with(:wait, 5 * 60)
+      expect(gcp_vm).to receive(:update).with(display_state: "stopping")
       expect { nx.wait }.to hop("stop_vm")
     end
 
     it "hops to start_vm" do
+      expect(nx).to receive(:register_deadline).with(:wait, 5 * 60)
+      expect(gcp_vm).to receive(:update).with(display_state: "starting")
       expect(nx).to receive(:when_start_vm_set?).and_yield
       expect { nx.wait }.to hop("start_vm")
     end
 
     it "hops to destroy" do
+      expect(gcp_vm).to receive(:update).with(display_state: "deleting")
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect { nx.wait }.to hop("destroy")
     end
 
     it "hops to update_storage" do
+      expect(nx).to receive(:register_deadline).with(:wait, 5 * 60)
+      expect(gcp_vm).to receive(:update).with(display_state: "updating")
       expect(nx).to receive(:when_update_storage_set?).and_yield
       expect { nx.wait }.to hop("update_storage")
     end
 
     it "hops to update_size" do
+      expect(nx).to receive(:register_deadline).with(:wait, 5 * 60)
+      expect(gcp_vm).to receive(:update).with(display_state: "updating")
       expect(nx).to receive(:when_update_size_set?).and_yield
       expect { nx.wait }.to hop("update_size")
     end
@@ -266,6 +275,13 @@ RSpec.describe Prog::GcpVm::Nexus do
       sshable = instance_double(Sshable, host: "1.1.1.1")
       expect(gcp_vm).to receive(:sshable).and_return(sshable)
       expect(nx.host).to eq("1.1.1.1")
+    end
+
+    describe "#failed_provisioning" do
+      it "updates display state" do
+        expect(gcp_vm).to receive(:update).with(display_state: "failed")
+        expect { nx.failed_provisioning }.to hop("wait")
+      end
     end
   end
 end

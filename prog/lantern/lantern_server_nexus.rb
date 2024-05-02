@@ -111,7 +111,10 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
 
   label def wait_bootstrap_rhizome
     reap
-    hop_setup_docker_stack if leaf?
+    if leaf?
+      register_deadline(:wait, 10 * 60)
+      hop_setup_docker_stack
+    end
     donate
   end
 
@@ -119,8 +122,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     if !Config.gcp_creds_gcr_b64
       raise "GCP_CREDS_GCR_B64 is required to setup docker stack for Lantern"
     end
-
-    register_deadline(:wait, 10 * 60)
 
     case vm.sshable.cmd("common/bin/daemonizer --check configure_lantern")
     when "Succeeded"
@@ -137,8 +138,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   end
 
   label def init_sql
-    register_deadline(:wait, 40 * 60)
-
     case vm.sshable.cmd("common/bin/daemonizer --check init_sql")
     when "Succeeded"
       vm.sshable.cmd("common/bin/daemonizer --clean init_sql")
@@ -190,12 +189,30 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       lantern_server.timeline_access = "push"
       lantern_server.save_changes
 
-      lantern_server.update_walg_creds
+      lantern_version = lantern_server.run_query("SELECT extversion FROM pg_extension WHERE extname='lantern'")
+      extras_version = lantern_server.run_query("SELECT extversion FROM pg_extension WHERE extname='lantern_extras'")
 
-      hop_wait
+      if lantern_version != lantern_server.lantern_version
+        incr_update_lantern_extension
+        lantern_server.update(lantern_version: lantern_version)
+      end
+
+      if extras_version != lantern_server.extras_version
+        incr_update_extras_extension
+        lantern_server.update(extras_version: extras_version)
+      end
+
+      hop_wait_timeline_available
     end
 
     nap 5
+  end
+
+  label def wait_timeline_available
+    nap 10 if lantern_server.timeline.strand.label != "wait_leader"
+    lantern_server.update_walg_creds
+    decr_initial_provisioning
+    hop_wait_db_available
   end
 
   label def wait_db_available
@@ -204,7 +221,10 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     when_initial_provisioning_set? do
       decr_initial_provisioning
 
-      hop_init_sql if lantern_server.primary?
+      if lantern_server.primary?
+        register_deadline(:wait, 40 * 60)
+        hop_init_sql
+      end
       hop_wait_catch_up if lantern_server.standby?
       hop_wait_recovery_completion
     end
@@ -222,6 +242,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     when "Succeeded"
       vm.sshable.cmd("common/bin/daemonizer --clean update_lantern")
       decr_update_lantern_extension
+      register_deadline(:wait, 40 * 60)
       hop_init_sql
     when "NotStarted"
       vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/update_lantern' update_lantern", stdin: JSON.generate({version: lantern_server.lantern_version}))
@@ -241,6 +262,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     when "Succeeded"
       vm.sshable.cmd("common/bin/daemonizer --clean update_extras")
       decr_update_extras_extension
+      register_deadline(:wait, 40 * 60)
       hop_init_sql
     when "NotStarted"
       vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/update_extras' update_extras", stdin: JSON.generate({version: lantern_server.extras_version}))
@@ -290,6 +312,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     end
 
     decr_add_domain
+    register_deadline(:wait, 5 * 60)
     hop_setup_ssl
   end
 
@@ -299,7 +322,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   end
 
   label def setup_ssl
-    register_deadline(:wait, 5 * 60)
     case vm.sshable.cmd("common/bin/daemonizer --check setup_ssl")
     when "Succeeded"
       vm.sshable.cmd("common/bin/daemonizer --clean setup_ssl")
@@ -351,8 +373,11 @@ SQL
     reap
 
     when_checkup_set? do
-      hop_unavailable if !available?
       decr_checkup
+      if !available?
+        register_deadline(:wait, 5 * 60)
+        hop_unavailable
+      end
     end
 
     when_update_user_password_set? do
@@ -379,6 +404,20 @@ SQL
       hop_add_domain
     end
 
+    # We will always update rhizome before updating extensions
+    # In case something is changed in rhizome scripts
+    when_update_lantern_extension_set? do
+      hop_update_rhizome
+    end
+
+    when_update_extras_extension_set? do
+      hop_update_rhizome
+    end
+
+    when_update_image_set? do
+      hop_update_rhizome
+    end
+
     when_update_rhizome_set? do
       hop_update_rhizome
     end
@@ -395,8 +434,6 @@ SQL
   end
 
   label def unavailable
-    register_deadline(:wait, 5 * 60)
-
     # TODO
     # if postgres_server.primary? && (standby = postgres_server.failover_target)
     #   standby.incr_take_over
@@ -442,7 +479,9 @@ SQL
         destroy_domain
       end
 
-      lantern_server.timeline.incr_destroy
+      if lantern_server.primary?
+        lantern_server.timeline.incr_destroy
+      end
       lantern_server.destroy
 
       vm.incr_destroy

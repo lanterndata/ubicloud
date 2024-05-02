@@ -40,7 +40,7 @@ class LanternResource < Sequel::Model
   end
 
   def display_state
-    representative_server&.display_state || "unavailable"
+    super || representative_server&.display_state || "unavailable"
   end
 
   def connection_string

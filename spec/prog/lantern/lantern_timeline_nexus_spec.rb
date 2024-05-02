@@ -96,7 +96,7 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
       expect(lantern_server.timeline).to receive(:need_cleanup?).and_return(true)
       expect(timeline).to receive(:leader).and_return(lantern_server)
       (Time.new - (24 * 60 * 60 * Config.backup_retention_days)).strftime("%Y-%m-%dT%H:%M:%S.%LZ")
-      expect(lantern_server.vm.sshable).to receive(:cmd).with(a_string_matching("common/bin/daemonizer 'docker compose -f /var/lib/lantern/docker-compos.yaml exec -T -u root postgresql bash -c"))
+      expect(lantern_server.vm.sshable).to receive(:cmd).with(a_string_matching("common/bin/daemonizer 'docker compose -f /var/lib/lantern/docker-compose.yaml exec -T -u root postgresql bash -c"))
       expect(lantern_server.timeline).to receive(:backups).and_return([{last_modified: Time.now - 1 * 24 * 60 * 60}])
       expect(lantern_server.timeline).to receive(:leader).and_return(lantern_server)
       expect { nx.wait }.to nap(20 * 60)
@@ -166,22 +166,8 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
   end
 
   describe "#destroy" do
-    it "removes parent from children and exit with message" do
-      expect(lantern_server.timeline).to receive(:destroy)
-      child = instance_double(LanternTimeline, parent_id: "test")
-      children = [child]
-      api = instance_double(Hosting::GcpApis)
-      allow(api).to receive(:remove_service_account)
-      allow(Hosting::GcpApis).to receive(:new).and_return(api)
-      expect(child).to receive(:parent_id=).with(nil)
-      expect(child).to receive(:save_changes)
-      expect(lantern_server.timeline).to receive(:children).and_return(children).twice
-      expect { nx.destroy }.to exit({"msg" => "lantern timeline is deleted"})
-    end
-
     it "exits with message without deleting sa" do
       expect(lantern_server.timeline).to receive(:destroy)
-      expect(lantern_server.timeline).to receive(:children).and_return([])
       expect(lantern_server.timeline).to receive(:service_account_name).and_return(nil)
       expect { nx.destroy }.to exit({"msg" => "lantern timeline is deleted"})
     end
@@ -191,7 +177,6 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
       allow(api).to receive(:remove_service_account)
       allow(Hosting::GcpApis).to receive(:new).and_return(api)
       expect(lantern_server.timeline).to receive(:destroy)
-      expect(lantern_server.timeline).to receive(:children).and_return([])
       expect { nx.destroy }.to exit({"msg" => "lantern timeline is deleted"})
     end
   end

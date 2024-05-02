@@ -168,6 +168,21 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(Prog::Lantern::LanternServerNexus).to receive(:assemble)
       expect { nx.wait }.to nap(30)
     end
+
+    it "updates display_state" do
+      expect(lantern_resource).to receive(:required_standby_count).and_return(0)
+      expect(lantern_resource).to receive(:display_state).and_return("failed")
+      expect(lantern_resource).to receive(:servers).and_return([instance_double(LanternServer, strand: instance_double(Strand, label: "wait"))]).at_least(:once)
+      expect(lantern_resource).to receive(:update).with(display_state: nil)
+      expect { nx.wait }.to nap(30)
+    end
+
+    it "does not updates display_state" do
+      expect(lantern_resource).to receive(:required_standby_count).and_return(0)
+      expect(lantern_resource).to receive(:display_state).and_return("failed")
+      expect(lantern_resource).to receive(:servers).and_return([instance_double(LanternServer, strand: instance_double(Strand, label: "unavailable"))]).at_least(:once)
+      expect { nx.wait }.to nap(30)
+    end
   end
 
   describe "#destroy" do
@@ -180,6 +195,13 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(lantern_resource).to receive(:destroy)
 
       expect { nx.destroy }.to exit({"msg" => "lantern resource is deleted"})
+    end
+  end
+
+  describe "#failed_provisioning" do
+    it "updates display state" do
+      expect(lantern_resource).to receive(:update).with(display_state: "failed")
+      expect { nx.failed_provisioning }.to hop("wait")
     end
   end
 end

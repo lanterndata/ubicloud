@@ -31,11 +31,6 @@ class GcpVm < Sequel::Model
     sshable&.host
   end
 
-  def display_state
-    return "deleting" if destroy_set?
-    super
-  end
-
   def mem_gib_ratio
     return 3.2 if arch == "arm64"
     8

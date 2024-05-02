@@ -34,11 +34,6 @@ RSpec.describe GcpVm do
       expect(gcp_vm.display_state).to be_nil
     end
 
-    it ".display_state when destroy set" do
-      expect(gcp_vm).to receive(:destroy_set?).and_return(true)
-      expect(gcp_vm.display_state).to eq("deleting")
-    end
-
     it ".mem_gib_ratio x64" do
       expect(gcp_vm).to receive(:arch).and_return("amd64")
       expect(gcp_vm.mem_gib_ratio).to eq(8)
