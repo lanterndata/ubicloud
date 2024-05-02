@@ -179,14 +179,14 @@ RSpec.describe Hosting::GcpApis do
     describe "#list_objects" do
       it "throws error from response" do
         stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
-        stub_request(:get, "https://storage.googleapis.com/storage/v1/b/test/o?prefix=test").to_return(status: 200, body: JSON.dump({error: {errors: [{message: "test error"}]}}), headers: {"Content-Type" => "application/json"})
+        stub_request(:get, "https://storage.googleapis.com/storage/v1/b/test/o?delimiter=/&matchGlob=test").to_return(status: 200, body: JSON.dump({error: {errors: [{message: "test error"}]}}), headers: {"Content-Type" => "application/json"})
         api = described_class.new
         expect { api.list_objects("test", "test") }.to raise_error "test error"
       end
 
       it "returns empty array" do
         stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
-        stub_request(:get, "https://storage.googleapis.com/storage/v1/b/test/o?prefix=test").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:get, "https://storage.googleapis.com/storage/v1/b/test/o?delimiter=/&matchGlob=test").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
         api = described_class.new
         expect(api.list_objects("test", "test")).to eq([])
       end
@@ -194,7 +194,7 @@ RSpec.describe Hosting::GcpApis do
       it "maps object names" do
         stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
         t = Time.new
-        stub_request(:get, "https://storage.googleapis.com/storage/v1/b/test/o?prefix=test").to_return(status: 200, body: JSON.dump({items: [{name: "test1", updated: t}, {name: "test2", updated: t}]}), headers: {"Content-Type" => "application/json"})
+        stub_request(:get, "https://storage.googleapis.com/storage/v1/b/test/o?delimiter=/&matchGlob=test").to_return(status: 200, body: JSON.dump({items: [{name: "test1", updated: t}, {name: "test2", updated: t}]}), headers: {"Content-Type" => "application/json"})
         api = described_class.new
         t_str = Time.new JSON.parse(JSON.dump(t))
         expect(api.list_objects("test", "test")).to eq([{key: "test1", last_modified: t_str}, {key: "test2", last_modified: t_str}])
