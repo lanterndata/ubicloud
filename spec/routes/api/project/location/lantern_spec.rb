@@ -175,6 +175,18 @@ RSpec.describe Clover, "lantern" do
     end
 
     describe "delete" do
+      it "does not delete instance if has forks" do
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        query_res = class_double(LanternResource, first: pg)
+        allow(query_res).to receive(:where).and_return(query_res)
+        expect(project).to receive(:lantern_resources_dataset).and_return(query_res)
+        expect(pg).to receive(:forks).and_return([instance_double(LanternResource)])
+
+        delete "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1"
+        expect(last_response.status).to eq(409)
+        expect(JSON.parse(last_response.body)).to eq({"error" => "Can not delete resource which has active forks"})
+      end
+
       it "deletes instance" do
         delete "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1"
         expect(last_response.status).to eq(200)
@@ -282,7 +294,7 @@ RSpec.describe Clover, "lantern" do
 
         post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/push-backup"
         expect(last_response.status).to eq(409)
-        expect(last_response.body).to eq("Another backup is in progress please try again later")
+        expect(JSON.parse(last_response.body)).to eq({"error" => "Another backup is in progress please try again later"})
       end
 
       it "fails to create new backup with unknown" do
@@ -294,6 +306,18 @@ RSpec.describe Clover, "lantern" do
 
         post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/push-backup"
         expect(last_response.status).to eq(400)
+      end
+    end
+
+    describe "dissociate-forks" do
+      it "dissociate-forkses" do
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        query_res = class_double(LanternResource, first: pg)
+        allow(query_res).to receive(:where).and_return(query_res)
+        expect(project).to receive(:lantern_resources_dataset).and_return(query_res)
+        expect(pg).to receive(:dissociate_forks)
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/dissociate-forks"
+        expect(last_response.status).to eq(200)
       end
     end
   end
