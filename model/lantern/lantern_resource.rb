@@ -16,6 +16,7 @@ class LanternResource < Sequel::Model
 
   include ResourceMethods
   include SemaphoreMethods
+  include DisplayStatusMethods
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
 

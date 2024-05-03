@@ -112,17 +112,11 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
 
   label def start
     nap 5 unless representative_server.vm.strand.label == "wait"
-    # TODO fix
-    # register_deadline(:failed_provisioning, 10 * 60)
+    register_deadline(:wait, 10 * 60)
     # bud self.class, frame, :trigger_pg_current_xact_id_on_parent if lantern_resource.parent
 
     # hop_wait_trigger_pg_current_xact_id_on_parent
     hop_wait_servers
-  end
-
-  label def failed_provisioning
-    lantern_resource.update(display_state: "failed")
-    hop_wait
   end
 
   # TODO:: check why is this needed
@@ -138,6 +132,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   # end
 
   label def wait_servers
+    lantern_resource.set_failed_on_deadline
     nap 5 if servers.any? { _1.strand.label != "wait" }
     hop_wait
   end
@@ -148,7 +143,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
       Prog::Lantern::LanternServerNexus.assemble(resource_id: lantern_resource.id, timeline_id: lantern_resource.timeline.id, timeline_access: "fetch")
     end
 
-    if lantern_resource.display_state == "failed" && servers.any? { _1.strand.label == "wait" }
+    if lantern_resource.display_state == "failed"
       lantern_resource.update(display_state: nil)
     end
 

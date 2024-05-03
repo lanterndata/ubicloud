@@ -63,7 +63,7 @@ RSpec.describe Prog::GcpVm::Nexus do
 
   describe "#create_vm" do
     it "Hops to create_vm on start" do
-      expect(nx).to receive(:register_deadline).with(:failed_provisioning, 10 * 60)
+      expect(nx).to receive(:register_deadline).with(:wait, 10 * 60)
       expect { nx.start }.to hop("create_vm")
     end
 
@@ -76,6 +76,7 @@ RSpec.describe Prog::GcpVm::Nexus do
       expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
       expect(nx.strand).to receive(:modified!).with(:stack).at_least(:once)
       expect(nx.strand).to receive(:save_changes).at_least(:once)
+      expect(gcp_vm).to receive(:strand).and_return(instance_double(Strand, prog: "GcpVm", stack: [{}])).at_least(:once)
       expect { nx.create_vm }.to hop("wait_create_vm")
     end
 
@@ -83,6 +84,7 @@ RSpec.describe Prog::GcpVm::Nexus do
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
       expect(gcp_api).to receive(:get_vm).with("dummy-vm", "us-central1-a").and_return({"status" => "PROVISIONING"})
+      expect(gcp_vm).to receive(:strand).and_return(instance_double(Strand, prog: "GcpVm", stack: [{}])).at_least(:once)
       expect { nx.wait_create_vm }.to nap(10)
     end
 
@@ -91,6 +93,7 @@ RSpec.describe Prog::GcpVm::Nexus do
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
       expect(gcp_api).to receive(:get_vm).with("dummy-vm", "us-central1-a").and_return({"status" => "RUNNING"})
       expect(gcp_api).to receive(:create_static_ipv4).with("dummy-vm", "us-central1").and_return({})
+      expect(gcp_vm).to receive(:strand).and_return(instance_double(Strand, prog: "GcpVm", stack: [{}])).at_least(:once)
       expect { nx.wait_create_vm }.to hop("wait_ipv4")
     end
 
@@ -275,13 +278,6 @@ RSpec.describe Prog::GcpVm::Nexus do
       sshable = instance_double(Sshable, host: "1.1.1.1")
       expect(gcp_vm).to receive(:sshable).and_return(sshable)
       expect(nx.host).to eq("1.1.1.1")
-    end
-
-    describe "#failed_provisioning" do
-      it "updates display state" do
-        expect(gcp_vm).to receive(:update).with(display_state: "failed")
-        expect { nx.failed_provisioning }.to hop("wait")
-      end
     end
   end
 end

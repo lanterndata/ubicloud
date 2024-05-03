@@ -13,9 +13,9 @@ if (suite = ENV.delete("COVERAGE"))
     # rhizome (dataplane) and controlplane should have separate coverage reports.
     # They will have different coverage suites in future.
     add_filter "/rhizome"
-    add_filter "/misc"
 
     # No need to check coverage for them
+    add_filter "/misc"
     add_filter "/migrate/"
     add_filter "/spec/"
     add_filter "/db.rb"

@@ -136,6 +136,14 @@ module HealthMonitorMethods
   end
 end
 
+module DisplayStatusMethods
+  def set_failed_on_deadline
+    if display_state != "failed" && Page.from_tag_parts("Deadline", id, strand.prog, strand.stack.first["deadline_target"])
+      update(display_state: "failed")
+    end
+  end
+end
+
 if (level = Config.database_logger_level)
   require "logger"
   DB.loggers << Logger.new($stdout, level: level)

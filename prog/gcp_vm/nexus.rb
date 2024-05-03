@@ -78,6 +78,7 @@ class Prog::GcpVm::Nexus < Prog::Base
   end
 
   label def wait_create_vm
+    gcp_vm.set_failed_on_deadline
     gcp_client = Hosting::GcpApis.new
     vm = gcp_client.get_vm(gcp_vm.name, "#{gcp_vm.location}-a")
     if vm["status"] == "RUNNING"
@@ -90,11 +91,12 @@ class Prog::GcpVm::Nexus < Prog::Base
   end
 
   label def start
-    register_deadline(:failed_provisioning, 10 * 60)
+    register_deadline(:wait, 10 * 60)
     hop_create_vm
   end
 
   label def create_vm
+    gcp_vm.set_failed_on_deadline
     gcp_client = Hosting::GcpApis.new
     labels = frame["labels"]
     gcp_client.create_vm(gcp_vm.name, "#{gcp_vm.location}-a", gcp_vm.boot_image, gcp_vm.public_key, gcp_vm.unix_user, "#{gcp_vm.family}-#{gcp_vm.cores}", gcp_vm.storage_size_gib, labels: labels)
@@ -106,11 +108,6 @@ class Prog::GcpVm::Nexus < Prog::Base
     strand.save_changes
 
     hop_wait_create_vm
-  end
-
-  label def failed_provisioning
-    gcp_vm.update(display_state: "failed")
-    hop_wait
   end
 
   label def wait_sshable

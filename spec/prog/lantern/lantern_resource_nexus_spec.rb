@@ -197,11 +197,4 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect { nx.destroy }.to exit({"msg" => "lantern resource is deleted"})
     end
   end
-
-  describe "#failed_provisioning" do
-    it "updates display state" do
-      expect(lantern_resource).to receive(:update).with(display_state: "failed")
-      expect { nx.failed_provisioning }.to hop("wait")
-    end
-  end
 end
