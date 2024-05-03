@@ -5,6 +5,7 @@ class Serializers::Api::Lantern < Serializers::Base
     {
       id: pg.id,
       ubid: pg.ubid,
+      parent_id: pg.parent_id,
       path: pg.path,
       name: pg.name,
       state: pg.display_state,
