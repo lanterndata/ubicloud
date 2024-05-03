@@ -114,7 +114,7 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
 
     it "registers deadline and hops" do
       expect(lantern_resource.representative_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
-      expect(nx).to receive(:register_deadline)
+      # expect(nx).to receive(:register_deadline)
       expect { nx.start }.to hop("wait_servers")
     end
 

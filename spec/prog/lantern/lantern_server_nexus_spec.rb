@@ -828,22 +828,41 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
   end
 
   describe "#prewarm_indexes" do
-    it "calls prewarm and exits" do
-      expect(lantern_server).to receive(:prewarm_indexes)
-      expect(Page).to receive(:from_tag_parts).at_least(:once)
-      expect { nx.prewarm_indexes }.to exit({"msg" => "lantern index prewarm success"})
+    it "naps if in progress" do
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check prewarm_indexes").and_return("InProgress")
+      expect { nx.prewarm_indexes }.to nap(30)
     end
 
-    it "calls prewarm, resolves page and exits" do
-      expect(lantern_server).to receive(:prewarm_indexes)
+    it "calls prewarm if not started" do
+      expect(lantern_server).to receive(:prewarm_indexes_query).and_return("test").at_least(:once)
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check prewarm_indexes").and_return("NotStarted")
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/exec_all' prewarm_indexes", stdin: lantern_server.prewarm_indexes_query)
+      expect { nx.prewarm_indexes }.to nap(30)
+    end
+
+    it "cleans and resolves page" do
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check prewarm_indexes").and_return("Succeeded")
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean prewarm_indexes")
       page = instance_double(Page)
       expect(page).to receive(:incr_resolve).at_least(:once)
       expect(Page).to receive(:from_tag_parts).at_least(:once).and_return(page)
       expect { nx.prewarm_indexes }.to exit({"msg" => "lantern index prewarm success"})
     end
 
-    it "calls prewarm and creates page" do
-      expect(lantern_server).to receive(:prewarm_indexes).and_raise
+    it "cleans and exits" do
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check prewarm_indexes").and_return("Succeeded")
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean prewarm_indexes")
+      expect(Page).to receive(:from_tag_parts).at_least(:once).and_return(nil)
+      expect { nx.prewarm_indexes }.to exit({"msg" => "lantern index prewarm success"})
+    end
+
+    it "fails and creates page" do
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check prewarm_indexes").and_return("Failed")
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --logs prewarm_indexes").and_return(JSON.generate({"stdout" => "test"}))
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean prewarm_indexes")
+      page = instance_double(Page)
+      expect(page).to receive(:incr_resolve).at_least(:once)
+      expect(Page).to receive(:from_tag_parts).at_least(:once).and_return(page)
       expect(lantern_server).to receive(:ubid)
       expect(lantern_server.resource).to receive(:ubid)
       expect(Prog::PageNexus).to receive(:assemble_with_logs).at_least(:once)
