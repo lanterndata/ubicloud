@@ -16,4 +16,8 @@ class MiscQueries
       resource.representative_server.run_query("ALTER DATABASE #{db} REFRESH COLLATION VERSION")
     end
   end
+
+  def self.active_queries(resource_name)
+    LanternResource[name: resource_name].representative_server.run_query("SELECT pid, query FROM pg_stat_activity")
+  end
 end

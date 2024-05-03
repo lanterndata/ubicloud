@@ -34,4 +34,24 @@ class MiscOperations
   def self.update_rhizome_from_local(vm, target_folder: "lantern", user: "lantern")
     update_rhizome(vm.sshable, target_folder, user)
   end
+
+  def self.docker_logs(resource_name, tail: 10)
+    LanternResource[name: resource_name].representative_server.vm.sshable.cmd("sudo docker logs lantern-postgresql-1 --tail #{tail} -f")
+  end
+
+  def self.docker_env(resource_name)
+    LanternResource[name: resource_name].representative_server.vm.sshable.cmd("sudo cat /var/lib/lantern/.env")
+  end
+
+  def self.mem_info(resource_name)
+    LanternResource[name: resource_name].representative_server.vm.sshable.cmd("free -mh")
+  end
+
+  def self.kill_query(resource_name, pid)
+    LanternResource[name: resource_name].representative_server.run_query("SELECT pg_terminate_backend(#{pid})")
+  end
+
+  def self.task_logs(resource_name, task_name)
+    LanternResource[name: resource_name].representative_server.vm.sshable.cmd("common/bin/daemonizer --logs #{task_name}")
+  end
 end
