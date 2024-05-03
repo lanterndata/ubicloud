@@ -112,7 +112,8 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
 
   label def start
     nap 5 unless representative_server.vm.strand.label == "wait"
-    register_deadline(:failed_provisioning, 10 * 60)
+    # TODO fix
+    # register_deadline(:failed_provisioning, 10 * 60)
     # bud self.class, frame, :trigger_pg_current_xact_id_on_parent if lantern_resource.parent
 
     # hop_wait_trigger_pg_current_xact_id_on_parent

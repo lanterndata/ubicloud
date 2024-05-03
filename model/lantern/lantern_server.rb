@@ -56,17 +56,17 @@ class LanternServer < Sequel::Model
   end
 
   def display_state
-    return "domain setup" if strand.label.include?("domain")
-    return "ssl setup" if strand.label.include?("setup_ssl")
-    return "updating" if strand.label.include?("update")
-    return "updating" if strand.label.include?("init_sql")
-    return "stopped" if vm.display_state.include?("stopped")
-    return "stopping" if vm.display_state.include?("stopping")
-    return "starting" if vm.display_state.include?("starting")
-    return "failed" if vm.display_state.include?("failed")
-    return "unavailable" if strand.label.include?("wait_db_available")
-    return "running" if ["wait"].include?(strand.label)
     return "deleting" if destroy_set? || strand.label == "destroy"
+    return "stopped" if vm.display_state == "stopped"
+    return "stopping" if vm.display_state == "stopping"
+    return "starting" if vm.display_state == "starting"
+    return "failed" if vm.display_state == "failed"
+    return "domain setup" if strand.label.include?("domain")
+    return "ssl setup" if strand.label == "setup_ssl"
+    return "updating" if strand.label.include?("update")
+    return "updating" if strand.label == "init_sql"
+    return "unavailable" if strand.label == "wait_db_available"
+    return "running" if strand.label == "wait"
     "creating"
   end
 
@@ -184,8 +184,8 @@ class LanternServer < Sequel::Model
     pulse
   end
 
-  def prewarm_indexes
-    query = <<SQL
+  def prewarm_indexes_query
+    <<SQL
     SELECT i.relname, pg_prewarm(i.relname::text)
 FROM pg_class t
 JOIN pg_index ix ON t.oid = ix.indrelid
@@ -194,7 +194,6 @@ JOIN pg_am a ON i.relam = a.oid
 JOIN pg_namespace n ON n.oid = i.relnamespace
 WHERE a.amname = 'lantern_hnsw';
 SQL
-    run_query_all(query)
   end
 
   # def failover_target

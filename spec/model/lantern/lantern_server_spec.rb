@@ -33,21 +33,25 @@ RSpec.describe LanternServer do
 
   describe "#display_state" do
     it "shows domain setup" do
+      expect(lantern_server.vm).to receive(:display_state).and_return("running").at_least(:once)
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "setup domain")).at_least(:once)
       expect(lantern_server.display_state).to eq("domain setup")
     end
 
     it "shows ssl setup" do
+      expect(lantern_server.vm).to receive(:display_state).and_return("running").at_least(:once)
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "setup_ssl")).at_least(:once)
       expect(lantern_server.display_state).to eq("ssl setup")
     end
 
     it "shows updating" do
+      expect(lantern_server.vm).to receive(:display_state).and_return("running").at_least(:once)
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "update_extension")).at_least(:once)
       expect(lantern_server.display_state).to eq("updating")
     end
 
     it "shows updating if init_sql" do
+      expect(lantern_server.vm).to receive(:display_state).and_return("running").at_least(:once)
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "init_sql")).at_least(:once)
       expect(lantern_server.display_state).to eq("updating")
     end
@@ -59,16 +63,13 @@ RSpec.describe LanternServer do
     end
 
     it "shows deleting" do
-      expect(lantern_server.vm).to receive(:display_state).and_return("running").at_least(:once)
       expect(lantern_server).to receive(:destroy_set?).and_return(false).at_least(:once)
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "destroy")).at_least(:once)
       expect(lantern_server.display_state).to eq("deleting")
     end
 
     it "shows deleting if destroy set" do
-      expect(lantern_server.vm).to receive(:display_state).and_return("running").at_least(:once)
       expect(lantern_server).to receive(:destroy_set?).and_return(true).at_least(:once)
-      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "unknown")).at_least(:once)
       expect(lantern_server.display_state).to eq("deleting")
     end
 
@@ -552,8 +553,7 @@ JOIN pg_am a ON i.relam = a.oid
 JOIN pg_namespace n ON n.oid = i.relnamespace
 WHERE a.amname = 'lantern_hnsw';
 SQL
-      expect(lantern_server).to receive(:run_query_all).with(query)
-      expect { lantern_server.prewarm_indexes }.not_to raise_error
+      expect(lantern_server.prewarm_indexes_query).to eq(query)
     end
   end
 end
