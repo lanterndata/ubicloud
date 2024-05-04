@@ -32,6 +32,8 @@ gem "countries"
 gem "octokit"
 gem "argon2-kdf"
 gem "googleauth"
+gem "simplecov"
+gem "simplecov-lcov"
 
 group :development do
   gem "brakeman"
@@ -47,7 +49,6 @@ group :development do
   gem "rubocop-rspec"
   gem "rubocop-sequel"
   gem "standard", ">= 1.24.3"
-  gem "simplecov"
   gem "turbo_tests"
 end
 
