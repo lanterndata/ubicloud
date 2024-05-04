@@ -113,6 +113,12 @@ RSpec.describe Clover, "lantern" do
         expect(body["postgres_password"]).to eq(pg.superuser_password)
       end
 
+      it "creates new lantern database from backup with wrong restore time" do
+        post "/api/project/#{project.ubid}/lantern", {size: "n1-standard-2", name: "instance-from-backup", org_id: 0, location: "us-central1", domain: "test.db.lantern.dev", parent_id: pg.id, restore_target: "Test" }
+
+        expect(last_response.status).to eq(400)
+      end
+
       it "creates new lantern database from backup with restore time" do
         expect(LanternResource).to receive(:[]).and_call_original.twice
         expect(LanternResource).to receive(:[]).with(pg.id).and_return(pg)

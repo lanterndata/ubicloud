@@ -30,7 +30,7 @@ class CloverApi
         Validation.validate_version(r.params["extras_version"], "extras_version")
         Validation.validate_version(r.params["minor_version"], "minor_version")
       else
-        restore_target = r.params["restore_target"].nil? ? Time.new : Time.new(r.params["restore_target"])
+        restore_target = r.params["restore_target"].nil? ? Time.new : Validation.validate_date(r.params["restore_target"])
       end
 
       domain = r.params["domain"]
