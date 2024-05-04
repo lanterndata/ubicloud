@@ -138,6 +138,13 @@ RSpec.describe LanternTimeline do
       expect(lantern_timeline.earliest_restore_time).to eq(earliest_restore + 5 * 60)
     end
 
+    it "returns earliest restore time for e2e tests" do
+      earliest_restore = Time.now
+      expect(Config).to receive(:e2e_test?).and_return(true)
+      expect(lantern_timeline).to receive(:earliest_backup_completed_at).and_return(earliest_restore)
+      expect(lantern_timeline.earliest_restore_time).to eq(earliest_restore)
+    end
+
     it "returns earliest restore time after refresh" do
       earliest_restore = Time.now
       expect(lantern_timeline).to receive(:refresh_earliest_backup_completion_time).and_return(earliest_restore)
