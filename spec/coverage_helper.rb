@@ -2,6 +2,9 @@
 
 if (suite = ENV.delete("COVERAGE"))
   require "simplecov"
+  require "simplecov-lcov"
+  SimpleCov::Formatter::LcovFormatter.config.report_with_single_file = true
+  SimpleCov.formatter = SimpleCov::Formatter::LcovFormatter
 
   SimpleCov.start do
     enable_coverage :branch
@@ -12,7 +15,9 @@ if (suite = ENV.delete("COVERAGE"))
 
     # rhizome (dataplane) and controlplane should have separate coverage reports.
     # They will have different coverage suites in future.
-    add_filter "/rhizome"
+    if !ENV.has_key?("E2E_TEST")
+      add_filter "/rhizome"
+    end
 
     # No need to check coverage for them
     add_filter "/misc"

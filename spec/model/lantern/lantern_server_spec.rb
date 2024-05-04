@@ -491,7 +491,8 @@ RSpec.describe LanternServer do
         reading_chg: Time.now - 30
       }
 
-      expect(lantern_server).to receive(:display_state).and_return("running")
+      expect(lantern_server).to receive(:destroy_set?).and_return(false)
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(lantern_server).not_to receive(:incr_checkup)
       lantern_server.check_pulse(session: session, previous_pulse: pulse)
     end
@@ -506,7 +507,8 @@ RSpec.describe LanternServer do
         reading_chg: Time.now - 30
       }
 
-      expect(lantern_server).to receive(:display_state).and_return("running")
+      expect(lantern_server).to receive(:destroy_set?).and_return(false)
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(lantern_server).to receive(:primary?).and_return(true)
       expect(lantern_server).not_to receive(:incr_checkup)
       lantern_server.check_pulse(session: session, previous_pulse: pulse)
@@ -522,13 +524,14 @@ RSpec.describe LanternServer do
         reading_chg: Time.now - 30
       }
 
-      expect(lantern_server).to receive(:display_state).and_return("running")
+      expect(lantern_server).to receive(:destroy_set?).and_return(false)
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(session[:db_connection]).to receive(:[]).and_raise(Sequel::DatabaseConnectionError)
       expect(lantern_server).to receive(:incr_checkup)
       lantern_server.check_pulse(session: session, previous_pulse: pulse)
     end
 
-    it "does not check the pulse if not running" do
+    it "does not check the pulse if destroying" do
       session = {
         db_connection: instance_double(Sequel::Postgres::Database)
       }
@@ -537,7 +540,35 @@ RSpec.describe LanternServer do
         reading_rpt: 5,
         reading_chg: Time.now - 30
       }
-      expect(lantern_server).to receive(:display_state).and_return("stopped")
+      expect(lantern_server).to receive(:destroy_set?).and_return(true)
+      lantern_server.check_pulse(session: session, previous_pulse: pulse)
+    end
+
+    it "does not check the pulse if strand label is destroy" do
+      session = {
+        db_connection: instance_double(Sequel::Postgres::Database)
+      }
+      pulse = {
+        reading: "down",
+        reading_rpt: 5,
+        reading_chg: Time.now - 30
+      }
+      expect(lantern_server).to receive(:destroy_set?).and_return(false)
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "destroy"))
+      lantern_server.check_pulse(session: session, previous_pulse: pulse)
+    end
+
+    it "does not check the pulse if strand does not exist" do
+      session = {
+        db_connection: instance_double(Sequel::Postgres::Database)
+      }
+      pulse = {
+        reading: "down",
+        reading_rpt: 5,
+        reading_chg: Time.now - 30
+      }
+      expect(lantern_server).to receive(:destroy_set?).and_return(false)
+      expect(lantern_server).to receive(:strand).and_return(nil)
       lantern_server.check_pulse(session: session, previous_pulse: pulse)
     end
   end
