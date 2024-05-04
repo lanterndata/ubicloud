@@ -121,7 +121,7 @@ class LanternTimeline < Sequel::Model
   # method at the appropriate points.
   def earliest_restore_time
     if (earliest_backup = earliest_backup_completed_at || refresh_earliest_backup_completion_time)
-      earliest_backup + 5 * 60
+      earliest_backup + (Config.e2e_test? ? 0 : 5 * 60)
     end
   end
 
