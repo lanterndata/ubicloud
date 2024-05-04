@@ -6,7 +6,7 @@ require "argon2"
 
 email = ARGV[0]
 pass = ARGV[1] || SecureRandom.urlsafe_base64(15)
-project_id = UBID.parse(ARGV[2]).to_uuid || Project.generate_ubid.to_uuid
+project_id = ARGV[2] ? UBID.parse(ARGV[2]).to_uuid : Project.generate_ubid.to_uuid
 
 account = Account[email: email]
 

@@ -268,6 +268,7 @@ GEM
       simplecov-html (~> 0.11)
       simplecov_json_formatter (~> 0.1)
     simplecov-html (0.12.3)
+    simplecov-lcov (0.8.0)
     simplecov_json_formatter (0.1.4)
     smart_properties (1.17.0)
     standard (1.35.1)
@@ -368,6 +369,7 @@ DEPENDENCIES
   sequel-annotate
   sequel_pg (>= 1.8)
   simplecov
+  simplecov-lcov
   standard (>= 1.24.3)
   stripe
   tilt (>= 2.2)
