@@ -29,10 +29,12 @@ class Hosting::GcpApis
   def self.check_errors(response)
     body = JSON.parse(response.body)
 
-    errors = body.fetch("error", {}).fetch("errors", [])
-    if errors.size > 0
+    error = body.fetch("error", {})
+    errors = error.fetch("errors", [])
+
+    if errors.size > 0 || !error["message"].nil?
       Clog.emit("Error received from GCP APIs") { {body: body} }
-      fail errors[0]["message"]
+      fail (errors.size > 0) ? errors[0]["message"] : error["message"]
     end
   end
 
