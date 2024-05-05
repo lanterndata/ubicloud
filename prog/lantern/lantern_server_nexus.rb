@@ -123,6 +123,9 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       raise "GCP_CREDS_GCR_B64 is required to setup docker stack for Lantern"
     end
 
+    # wait for service account to be created
+    nap 10 if lantern_server.timeline.strand.label != "wait_leader"
+
     case vm.sshable.cmd("common/bin/daemonizer --check configure_lantern")
     when "Succeeded"
       vm.sshable.cmd("common/bin/daemonizer --clean configure_lantern")

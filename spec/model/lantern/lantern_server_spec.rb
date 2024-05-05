@@ -448,9 +448,7 @@ RSpec.describe LanternServer do
     it "calls update_env on vm" do
       timeline = instance_double(LanternTimeline)
       expect(timeline).to receive(:generate_walg_config).and_return({gcp_creds_b64: "test-creds-push", walg_gs_prefix: "test-bucket-push"}).at_least(:once)
-      expect(timeline).to receive(:id).and_return("test").at_least(:once)
       expect(lantern_server).to receive(:timeline).and_return(timeline).at_least(:once)
-      expect(LanternTimeline).to receive(:[]).and_return(timeline).at_least(:once)
       walg_config = timeline.generate_walg_config
       expect(vm.sshable).to receive(:cmd).with("sudo lantern/bin/update_env", stdin: JSON.generate([
         ["WALG_GS_PREFIX", walg_config[:walg_gs_prefix]],
