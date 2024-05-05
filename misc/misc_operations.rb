@@ -71,8 +71,20 @@ class MiscOperations
     LanternResource[name: resource_name].representative_server.run_query("SELECT pg_terminate_backend(#{pid})")
   end
 
-  def self.task_logs(resource_name, task_name)
-    LanternResource[name: resource_name].representative_server.vm.sshable.cmd("common/bin/daemonizer --logs #{task_name}")
+  def self.task_logs(resource_name, task_name, poll: false)
+    loop do
+      puts LanternResource[name: resource_name].representative_server.vm.sshable.cmd("common/bin/daemonizer --logs #{task_name}")
+      break if !poll
+      sleep(2)
+    end
+  end
+
+  def self.task_status(resource_name, task_name, poll: false)
+    loop do
+      puts LanternResource[name: resource_name].representative_server.vm.sshable.cmd("common/bin/daemonizer --check #{task_name}")
+      break if !poll
+      sleep(2)
+    end
   end
 
   def self.query_on_db(vm, db_name, query)
@@ -85,7 +97,7 @@ class MiscOperations
     command_list = []
     all_dbs.each do |db|
       db_name = db.strip
-      indexes = MiscOperations.query_on_db(serv.vm, db_name, "SELECT i.relname::text
+      indexes = MiscOperations.query_on_db(serv.vm, db_name, "SELECT n.nspname::text || '.' || i.relname
                               FROM pg_class t
                               JOIN pg_index ix ON t.oid = ix.indrelid
                               JOIN pg_class i ON i.oid = ix.indexrelid
@@ -96,7 +108,8 @@ class MiscOperations
       if !indexes.empty?
         queries = []
         indexes.each {
-          queries.push("REINDEX INDEX CONCURRENTLY #{_1};")
+          schema, idx = _1.split(".")
+          queries.push("REINDEX INDEX CONCURRENTLY \\\"#{schema}\\\".\\\"#{idx}\\\";")
           if disable_indexes
             queries.push("UPDATE pg_index SET indisvalid = false, indisready = false WHERE indexrelid = quote_ident('#{_1}')::regclass::oid;")
           end

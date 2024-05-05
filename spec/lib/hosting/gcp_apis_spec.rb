@@ -27,6 +27,18 @@ RSpec.describe Hosting::GcpApis do
       }.to raise_error "test error"
     end
 
+    it "throws error from response if one error" do
+      expect {
+        described_class.check_errors(OpenStruct.new({body: JSON.dump({error: {message: "permission error", errors: []}})}))
+      }.to raise_error "permission error"
+    end
+
+    it "throws error from errors if both defined" do
+      expect {
+        described_class.check_errors(OpenStruct.new({body: JSON.dump({error: {message: "permission error", errors: [{message: "test error"}]}})}))
+      }.to raise_error "test error"
+    end
+
     it "does not throw error" do
       expect {
         described_class.check_errors(OpenStruct.new({body: JSON.dump({error: {errors: []}})}))
