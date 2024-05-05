@@ -18,9 +18,18 @@ end
 
 def update_extensions_in_sql
   all_dbs = (r "docker compose -f #{$compose_file} exec postgresql psql -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'").strip!.split("\n")
+  tmp_cmd = ""
   all_dbs.each do |db|
-    $stdout.puts r "docker compose -f #{$compose_file} exec postgresql psql -U postgres -f /lantern-init.sql #{db}"
+    tmp_cmd += "docker compose -f #{$compose_file} exec postgresql psql -U postgres -f /lantern-init.sql #{db} \n"
   end
+
+  # There was a strange issue with open3
+  # If for example the database count would be >300 it might fail without error
+  # But if we put all the commands in one bash file and execute that file it would succeed
+
+  File.write("/tmp/update_extensions_in_sql.sh", tmp_cmd)
+  $stdout.puts r "bash /tmp/update_extensions_in_sql.sh"
+  $stdout.puts r "rm -rf /tmp/update_extensions_in_sql.sh"
 end
 
 def wait_for_pg
