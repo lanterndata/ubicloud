@@ -197,6 +197,16 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
   end
 
   describe "#setup_docker_stack" do
+    before do
+      allow(lantern_server.timeline).to receive(:strand).and_return(instance_double(Strand, label: "wait_leader"))
+    end
+
+    it "naps if timeline is not ready" do
+      expect(lantern_server.timeline).to receive(:strand).and_return(instance_double(Strand, label: "start"))
+      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds")
+      expect { nx.setup_docker_stack }.to nap(10)
+    end
+
     it "raises if gcr credentials are not provided" do
       expect(Config).to receive(:gcp_creds_gcr_b64).and_return(nil)
       expect { nx.setup_docker_stack }.to raise_error "GCP_CREDS_GCR_B64 is required to setup docker stack for Lantern"
