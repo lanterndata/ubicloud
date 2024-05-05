@@ -8,6 +8,7 @@ class Serializers::Api::Lantern < Serializers::Base
       parent_id: pg.parent_id,
       path: pg.path,
       name: pg.name,
+      label: pg.label,
       state: pg.display_state,
       instance_type: pg.representative_server&.instance_type,
       location: pg.location,

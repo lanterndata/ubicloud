@@ -23,6 +23,7 @@ class CloverWeb
         project_id: @project.id,
         location: r.params["location"],
         name: r.params["name"],
+        label: r.params["label"],
         org_id: r.params["org_id"],
         target_vm_size: parsed_size.vm_size,
         target_storage_size_gib: parsed_size.storage_size_gib,
