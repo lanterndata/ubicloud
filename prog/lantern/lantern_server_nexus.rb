@@ -124,7 +124,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     end
 
     # wait for service account to be created
-    nap 10 if lantern_server.timeline.strand.label != "wait_leader"
+    nap 10 if lantern_server.timeline.strand.label == "start"
 
     case vm.sshable.cmd("common/bin/daemonizer --check configure_lantern")
     when "Succeeded"
@@ -212,7 +212,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   end
 
   label def wait_timeline_available
-    nap 10 if lantern_server.timeline.strand.label != "wait_leader"
+    nap 10 if lantern_server.timeline.strand.label == "start"
     lantern_server.update_walg_creds
     decr_initial_provisioning
     hop_wait_db_available
