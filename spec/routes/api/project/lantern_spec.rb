@@ -59,12 +59,13 @@ RSpec.describe Clover, "lantern" do
 
     describe "create" do
       it "creates new lantern database" do
-        post "/api/project/#{project.ubid}/lantern", {size: "n1-standard-2", name: "instance-2", org_id: 0, location: "us-central1", storage_size_gib: 100, lantern_version: "0.2.2", extras_version: "0.1.4", minor_version: "1", domain: "test.db.lantern.dev", app_env: "test", repl_password: "test-repl-pass", enable_telemetry: true, postgres_password: "test-pg-pass"}
+        post "/api/project/#{project.ubid}/lantern", {size: "n1-standard-2", name: "instance-2", label: "test-label", org_id: 0, location: "us-central1", storage_size_gib: 100, lantern_version: "0.2.2", extras_version: "0.1.4", minor_version: "1", domain: "test.db.lantern.dev", app_env: "test", repl_password: "test-repl-pass", enable_telemetry: true, postgres_password: "test-pg-pass"}
 
         body = JSON.parse(last_response.body)
         expect(last_response.status).to eq(200)
 
         expect(body["name"]).to eq("instance-2")
+        expect(body["label"]).to eq("test-label")
         expect(body["state"]).to eq("creating")
         expect(body["instance_type"]).to eq("writer")
         expect(body["location"]).to eq("us-central1")

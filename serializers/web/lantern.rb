@@ -7,6 +7,7 @@ class Serializers::Web::Lantern < Serializers::Base
       ubid: pg.ubid,
       path: pg.path,
       name: pg.name,
+      label: pg.label,
       state: pg.display_state,
       primary?: pg.representative_server&.primary?,
       instance_type: pg.representative_server&.instance_type,

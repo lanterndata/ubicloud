@@ -46,6 +46,19 @@
                 <%== render(
                   "components/form/text",
                   locals: {
+                    name: "label",
+                    label: "Label",
+                    attributes: {
+                      required: false,
+                      placeholder: "Enter label"
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="sm:col-span-3">
+                <%== render(
+                  "components/form/text",
+                  locals: {
                     name: "org_id",
                     label: "Org Id",
                     attributes: {

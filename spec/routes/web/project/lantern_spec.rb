@@ -69,6 +69,7 @@ RSpec.describe Clover, "lantern" do
           location: "us-central1",
           name: "instance-2",
           target_vm_size: "n1-standard-2",
+          label: "test",
           target_storage_size_gib: 100,
           org_id: 0
         )
@@ -76,7 +77,25 @@ RSpec.describe Clover, "lantern" do
         visit "#{project.path}/lantern"
 
         expect(page.title).to eq("Ubicloud - Lantern Databases")
-        expect(page).to have_content "instance-2"
+        expect(page).to have_content "instance-2 (test)"
+      end
+
+      it "show no-label if no label was specified" do
+        Prog::Lantern::LanternResourceNexus.assemble(
+          project_id: project.id,
+          location: "us-central1",
+          name: "instance-4",
+          target_vm_size: "n1-standard-2",
+          target_storage_size_gib: 100,
+          org_id: 0
+        )
+
+        LanternResource[name: "instance-4"].update(label: nil)
+
+        visit "#{project.path}/lantern"
+
+        expect(page.title).to eq("Ubicloud - Lantern Databases")
+        expect(page).to have_content "instance-4 (no-label)"
       end
     end
 
@@ -87,6 +106,7 @@ RSpec.describe Clover, "lantern" do
         expect(page.title).to eq("Ubicloud - Create Lantern Database")
         name = "new-pg-db"
         fill_in "Name", with: name
+        fill_in "Label", with: "test-label"
         choose option: "us-central1"
         choose option: "n1-standard-2"
         find_by_id("parent_id").find(:xpath, "option[1]").select_option
@@ -97,6 +117,7 @@ RSpec.describe Clover, "lantern" do
         expect(page).to have_content "'#{name}' will be ready in a few minutes"
         expect(LanternResource.count).to eq(1)
         expect(LanternResource.first.projects.first.id).to eq(project.id)
+        expect(LanternResource.first.label).to eq("test-label")
       end
 
       it "can create new Lantern database with domain" do
