@@ -56,6 +56,11 @@ class Prog::Lantern::LanternDoctorNexus < Prog::Base
 
   label def destroy
     decr_destroy
+
+    lantern_doctor.failed_queries.each {
+      _1.active_pages.each {|pg| pg.incr_resolve }
+    }
+
     lantern_doctor.destroy
     pop "lantern doctor is deleted"
   end
