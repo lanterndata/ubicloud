@@ -103,6 +103,10 @@ RSpec.describe Prog::Lantern::LanternDoctorNexus do
   describe "#destroy" do
     it "exits with message" do
       expect(nx).to receive(:decr_destroy)
+      page = instance_double(Page)
+      query = instance_double(LanternDoctorQuery, active_pages: [page])
+      expect(page).to receive(:incr_resolve)
+      expect(lantern_doctor).to receive(:failed_queries).and_return([query])
       expect(lantern_doctor).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "lantern doctor is deleted"})
     end
