@@ -55,12 +55,19 @@ RSpec.describe Prog::Lantern::LanternDoctorNexus do
   end
 
   describe "#wait" do
+    it "hops to destroy" do
+      expect(lantern_doctor).to receive(:resource).and_return(nil)
+      expect { nx.wait }.to hop("destroy")
+    end
+
     it "syncs system queries" do
+      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, strand: nil))
       expect(nx).to receive(:when_sync_system_queries_set?).and_yield
       expect { nx.wait }.to hop("sync_system_queries")
     end
 
     it "runs queries and naps" do
+      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, strand: nil))
       queries = [instance_double(LanternDoctorQuery)]
       expect(queries[0]).to receive(:run)
       expect(lantern_doctor).to receive(:queries).and_return(queries)

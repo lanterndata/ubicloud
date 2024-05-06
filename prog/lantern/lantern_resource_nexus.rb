@@ -165,6 +165,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
       nap 5
     end
 
+    lantern_resource.doctor.incr_destroy
     lantern_resource.dissociate_with_project(lantern_resource.project)
     lantern_resource.destroy
 

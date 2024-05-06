@@ -36,6 +36,10 @@ class Prog::Lantern::LanternDoctorNexus < Prog::Base
   end
 
   label def wait
+    if lantern_doctor.resource.nil?
+      hop_destroy
+    end
+
     when_sync_system_queries_set? do
       hop_sync_system_queries
     end
