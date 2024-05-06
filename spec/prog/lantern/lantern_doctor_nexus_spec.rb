@@ -87,9 +87,9 @@ RSpec.describe Prog::Lantern::LanternDoctorNexus do
 
   describe "#sync_system_queries" do
     it "calls sync_system_queries" do
-    expect(lantern_doctor).to receive(:sync_system_queries)
-    expect(nx).to receive(:decr_sync_system_queries)
-    expect{nx.sync_system_queries}.to hop("wait")
+      expect(lantern_doctor).to receive(:sync_system_queries)
+      expect(nx).to receive(:decr_sync_system_queries)
+      expect { nx.sync_system_queries }.to hop("wait")
     end
   end
 

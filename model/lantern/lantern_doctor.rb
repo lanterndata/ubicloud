@@ -16,7 +16,7 @@ class LanternDoctor < Sequel::Model
   semaphore :destroy, :sync_system_queries
 
   def system_queries
-    @system_queries ||= LanternDoctorQuery.where(type: "system")
+    @system_queries ||= LanternDoctorQuery.where(type: "system").all
   end
 
   def has_system_query?(queries, query)

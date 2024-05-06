@@ -16,7 +16,7 @@ RSpec.describe LanternDoctor do
     end
 
     it "fetches system queries" do
-      expect(LanternDoctorQuery).to receive(:where).with(type: "system").and_return([instance_double(LanternDoctorQuery), instance_double(LanternDoctorQuery)])
+      expect(LanternDoctorQuery).to receive(:where).with(type: "system").and_return(instance_double(Sequel::Dataset, all: [instance_double(LanternDoctorQuery), instance_double(LanternDoctorQuery)]))
       expect(lantern_doctor.system_queries.size).to be(2)
     end
   end
@@ -43,7 +43,7 @@ RSpec.describe LanternDoctor do
       expect(lantern_doctor).to receive(:system_queries).and_return(system_queries)
       new_query = instance_double(LanternDoctorQuery, parent_id: "test-parent-id")
       expect(LanternDoctorQuery).to receive(:create_with_id).with(parent_id: "test-parent-id", doctor_id: lantern_doctor.id, type: "user", condition: "unknown").and_return(new_query)
-      expect{lantern_doctor.sync_system_queries}.not_to raise_error
+      expect { lantern_doctor.sync_system_queries }.not_to raise_error
     end
   end
 end

@@ -340,4 +340,29 @@ RSpec.describe LanternDoctorQuery do
     expect(serv).to receive(:run_query).with("SELECT (SELECT COUNT(*) FROM \"public\".\"test\" WHERE \"test-src\" IS NOT NULL AND \"test-src\" != '' AND \"test-dst\" IS NULL) > 1000", db: "postgres", user: "postgres").and_return("f")
     expect(lantern_doctor_query.check_daemon_embedding_jobs("postgres", "postgres")).to eq("f")
   end
+
+  describe "#page" do
+    it "lists active pages" do
+      p1 = Prog::PageNexus.assemble_with_logs("test", [lantern_doctor_query.ubid], {"stderr" => ""}, "error", "LanternDoctorQueryFailed", lantern_doctor_query.id, "postgres")
+      p2 = Prog::PageNexus.assemble_with_logs("test", [lantern_doctor_query.ubid], {"stderr" => ""}, "error", "LanternDoctorQueryFailed", lantern_doctor_query.id, "postgres2")
+
+      Page[p2.id].update(resolved_at: Time.new)
+
+      pages = lantern_doctor_query.active_pages
+      expect(pages.size).to be(1)
+      expect(pages[0].id).to eq(p1.id)
+    end
+
+    it "lists all pages" do
+      p1 = Prog::PageNexus.assemble_with_logs("test", [lantern_doctor_query.ubid], {"stderr" => ""}, "error", "LanternDoctorQueryFailed", lantern_doctor_query.id, "postgres")
+      p2 = Prog::PageNexus.assemble_with_logs("test", [lantern_doctor_query.ubid], {"stderr" => ""}, "error", "LanternDoctorQueryFailed", lantern_doctor_query.id, "postgres2")
+
+      Page[p2.id].update(resolved_at: Time.new)
+
+      pages = lantern_doctor_query.all_pages
+      expect(pages.size).to be(2)
+      expect(pages[0].id).to eq(p1.id)
+      expect(pages[1].id).to eq(p2.id)
+    end
+  end
 end

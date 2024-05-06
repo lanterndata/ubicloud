@@ -11,6 +11,7 @@ class LanternDoctorQuery < Sequel::Model
   one_to_many :children, key: :parent_id, class: self
 
   plugin :association_dependencies, children: :destroy
+  dataset_module Pagination
 
   include ResourceMethods
   include SemaphoreMethods
@@ -52,6 +53,16 @@ class LanternDoctorQuery < Sequel::Model
   def user
     return "postgres" if is_system?
     doctor.resource.db_user
+  end
+
+  def active_pages
+    tag = Page.generate_tag("LanternDoctorQueryFailed", id)
+    Page.active.where(Sequel.like(:tag, "%#{tag}-%")).all
+  end
+
+  def all_pages
+    tag = Page.generate_tag("LanternDoctorQueryFailed", id)
+    Page.where(Sequel.like(:tag, "%#{tag}-%")).all
   end
 
   def run
@@ -110,7 +121,7 @@ class LanternDoctorQuery < Sequel::Model
       .from(:embedding_generation_jobs)
       .where(database_id: doctor.resource.name)
       .where(Sequel.like(:db_connection, "%/#{db}"))
-      .where(Sequel.lit('init_finished_at IS NOT NULL'))
+      .where(Sequel.lit("init_finished_at IS NOT NULL"))
       .all
 
     if jobs.empty?
