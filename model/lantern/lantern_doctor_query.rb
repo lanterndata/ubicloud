@@ -6,8 +6,8 @@ require_relative "../../db"
 
 class LanternDoctorQuery < Sequel::Model
   one_to_one :strand, key: :id
-  one_to_one :doctor, key: :id, primary_key: :doctor_id
-  one_to_one :parent, class: self, key: :parent_id
+  many_to_one :doctor, class: LanternDoctor, key: :doctor_id, primary_key: :id
+  many_to_one :parent, class: self, key: :parent_id
   one_to_many :children, key: :parent_id, class: self
 
   plugin :association_dependencies, children: :destroy
@@ -42,8 +42,6 @@ class LanternDoctorQuery < Sequel::Model
   end
 
   def should_run?
-    puts "Parent ->>>>> #{parent}"
-    puts "Schedule is ->>>>>>> #{schedule}"
     CronParser.new(schedule).next(last_checked || Time.new - 61) <= Time.new
   end
 
@@ -60,8 +58,6 @@ class LanternDoctorQuery < Sequel::Model
     if !should_run?
       return nil
     end
-
-    puts "RUNNING QUERY::::::::::::::::: #{name}"
 
     lantern_server = doctor.resource.representative_server
     dbs = (db_name == "*") ? lantern_server.list_all_databases : [db_name]
@@ -95,7 +91,7 @@ class LanternDoctorQuery < Sequel::Model
       pg = Page.from_tag_parts("LanternDoctorQueryFailed", id, db)
 
       if failed && !pg
-        Prog::PageNexus.assemble_with_logs("Query #{name} failed on #{doctor.resource.name} (#{db})", [ubid, doctor.ubid, lantern_server.ubid], {"stderr" => err_msg}, severity, "LanternDoctorQueryFailed", id, db)
+        Prog::PageNexus.assemble_with_logs("Healthcheck: #{name} failed on #{doctor.resource.name} (#{db})", [ubid, doctor.ubid, lantern_server.ubid], {"stderr" => err_msg}, severity, "LanternDoctorQueryFailed", id, db)
       elsif !failed && pg
         pg.incr_resolve
       end
@@ -109,15 +105,12 @@ class LanternDoctorQuery < Sequel::Model
       fail "No connection to lantern backend database specified"
     end
 
-    puts "HERE FINDING JOBS"
     jobs = LanternBackend.db
       .select(:schema, :table, :src_column, :dst_column)
       .from(:embedding_generation_jobs)
       .where(database_id: doctor.resource.name)
       .where(Sequel.like(:db_connection, "%/#{db}"))
-      # :nocov:
-      .where { !init_finished_at.nil? }
-      # :nocov:
+      .where(Sequel.lit('init_finished_at IS NOT NULL'))
       .all
 
     if jobs.empty?
@@ -126,7 +119,7 @@ class LanternDoctorQuery < Sequel::Model
 
     lantern_server = doctor.resource.representative_server
     failed = jobs.any? do |job|
-      res = lantern_server.run_query("SELECT EXISTS(SELECT (SELECT COUNT(*) FROM \"#{job[:schema]}\".\"#{job[:table]}\" WHERE \"#{job[:src_column]}\" IS NOT NULL AND \"#{job[:src_column]}\" != '' AND \"#{job[:dst_column]}\" IS NULL) > 1000)", db: db, user: query_user).strip
+      res = lantern_server.run_query("SELECT (SELECT COUNT(*) FROM \"#{job[:schema]}\".\"#{job[:table]}\" WHERE \"#{job[:src_column]}\" IS NOT NULL AND \"#{job[:src_column]}\" != '' AND \"#{job[:dst_column]}\" IS NULL) > 1000", db: db, user: query_user).strip
       res == "t"
     end
 

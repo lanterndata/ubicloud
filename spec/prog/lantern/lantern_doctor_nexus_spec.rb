@@ -27,11 +27,22 @@ RSpec.describe Prog::Lantern::LanternDoctorNexus do
 
   describe "#start" do
     it "hops to wait resource" do
+      expect(lantern_doctor).to receive(:sync_system_queries)
       expect { nx.start }.to hop("wait_resource")
     end
   end
 
   describe "#wait_resource" do
+    it "naps if no resource yet" do
+      expect(lantern_doctor).to receive(:resource).and_return(nil)
+      expect { nx.wait_resource }.to nap(5)
+    end
+
+    it "naps if no resource strand yet" do
+      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, strand: nil))
+      expect { nx.wait_resource }.to nap(5)
+    end
+
     it "naps if resource is not available" do
       expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, strand: instance_double(Strand, label: "start")))
       expect { nx.wait_resource }.to nap(5)
@@ -44,6 +55,11 @@ RSpec.describe Prog::Lantern::LanternDoctorNexus do
   end
 
   describe "#wait" do
+    it "syncs system queries" do
+      expect(nx).to receive(:when_sync_system_queries_set?).and_yield
+      expect { nx.wait }.to hop("sync_system_queries")
+    end
+
     it "runs queries and naps" do
       queries = [instance_double(LanternDoctorQuery)]
       expect(queries[0]).to receive(:run)
@@ -66,6 +82,14 @@ RSpec.describe Prog::Lantern::LanternDoctorNexus do
 
     it "does not hop to destroy" do
       expect(nx.before_run).to be_nil
+    end
+  end
+
+  describe "#sync_system_queries" do
+    it "calls sync_system_queries" do
+    expect(lantern_doctor).to receive(:sync_system_queries)
+    expect(nx).to receive(:decr_sync_system_queries)
+    expect{nx.sync_system_queries}.to hop("wait")
     end
   end
 

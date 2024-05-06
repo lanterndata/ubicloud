@@ -197,7 +197,11 @@ SQL
   end
 
   def list_all_databases
-    vm.sshable.cmd("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec postgresql psql -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'").chomp.strip.split("\n")
+    vm.sshable.cmd("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec postgresql psql -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'")
+      .chomp
+      .strip
+      .split("\n")
+      .map { _1.strip }
   end
 
   # def failover_target

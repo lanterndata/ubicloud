@@ -8,7 +8,7 @@ class Prog::Lantern::LanternDoctorNexus < Prog::Base
   extend Forwardable
   def_delegators :lantern_doctor
 
-  semaphore :destroy
+  semaphore :destroy, :sync_system_queries
 
   def self.assemble
     DB.transaction do
@@ -26,17 +26,28 @@ class Prog::Lantern::LanternDoctorNexus < Prog::Base
   end
 
   label def start
+    lantern_doctor.sync_system_queries
     hop_wait_resource
   end
 
   label def wait_resource
-    nap 5 if lantern_doctor.resource.strand.label != "wait"
+    nap 5 if lantern_doctor.resource&.strand&.label != "wait"
     hop_wait
   end
 
   label def wait
-    lantern_doctor.list_queries.each { _1.run }
-    nap 10
+    when_sync_system_queries_set? do
+      hop_sync_system_queries
+    end
+
+    lantern_doctor.queries.each { _1.run }
+    nap 60
+  end
+
+  label def sync_system_queries
+    decr_sync_system_queries
+    lantern_doctor.sync_system_queries
+    hop_wait
   end
 
   label def destroy

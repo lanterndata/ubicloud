@@ -155,7 +155,7 @@ RSpec.describe LanternDoctorQuery do
       expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
       expect(lantern_doctor_query).to receive(:should_run?).and_return(true)
       expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "failed"))
-      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Query #{lantern_doctor_query.name} failed on #{doctor.resource.name} (postgres)", [lantern_doctor_query.ubid, doctor.ubid, serv.ubid], {"stderr" => "BUG: non-system query without sql"}, lantern_doctor_query.severity, "LanternDoctorQueryFailed", lantern_doctor_query.id, "postgres")
+      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Healthcheck: #{lantern_doctor_query.name} failed on #{doctor.resource.name} (postgres)", [lantern_doctor_query.ubid, doctor.ubid, serv.ubid], {"stderr" => "BUG: non-system query without sql"}, lantern_doctor_query.severity, "LanternDoctorQueryFailed", lantern_doctor_query.id, "postgres")
 
       expect { lantern_doctor_query.run }.not_to raise_error
     end
@@ -213,7 +213,7 @@ RSpec.describe LanternDoctorQuery do
       expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
       expect(lantern_doctor_query).to receive(:should_run?).and_return(true)
       expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "failed"))
-      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Query #{lantern_doctor_query.name} failed on #{doctor.resource.name} (db1)", [lantern_doctor_query.ubid, doctor.ubid, serv.ubid], {"stderr" => "test-err"}, lantern_doctor_query.severity, "LanternDoctorQueryFailed", lantern_doctor_query.id, "db1")
+      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Healthcheck: #{lantern_doctor_query.name} failed on #{doctor.resource.name} (db1)", [lantern_doctor_query.ubid, doctor.ubid, serv.ubid], {"stderr" => "test-err"}, lantern_doctor_query.severity, "LanternDoctorQueryFailed", lantern_doctor_query.id, "db1")
 
       expect { lantern_doctor_query.run }.not_to raise_error
     end
@@ -233,7 +233,7 @@ RSpec.describe LanternDoctorQuery do
       expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
       expect(lantern_doctor_query).to receive(:should_run?).and_return(true)
       expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "failed"))
-      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Query #{lantern_doctor_query.name} failed on #{doctor.resource.name} (db1)", [lantern_doctor_query.ubid, doctor.ubid, serv.ubid], {"stderr" => ""}, lantern_doctor_query.severity, "LanternDoctorQueryFailed", lantern_doctor_query.id, "db1")
+      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Healthcheck: #{lantern_doctor_query.name} failed on #{doctor.resource.name} (db1)", [lantern_doctor_query.ubid, doctor.ubid, serv.ubid], {"stderr" => ""}, lantern_doctor_query.severity, "LanternDoctorQueryFailed", lantern_doctor_query.id, "db1")
 
       expect { lantern_doctor_query.run }.not_to raise_error
     end
@@ -303,7 +303,7 @@ RSpec.describe LanternDoctorQuery do
               where: instance_double(Sequel::Dataset,
                 where: instance_double(Sequel::Dataset,
                   all: [{schema: "public", table: "test", src_column: "test-src", dst_column: "test-dst"}]))))))
-      expect(serv).to receive(:run_query).with("SELECT EXISTS(SELECT (SELECT COUNT(*) FROM \"public\".\"test\" WHERE \"test-src\" IS NOT NULL AND \"test-src\" != '' AND \"test-dst\" IS NULL) > 1000)", db: "postgres", user: "postgres").and_return("t")
+      expect(serv).to receive(:run_query).with("SELECT (SELECT COUNT(*) FROM \"public\".\"test\" WHERE \"test-src\" IS NOT NULL AND \"test-src\" != '' AND \"test-dst\" IS NULL) > 1000", db: "postgres", user: "postgres").and_return("t")
       expect(lantern_doctor_query.check_daemon_embedding_jobs("postgres", "postgres")).to eq("t")
     end
 
@@ -337,7 +337,7 @@ RSpec.describe LanternDoctorQuery do
             where: instance_double(Sequel::Dataset,
               where: instance_double(Sequel::Dataset,
                 all: [{schema: "public", table: "test", src_column: "test-src", dst_column: "test-dst"}]))))))
-    expect(serv).to receive(:run_query).with("SELECT EXISTS(SELECT (SELECT COUNT(*) FROM \"public\".\"test\" WHERE \"test-src\" IS NOT NULL AND \"test-src\" != '' AND \"test-dst\" IS NULL) > 1000)", db: "postgres", user: "postgres").and_return("f")
+    expect(serv).to receive(:run_query).with("SELECT (SELECT COUNT(*) FROM \"public\".\"test\" WHERE \"test-src\" IS NOT NULL AND \"test-src\" != '' AND \"test-dst\" IS NULL) > 1000", db: "postgres", user: "postgres").and_return("f")
     expect(lantern_doctor_query.check_daemon_embedding_jobs("postgres", "postgres")).to eq("f")
   end
 end

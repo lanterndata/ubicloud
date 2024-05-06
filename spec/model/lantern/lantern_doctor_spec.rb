@@ -35,22 +35,15 @@ RSpec.describe LanternDoctor do
     end
   end
 
-  describe "#list_queries" do
+  describe "#sync_system_queries" do
     it "creates new system query if not exists" do
       system_queries = [instance_double(LanternDoctorQuery, id: "test-parent-id"), instance_double(LanternDoctorQuery, id: "test-parent-id2")]
       query_list = [instance_double(LanternDoctorQuery, parent_id: "test-parent-id2"), instance_double(LanternDoctorQuery, parent_id: nil)]
       expect(lantern_doctor).to receive(:queries).and_return(query_list)
       expect(lantern_doctor).to receive(:system_queries).and_return(system_queries)
       new_query = instance_double(LanternDoctorQuery, parent_id: "test-parent-id")
-      expect(LanternDoctorQuery).to receive(:create_with_id).with(parent_id: "test-parent-id", condition: "unknown").and_return(new_query)
-      # query list is changed by reference in list_queries method
-      expect(lantern_doctor.list_queries).to eq(query_list)
-    end
-  end
-
-  describe "#list_incidents" do
-    it "returns all incidents" do
-      expect(lantern_doctor.list_incidents).to eq([])
+      expect(LanternDoctorQuery).to receive(:create_with_id).with(parent_id: "test-parent-id", doctor_id: lantern_doctor.id, type: "user", condition: "unknown").and_return(new_query)
+      expect{lantern_doctor.sync_system_queries}.not_to raise_error
     end
   end
 end

@@ -13,7 +13,7 @@ Sequel.migration do
     end
     # queries
     create_enum(:query_condition, %w[unknown healthy failed])
-    create_enum(:query_type, %w[system udf])
+    create_enum(:query_type, %w[system user])
     create_table(:lantern_doctor_query) do
       column :id, :uuid, primary_key: true, default: nil
       foreign_key :parent_id, :lantern_doctor_query, type: :uuid
