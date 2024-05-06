@@ -111,7 +111,7 @@ class MiscOperations
           schema, idx = _1.split(".")
           queries.push("REINDEX INDEX CONCURRENTLY \\\"#{schema}\\\".\\\"#{idx}\\\";")
           if disable_indexes
-            queries.push("UPDATE pg_index SET indisvalid = false, indisready = false WHERE indexrelid = quote_ident('#{_1}')::regclass::oid;")
+            queries.push("UPDATE pg_index SET indisvalid = false, indisready = false WHERE indexrelid = quote_ident('#{idx}')::regclass::oid;")
           end
         }
 
