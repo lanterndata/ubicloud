@@ -145,4 +145,11 @@ class MiscOperations
     end
     all_indexes
   end
+
+  def self.add_lantern_doctor_to_all
+    LanternResource.all.each {
+      lantern_doctor = Prog::Lantern::LanternDoctorNexus.assemble
+      _1.update(doctor_id: lantern_doctor.id)
+    }
+  end
 end

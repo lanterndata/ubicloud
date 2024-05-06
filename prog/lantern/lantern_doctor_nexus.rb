@@ -25,6 +25,10 @@ class Prog::Lantern::LanternDoctorNexus < Prog::Base
     end
   end
 
+  def should_run?
+    lantern_doctor.resource&.representative_server&.strand&.label == "wait"
+  end
+
   label def start
     lantern_doctor.sync_system_queries
     hop_wait_resource
@@ -44,7 +48,10 @@ class Prog::Lantern::LanternDoctorNexus < Prog::Base
       hop_sync_system_queries
     end
 
-    lantern_doctor.queries.each { _1.run }
+    if should_run?
+      lantern_doctor.queries.each { _1.run }
+    end
+
     nap 60
   end
 

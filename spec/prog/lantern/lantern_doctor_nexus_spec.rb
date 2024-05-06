@@ -55,6 +55,12 @@ RSpec.describe Prog::Lantern::LanternDoctorNexus do
   end
 
   describe "#wait" do
+    it "naps" do
+      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, strand: nil))
+      expect(nx).to receive(:should_run?).and_return(false)
+      expect { nx.wait }.to nap(60)
+    end
+
     it "hops to destroy" do
       expect(lantern_doctor).to receive(:resource).and_return(nil)
       expect { nx.wait }.to hop("destroy")
@@ -67,6 +73,7 @@ RSpec.describe Prog::Lantern::LanternDoctorNexus do
     end
 
     it "runs queries and naps" do
+      expect(nx).to receive(:should_run?).and_return(true)
       expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, strand: nil))
       queries = [instance_double(LanternDoctorQuery)]
       expect(queries[0]).to receive(:run)
@@ -109,6 +116,33 @@ RSpec.describe Prog::Lantern::LanternDoctorNexus do
       expect(lantern_doctor).to receive(:failed_queries).and_return([query])
       expect(lantern_doctor).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "lantern doctor is deleted"})
+    end
+  end
+
+  describe "#should_run" do
+    it "returns true" do
+      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, representative_server: instance_double(LanternServer, strand: instance_double(Strand, label: "wait"))))
+      expect(nx.should_run?).to be(true)
+    end
+
+    it "returns false" do
+      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, representative_server: instance_double(LanternServer, strand: instance_double(Strand, label: "start"))))
+      expect(nx.should_run?).to be(false)
+    end
+
+    it "returns false if no resource" do
+      expect(lantern_doctor).to receive(:resource).and_return(nil)
+      expect(nx.should_run?).to be(false)
+    end
+
+    it "returns false if no server" do
+      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, representative_server: nil))
+      expect(nx.should_run?).to be(false)
+    end
+
+    it "returns false if no strand" do
+      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, representative_server: instance_double(LanternServer, strand: nil)))
+      expect(nx.should_run?).to be(false)
     end
   end
 end
