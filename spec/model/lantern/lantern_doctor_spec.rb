@@ -67,15 +67,5 @@ RSpec.describe LanternDoctor do
       expect(lantern_doctor).to receive(:resource).and_return(nil)
       expect(lantern_doctor.should_run?).to be(false)
     end
-
-    it "returns false if no server" do
-      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, representative_server: nil)).at_least(:once)
-      expect(lantern_doctor.should_run?).to be(false)
-    end
-
-    it "returns false if no strand" do
-      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, representative_server: instance_double(LanternServer, display_state: "running", strand: nil))).at_least(:once)
-      expect(lantern_doctor.should_run?).to be(false)
-    end
   end
 end
