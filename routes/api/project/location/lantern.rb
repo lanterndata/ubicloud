@@ -12,6 +12,7 @@ class CloverApi
       end
 
       @pg = serialize(pg, :detailed)
+      r.hash_branches(:project_location_lantern_prefix)
 
       r.get true do
         Authorization.authorize(@current_user.id, "Postgres:view", pg.id)

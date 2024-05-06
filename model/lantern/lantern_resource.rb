@@ -10,6 +10,7 @@ class LanternResource < Sequel::Model
   one_to_many :servers, class: LanternServer, key: :resource_id
   one_to_one :representative_server, class: LanternServer, key: :resource_id, conditions: Sequel.~(representative_at: nil)
   one_through_one :timeline, class: LanternTimeline, join_table: :lantern_server, left_key: :resource_id, right_key: :timeline_id
+  one_to_one :doctor, class: LanternDoctor, key: :id, primary_key: :doctor_id
 
   dataset_module Authorization::Dataset
   dataset_module Pagination

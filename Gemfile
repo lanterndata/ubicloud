@@ -33,6 +33,7 @@ gem "octokit"
 gem "argon2-kdf"
 gem "googleauth"
 gem "simplecov"
+gem "parse-cron"
 
 group :development do
   gem "brakeman"

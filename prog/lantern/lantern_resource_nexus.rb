@@ -74,12 +74,14 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
 
       end
 
+      lantern_doctor = Prog::Lantern::LanternDoctorNexus.assemble
+
       lantern_resource = LanternResource.create(
         project_id: project_id, location: location, name: name, org_id: org_id, app_env: app_env,
         superuser_password: superuser_password, ha_type: ha_type, parent_id: parent_id,
         restore_target: restore_target, db_name: db_name, db_user: db_user,
         db_user_password: db_user_password, repl_user: repl_user, repl_password: repl_password,
-        label: label
+        label: label, doctor_id: lantern_doctor.id
       ) { _1.id = ubid.to_uuid }
       lantern_resource.associate_with_project(project)
 
@@ -163,6 +165,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
       nap 5
     end
 
+    lantern_resource.doctor&.incr_destroy
     lantern_resource.dissociate_with_project(lantern_resource.project)
     lantern_resource.destroy
 

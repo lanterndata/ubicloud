@@ -193,6 +193,21 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(lantern_resource).to receive(:servers).and_return([])
       expect(lantern_resource).to receive(:dissociate_with_project)
       expect(lantern_resource).to receive(:destroy)
+      expect(lantern_resource).to receive(:doctor).and_return(nil)
+
+      expect { nx.destroy }.to exit({"msg" => "lantern resource is deleted"})
+    end
+
+    it "triggers server deletion and deletes doctor" do
+      expect(lantern_resource.servers).to all(receive(:incr_destroy))
+      expect { nx.destroy }.to nap(5)
+
+      expect(lantern_resource).to receive(:servers).and_return([])
+      expect(lantern_resource).to receive(:dissociate_with_project)
+      expect(lantern_resource).to receive(:destroy)
+      doctor = instance_double(LanternDoctor)
+      expect(lantern_resource).to receive(:doctor).and_return(doctor)
+      expect(doctor).to receive(:incr_destroy)
 
       expect { nx.destroy }.to exit({"msg" => "lantern resource is deleted"})
     end

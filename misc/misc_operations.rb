@@ -111,7 +111,7 @@ class MiscOperations
           schema, idx = _1.split(".")
           queries.push("REINDEX INDEX CONCURRENTLY \\\"#{schema}\\\".\\\"#{idx}\\\";")
           if disable_indexes
-            queries.push("UPDATE pg_index SET indisvalid = false, indisready = false WHERE indexrelid = quote_ident('#{_1}')::regclass::oid;")
+            queries.push("UPDATE pg_index SET indisvalid = false, indisready = false WHERE indexrelid = quote_ident('#{idx}')::regclass::oid;")
           end
         }
 
@@ -144,5 +144,12 @@ class MiscOperations
       all_indexes += indexes
     end
     all_indexes
+  end
+
+  def self.add_lantern_doctor_to_all
+    LanternResource.all.each {
+      lantern_doctor = Prog::Lantern::LanternDoctorNexus.assemble
+      _1.update(doctor_id: lantern_doctor.id)
+    }
   end
 end
