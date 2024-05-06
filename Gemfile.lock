@@ -157,6 +157,7 @@ GEM
     parallel (1.24.0)
     parallel_tests (4.5.2)
       parallel
+    parse-cron (0.1.4)
     parser (3.3.0.5)
       ast (~> 2.4.1)
       racc
@@ -346,6 +347,7 @@ DEPENDENCIES
   nokogiri
   octokit
   pagerduty (>= 4.0)
+  parse-cron
   pry
   pry-byebug
   puma (>= 6.2.2)

@@ -47,12 +47,12 @@ class LanternServer < Sequel::Model
     ).to_s
   end
 
-  def run_query(query)
-    vm.sshable.cmd("sudo lantern/bin/exec", stdin: query).chomp
+  def run_query(query, db: "postgres", user: "postgres")
+    vm.sshable.cmd("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -U #{user} -t --csv #{db}", stdin: query).chomp
   end
 
   def run_query_all(query)
-    vm.sshable.cmd("sudo lantern/bin/exec_all", stdin: query).chomp
+    list_all_databases.map { [_1, run_query(query, db: _1)] }
   end
 
   def display_state
@@ -194,6 +194,14 @@ JOIN pg_am a ON i.relam = a.oid
 JOIN pg_namespace n ON n.oid = i.relnamespace
 WHERE a.amname = 'lantern_hnsw';
 SQL
+  end
+
+  def list_all_databases
+    vm.sshable.cmd("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec postgresql psql -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'")
+      .chomp
+      .strip
+      .split("\n")
+      .map { _1.strip }
   end
 
   # def failover_target

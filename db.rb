@@ -26,3 +26,11 @@ end
 # DB.extension :date_arithmetic
 DB.extension :pg_json, :pg_auto_parameterize, :pg_timestamptz, :pg_range, :pg_array
 Sequel.extension :pg_range_ops
+
+module LanternBackend
+  @@db = Sequel.connect(Config.lantern_backend_database_url, max_connections: Config.db_pool, pool_timeout: Config.database_timeout) if Config.lantern_backend_database_url
+
+  def self.db
+    @@db
+  end
+end
