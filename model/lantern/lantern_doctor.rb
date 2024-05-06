@@ -23,6 +23,10 @@ class LanternDoctor < Sequel::Model
     queries.any? { _1.parent_id == query.id }
   end
 
+  def should_run?
+    resource&.representative_server&.display_state == "running" && resource&.representative_server&.strand&.label == "wait"
+  end
+
   def sync_system_queries
     doctor_query_list = queries
     system_query_list = system_queries

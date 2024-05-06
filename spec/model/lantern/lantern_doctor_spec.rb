@@ -46,4 +46,36 @@ RSpec.describe LanternDoctor do
       expect { lantern_doctor.sync_system_queries }.not_to raise_error
     end
   end
+
+  describe "#should_run" do
+    it "returns true" do
+      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, representative_server: instance_double(LanternServer, display_state: "running", strand: instance_double(Strand, label: "wait")))).at_least(:once)
+      expect(lantern_doctor.should_run?).to be(true)
+    end
+
+    it "returns false if not running" do
+      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, representative_server: instance_double(LanternServer, display_state: "stopped", strand: instance_double(Strand, label: "start")))).at_least(:once)
+      expect(lantern_doctor.should_run?).to be(false)
+    end
+
+    it "returns false" do
+      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, representative_server: instance_double(LanternServer, display_state: "running", strand: instance_double(Strand, label: "start")))).at_least(:once)
+      expect(lantern_doctor.should_run?).to be(false)
+    end
+
+    it "returns false if no resource" do
+      expect(lantern_doctor).to receive(:resource).and_return(nil)
+      expect(lantern_doctor.should_run?).to be(false)
+    end
+
+    it "returns false if no server" do
+      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, representative_server: nil)).at_least(:once)
+      expect(lantern_doctor.should_run?).to be(false)
+    end
+
+    it "returns false if no strand" do
+      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, representative_server: instance_double(LanternServer, display_state: "running", strand: nil))).at_least(:once)
+      expect(lantern_doctor.should_run?).to be(false)
+    end
+  end
 end
