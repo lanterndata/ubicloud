@@ -504,6 +504,7 @@ RSpec.describe LanternServer do
       }
 
       expect(lantern_server).to receive(:destroy_set?).and_return(false)
+      expect(lantern_server).to receive(:display_state).and_return("running")
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(lantern_server).not_to receive(:incr_checkup)
       lantern_server.check_pulse(session: session, previous_pulse: pulse)
@@ -519,6 +520,7 @@ RSpec.describe LanternServer do
         reading_chg: Time.now - 30
       }
 
+      expect(lantern_server).to receive(:display_state).and_return("running")
       expect(lantern_server).to receive(:destroy_set?).and_return(false)
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(lantern_server).to receive(:primary?).and_return(true)
@@ -536,6 +538,7 @@ RSpec.describe LanternServer do
         reading_chg: Time.now - 30
       }
 
+      expect(lantern_server).to receive(:display_state).and_return("running")
       expect(lantern_server).to receive(:destroy_set?).and_return(false)
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(session[:db_connection]).to receive(:[]).and_raise(Sequel::DatabaseConnectionError)
@@ -567,6 +570,21 @@ RSpec.describe LanternServer do
       }
       expect(lantern_server).to receive(:destroy_set?).and_return(false)
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "destroy"))
+      lantern_server.check_pulse(session: session, previous_pulse: pulse)
+    end
+
+    it "does not check the pulse if not running" do
+      session = {
+        db_connection: instance_double(Sequel::Postgres::Database)
+      }
+      pulse = {
+        reading: "down",
+        reading_rpt: 5,
+        reading_chg: Time.now - 30
+      }
+      expect(lantern_server).to receive(:display_state).and_return("stopped")
+      expect(lantern_server).to receive(:destroy_set?).and_return(false)
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       lantern_server.check_pulse(session: session, previous_pulse: pulse)
     end
 
