@@ -34,7 +34,7 @@ class LanternDoctor < Sequel::Model
 
     system_query_list.each {
       if !has_system_query?(doctor_query_list, _1)
-        LanternDoctorQuery.create_with_id(parent_id: _1.id, doctor_id: id, condition: "unknown", type: "user")
+        LanternDoctorQuery.create_with_id(parent_id: _1.id, doctor_id: id, condition: "unknown", type: "user", response_type: _1.response_type)
       end
     }
   end
