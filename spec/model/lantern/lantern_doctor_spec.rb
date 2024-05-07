@@ -37,12 +37,12 @@ RSpec.describe LanternDoctor do
 
   describe "#sync_system_queries" do
     it "creates new system query if not exists" do
-      system_queries = [instance_double(LanternDoctorQuery, id: "test-parent-id"), instance_double(LanternDoctorQuery, id: "test-parent-id2")]
+      system_queries = [instance_double(LanternDoctorQuery, id: "test-parent-id", response_type: "rows"), instance_double(LanternDoctorQuery, id: "test-parent-id2", response_type: "bool")]
       query_list = [instance_double(LanternDoctorQuery, parent_id: "test-parent-id2"), instance_double(LanternDoctorQuery, parent_id: nil)]
       expect(lantern_doctor).to receive(:queries).and_return(query_list)
       expect(lantern_doctor).to receive(:system_queries).and_return(system_queries)
       new_query = instance_double(LanternDoctorQuery, parent_id: "test-parent-id")
-      expect(LanternDoctorQuery).to receive(:create_with_id).with(parent_id: "test-parent-id", doctor_id: lantern_doctor.id, type: "user", condition: "unknown").and_return(new_query)
+      expect(LanternDoctorQuery).to receive(:create_with_id).with(parent_id: "test-parent-id", doctor_id: lantern_doctor.id, type: "user", response_type: "rows", condition: "unknown").and_return(new_query)
       expect { lantern_doctor.sync_system_queries }.not_to raise_error
     end
   end

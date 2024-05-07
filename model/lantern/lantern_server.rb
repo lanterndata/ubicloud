@@ -152,7 +152,7 @@ class LanternServer < Sequel::Model
   end
 
   def check_pulse(session:, previous_pulse:)
-    if destroy_set? || strand&.label != "wait"
+    if destroy_set? || strand&.label != "wait" || display_state != "running"
       # if there's an operation ongoing, do not check the pulse
       return previous_pulse
     end

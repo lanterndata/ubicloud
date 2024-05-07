@@ -77,7 +77,7 @@ RSpec.describe Clover, "lantern-doctor" do
         first_query = LanternDoctorQuery[doctor_id: pg.doctor.id]
         first_query.update(condition: "failed")
         summary = "Healthcheck: #{first_query.name} failed on #{pg.name} (postgres)"
-        Prog::PageNexus.assemble_with_logs(summary, [first_query.ubid, pg.doctor.ubid, "test"], {"stderr" => ""}, system_query.severity, "LanternDoctorQueryFailed", first_query.id, "postgres")
+        Prog::PageNexus.assemble_with_logs(summary, [first_query.ubid, pg.doctor.ubid, "test"], {"stderr" => "", "stdout" => "test res"}, system_query.severity, "LanternDoctorQueryFailed", first_query.id, "postgres")
 
         get "/api/project/#{project.ubid}/location/#{pg.location}/lantern/#{pg.name}/doctor/incidents"
         expect(last_response.status).to eq(200)
@@ -88,7 +88,8 @@ RSpec.describe Clover, "lantern-doctor" do
         incidents = first_item["incidents"]
         expect(incidents.size).to eq(1)
         expect(incidents[0]["summary"]).to eq(summary)
-        expect(incidents[0]["logs"]).to eq("")
+        expect(incidents[0]["error"]).to eq("")
+        expect(incidents[0]["output"]).to eq("test res")
       end
 
       it "changes check time of query to run on next loop" do
