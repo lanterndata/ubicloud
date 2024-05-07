@@ -199,7 +199,6 @@ RSpec.describe LanternDoctorQuery do
       expect(lantern_doctor_query).to receive(:should_run?).and_return(true).at_least(:once)
       expect(lantern_doctor_query).to receive(:check_daemon_embedding_jobs).and_return("f")
       expect(lantern_doctor_query).to receive(:response_type).and_return("bool").at_least(:once)
-
       expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "healthy"))
 
       expect { lantern_doctor_query.run }.not_to raise_error
