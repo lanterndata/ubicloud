@@ -115,19 +115,19 @@ RSpec.describe LanternServer do
   end
 
   it "runs query on vm" do
-    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -U postgres -t --csv postgres", stdin: "SELECT 1").and_return("1\n")
+    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U postgres -t --csv postgres", stdin: "SELECT 1").and_return("1\n")
     expect(lantern_server.run_query("SELECT 1")).to eq("1")
   end
 
   it "runs query on vm with different user and db" do
-    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -U lantern -t --csv db2", stdin: "SELECT 1").and_return("1\n")
+    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U lantern -t --csv db2", stdin: "SELECT 1").and_return("1\n")
     expect(lantern_server.run_query("SELECT 1", db: "db2", user: "lantern")).to eq("1")
   end
 
   it "runs query on vm for all databases" do
     expect(lantern_server).to receive(:list_all_databases).and_return(["postgres", "db2"])
-    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -U postgres -t --csv postgres", stdin: "SELECT 1").and_return("1\n")
-    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -U postgres -t --csv db2", stdin: "SELECT 1").and_return("2\n")
+    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U postgres -t --csv postgres", stdin: "SELECT 1").and_return("1\n")
+    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U postgres -t --csv db2", stdin: "SELECT 1").and_return("2\n")
     expect(lantern_server.run_query_all("SELECT 1")).to eq(
       [
         ["postgres", "1"],
