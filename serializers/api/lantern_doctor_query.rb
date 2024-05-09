@@ -21,7 +21,7 @@ class Serializers::Api::LanternDoctorQuery < Serializers::Base
   structure(:detailed) do |query|
     base(query).merge({
       incidents: query.active_pages.map {
-        {summary: _1.summary, error: _1.details["logs"]["stderr"], output: _1.details["logs"]["stdout"]}
+        {id: _1.id, summary: _1.page.summary, error: _1.error, output: _1.output, triggered_at: _1.created_at}
       }
     })
   end

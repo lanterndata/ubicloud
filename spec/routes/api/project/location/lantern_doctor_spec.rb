@@ -62,8 +62,8 @@ RSpec.describe Clover, "lantern-doctor" do
     end
 
     describe "incidents" do
-      it "lists active incidents" do
-        system_query = LanternDoctorQuery.create_with_id(
+      it "trigger incident for user" do
+        LanternDoctorQuery.create_with_id(
           name: "test system query",
           db_name: "postgres",
           schedule: "*/30 * * * *",
@@ -76,8 +76,82 @@ RSpec.describe Clover, "lantern-doctor" do
         pg.doctor.queries
         first_query = LanternDoctorQuery[doctor_id: pg.doctor.id]
         first_query.update(condition: "failed")
-        summary = "Healthcheck: #{first_query.name} failed on #{pg.name} (postgres)"
-        Prog::PageNexus.assemble_with_logs(summary, [first_query.ubid, pg.doctor.ubid, "test"], {"stderr" => "", "stdout" => "test res"}, system_query.severity, "LanternDoctorQueryFailed", first_query.id, "postgres")
+        page = LanternDoctorPage.create_incident(first_query, "postgres", err: "test-err", output: "test-out")
+        expect(page.status).to eq("new")
+
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/#{pg.name}/doctor/incidents/#{page.id}/trigger"
+        expect(last_response.status).to eq(204)
+        page = LanternDoctorPage[page.id]
+        expect(page.status).to eq("triggered")
+      end
+
+      it "trigger incident (not found)" do
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/#{pg.name}/doctor/incidents/#{pg.id}/trigger"
+        expect(last_response.status).to eq(404)
+      end
+
+      it "ack incident for user" do
+        LanternDoctorQuery.create_with_id(
+          name: "test system query",
+          db_name: "postgres",
+          schedule: "*/30 * * * *",
+          condition: "unknown",
+          sql: "SELECT 1<2",
+          type: "system",
+          severity: "error"
+        )
+        pg.doctor.sync_system_queries
+        pg.doctor.queries
+        first_query = LanternDoctorQuery[doctor_id: pg.doctor.id]
+        first_query.update(condition: "failed")
+        page = LanternDoctorPage.create_incident(first_query, "postgres", err: "test-err", output: "test-out")
+        expect(page.status).to eq("new")
+
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/#{pg.name}/doctor/incidents/#{page.id}/ack"
+        expect(last_response.status).to eq(204)
+        page = LanternDoctorPage[page.id]
+        expect(page.status).to eq("acknowledged")
+      end
+
+      it "resolve incident for user" do
+        LanternDoctorQuery.create_with_id(
+          name: "test system query",
+          db_name: "postgres",
+          schedule: "*/30 * * * *",
+          condition: "unknown",
+          sql: "SELECT 1<2",
+          type: "system",
+          severity: "error"
+        )
+        pg.doctor.sync_system_queries
+        pg.doctor.queries
+        first_query = LanternDoctorQuery[doctor_id: pg.doctor.id]
+        first_query.update(condition: "failed")
+        page = LanternDoctorPage.create_incident(first_query, "postgres", err: "test-err", output: "test-out")
+        expect(page.status).to eq("new")
+
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/#{pg.name}/doctor/incidents/#{page.id}/resolve"
+        expect(last_response.status).to eq(204)
+        page = LanternDoctorPage[page.id]
+        expect(page.status).to eq("resolved")
+      end
+
+      it "lists active incidents" do
+        LanternDoctorQuery.create_with_id(
+          name: "test system query",
+          db_name: "postgres",
+          schedule: "*/30 * * * *",
+          condition: "unknown",
+          sql: "SELECT 1<2",
+          type: "system",
+          severity: "error"
+        )
+        pg.doctor.sync_system_queries
+        pg.doctor.queries
+        first_query = LanternDoctorQuery[doctor_id: pg.doctor.id]
+        first_query.update(condition: "failed")
+        page = LanternDoctorPage.create_incident(first_query, "postgres", err: "test-err", output: "test-out")
+        page.trigger
 
         get "/api/project/#{project.ubid}/location/#{pg.location}/lantern/#{pg.name}/doctor/incidents"
         expect(last_response.status).to eq(200)
@@ -87,9 +161,9 @@ RSpec.describe Clover, "lantern-doctor" do
         expect(first_item["condition"]).to eq("failed")
         incidents = first_item["incidents"]
         expect(incidents.size).to eq(1)
-        expect(incidents[0]["summary"]).to eq(summary)
-        expect(incidents[0]["error"]).to eq("")
-        expect(incidents[0]["output"]).to eq("test res")
+        expect(incidents[0]["summary"]).to eq("Healthcheck: test system query failed on instance-1 - no-label (postgres)")
+        expect(incidents[0]["error"]).to eq("test-err")
+        expect(incidents[0]["output"]).to eq("test-out")
       end
 
       it "changes check time of query to run on next loop" do

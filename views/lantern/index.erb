@@ -37,7 +37,7 @@
         <tbody class="divide-y divide-gray-200 bg-white">
           <% @lantern_databases.each do |pg| %>
             <tr>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= pg[:name] %> (<%= (!pg[:label] || pg[:label].empty?) ? "no-label" : pg[:label] %>)</td>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= pg[:name] %> (<%= pg[:label] %>)</td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= pg[:location] %></td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                 <%== render("components/pg_state_label", locals: { state: pg[:state] }) %>
