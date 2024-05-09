@@ -11,6 +11,7 @@ RSpec.describe LanternDoctorQuery do
       r.severity = "error"
       r.schedule = "*/1 * * * *"
       r.id = "6181ddb3-0002-8ad0-9aeb-084832c9273b"
+      r.response_type = "bool"
     end
   }
 
@@ -73,6 +74,15 @@ RSpec.describe LanternDoctorQuery do
       expect(lantern_doctor_query).to receive(:parent).and_return(parent)
       expect(parent).to receive(:fn_label).and_return("test")
       expect(lantern_doctor_query.fn_label).to be("test")
+    end
+
+    it "returns parent response_type if parent_id is defined else self response_type" do
+      expect(lantern_doctor_query).to receive(:parent).and_return(nil)
+      expect(lantern_doctor_query.response_type).to eq("bool")
+
+      expect(lantern_doctor_query).to receive(:parent).and_return(parent)
+      expect(parent).to receive(:response_type).and_return("rows")
+      expect(lantern_doctor_query.response_type).to be("rows")
     end
   end
 
@@ -155,7 +165,22 @@ RSpec.describe LanternDoctorQuery do
       expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
       expect(lantern_doctor_query).to receive(:should_run?).and_return(true)
       expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "failed"))
-      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Healthcheck: #{lantern_doctor_query.name} failed on #{doctor.resource.name} (postgres)", [lantern_doctor_query.ubid, doctor.ubid, serv.ubid], {"stderr" => "BUG: non-system query without sql"}, lantern_doctor_query.severity, "LanternDoctorQueryFailed", lantern_doctor_query.id, "postgres")
+      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Healthcheck: #{lantern_doctor_query.name} failed on #{doctor.resource.name} (postgres)", [lantern_doctor_query.ubid, doctor.ubid, serv.ubid], {"stderr" => "BUG: non-system query without sql", "stdout" => ""}, lantern_doctor_query.severity, "LanternDoctorQueryFailed", lantern_doctor_query.id, "postgres")
+
+      expect { lantern_doctor_query.run }.not_to raise_error
+    end
+
+    it "throws error if wrong response_type" do
+      serv = instance_double(LanternServer, ubid: "test-ubid")
+      resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b")
+      doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
+
+      expect(serv).to receive(:run_query).with(lantern_doctor_query.sql, db: "postgres", user: resource.db_user).and_return("f")
+      expect(lantern_doctor_query).to receive(:response_type).and_return("test").at_least(:once)
+      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
+      expect(lantern_doctor_query).to receive(:should_run?).and_return(true)
+      expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "failed"))
+      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Healthcheck: #{lantern_doctor_query.name} failed on #{doctor.resource.name} (postgres)", [lantern_doctor_query.ubid, doctor.ubid, serv.ubid], {"stderr" => "BUG: invalid response type (test) on query test", "stdout" => ""}, lantern_doctor_query.severity, "LanternDoctorQueryFailed", lantern_doctor_query.id, "postgres")
 
       expect { lantern_doctor_query.run }.not_to raise_error
     end
@@ -173,7 +198,7 @@ RSpec.describe LanternDoctorQuery do
       expect(lantern_doctor_query).to receive(:is_system?).and_return(true).at_least(:once)
       expect(lantern_doctor_query).to receive(:should_run?).and_return(true).at_least(:once)
       expect(lantern_doctor_query).to receive(:check_daemon_embedding_jobs).and_return("f")
-
+      expect(lantern_doctor_query).to receive(:response_type).and_return("bool").at_least(:once)
       expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "healthy"))
 
       expect { lantern_doctor_query.run }.not_to raise_error
@@ -213,7 +238,7 @@ RSpec.describe LanternDoctorQuery do
       expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
       expect(lantern_doctor_query).to receive(:should_run?).and_return(true)
       expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "failed"))
-      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Healthcheck: #{lantern_doctor_query.name} failed on #{doctor.resource.name} (db1)", [lantern_doctor_query.ubid, doctor.ubid, serv.ubid], {"stderr" => "test-err"}, lantern_doctor_query.severity, "LanternDoctorQueryFailed", lantern_doctor_query.id, "db1")
+      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Healthcheck: #{lantern_doctor_query.name} failed on #{doctor.resource.name} (db1)", [lantern_doctor_query.ubid, doctor.ubid, serv.ubid], {"stderr" => "test-err", "stdout" => ""}, lantern_doctor_query.severity, "LanternDoctorQueryFailed", lantern_doctor_query.id, "db1")
 
       expect { lantern_doctor_query.run }.not_to raise_error
     end
@@ -233,7 +258,28 @@ RSpec.describe LanternDoctorQuery do
       expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
       expect(lantern_doctor_query).to receive(:should_run?).and_return(true)
       expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "failed"))
-      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Healthcheck: #{lantern_doctor_query.name} failed on #{doctor.resource.name} (db1)", [lantern_doctor_query.ubid, doctor.ubid, serv.ubid], {"stderr" => ""}, lantern_doctor_query.severity, "LanternDoctorQueryFailed", lantern_doctor_query.id, "db1")
+      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Healthcheck: #{lantern_doctor_query.name} failed on #{doctor.resource.name} (db1)", [lantern_doctor_query.ubid, doctor.ubid, serv.ubid], {"stderr" => "", "stdout" => ""}, lantern_doctor_query.severity, "LanternDoctorQueryFailed", lantern_doctor_query.id, "db1")
+
+      expect { lantern_doctor_query.run }.not_to raise_error
+    end
+
+    it "runs query on all databases and fails with rows" do
+      serv = instance_double(LanternServer, ubid: "test-ubid")
+      resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b")
+      doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
+      dbs = ["db1", "db2"]
+
+      expect(serv).to receive(:list_all_databases).and_return(dbs)
+
+      expect(serv).to receive(:run_query).with(lantern_doctor_query.sql, db: "db1", user: resource.db_user).and_return("r1\nr2")
+      expect(serv).to receive(:run_query).with(lantern_doctor_query.sql, db: "db2", user: resource.db_user).and_return("")
+
+      expect(lantern_doctor_query).to receive(:response_type).and_return("rows").at_least(:once)
+      expect(lantern_doctor_query).to receive(:db_name).and_return("*")
+      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
+      expect(lantern_doctor_query).to receive(:should_run?).and_return(true)
+      expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "failed"))
+      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Healthcheck: #{lantern_doctor_query.name} failed on #{doctor.resource.name} (db1)", [lantern_doctor_query.ubid, doctor.ubid, serv.ubid], {"stderr" => "", "stdout" => "r1\nr2"}, lantern_doctor_query.severity, "LanternDoctorQueryFailed", lantern_doctor_query.id, "db1")
 
       expect { lantern_doctor_query.run }.not_to raise_error
     end
@@ -343,8 +389,8 @@ RSpec.describe LanternDoctorQuery do
 
   describe "#page" do
     it "lists active pages" do
-      p1 = Prog::PageNexus.assemble_with_logs("test", [lantern_doctor_query.ubid], {"stderr" => ""}, "error", "LanternDoctorQueryFailed", lantern_doctor_query.id, "postgres")
-      p2 = Prog::PageNexus.assemble_with_logs("test", [lantern_doctor_query.ubid], {"stderr" => ""}, "error", "LanternDoctorQueryFailed", lantern_doctor_query.id, "postgres2")
+      p1 = Prog::PageNexus.assemble_with_logs("test", [lantern_doctor_query.ubid], {"stderr" => "", "stdout" => ""}, "error", "LanternDoctorQueryFailed", lantern_doctor_query.id, "postgres")
+      p2 = Prog::PageNexus.assemble_with_logs("test", [lantern_doctor_query.ubid], {"stderr" => "", "stdout" => ""}, "error", "LanternDoctorQueryFailed", lantern_doctor_query.id, "postgres2")
 
       Page[p2.id].update(resolved_at: Time.new)
 
@@ -354,8 +400,8 @@ RSpec.describe LanternDoctorQuery do
     end
 
     it "lists all pages" do
-      p1 = Prog::PageNexus.assemble_with_logs("test", [lantern_doctor_query.ubid], {"stderr" => ""}, "error", "LanternDoctorQueryFailed", lantern_doctor_query.id, "postgres")
-      p2 = Prog::PageNexus.assemble_with_logs("test", [lantern_doctor_query.ubid], {"stderr" => ""}, "error", "LanternDoctorQueryFailed", lantern_doctor_query.id, "postgres2")
+      p1 = Prog::PageNexus.assemble_with_logs("test", [lantern_doctor_query.ubid], {"stderr" => "", "stdout" => ""}, "error", "LanternDoctorQueryFailed", lantern_doctor_query.id, "postgres")
+      p2 = Prog::PageNexus.assemble_with_logs("test", [lantern_doctor_query.ubid], {"stderr" => "", "stdout" => ""}, "error", "LanternDoctorQueryFailed", lantern_doctor_query.id, "postgres2")
 
       Page[p2.id].update(resolved_at: Time.new)
 

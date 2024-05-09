@@ -115,19 +115,19 @@ RSpec.describe LanternServer do
   end
 
   it "runs query on vm" do
-    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -U postgres -t --csv postgres", stdin: "SELECT 1").and_return("1\n")
+    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U postgres -t --csv postgres", stdin: "SELECT 1").and_return("1\n")
     expect(lantern_server.run_query("SELECT 1")).to eq("1")
   end
 
   it "runs query on vm with different user and db" do
-    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -U lantern -t --csv db2", stdin: "SELECT 1").and_return("1\n")
+    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U lantern -t --csv db2", stdin: "SELECT 1").and_return("1\n")
     expect(lantern_server.run_query("SELECT 1", db: "db2", user: "lantern")).to eq("1")
   end
 
   it "runs query on vm for all databases" do
     expect(lantern_server).to receive(:list_all_databases).and_return(["postgres", "db2"])
-    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -U postgres -t --csv postgres", stdin: "SELECT 1").and_return("1\n")
-    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -U postgres -t --csv db2", stdin: "SELECT 1").and_return("2\n")
+    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U postgres -t --csv postgres", stdin: "SELECT 1").and_return("1\n")
+    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U postgres -t --csv db2", stdin: "SELECT 1").and_return("2\n")
     expect(lantern_server.run_query_all("SELECT 1")).to eq(
       [
         ["postgres", "1"],
@@ -504,6 +504,7 @@ RSpec.describe LanternServer do
       }
 
       expect(lantern_server).to receive(:destroy_set?).and_return(false)
+      expect(lantern_server).to receive(:display_state).and_return("running")
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(lantern_server).not_to receive(:incr_checkup)
       lantern_server.check_pulse(session: session, previous_pulse: pulse)
@@ -519,6 +520,7 @@ RSpec.describe LanternServer do
         reading_chg: Time.now - 30
       }
 
+      expect(lantern_server).to receive(:display_state).and_return("running")
       expect(lantern_server).to receive(:destroy_set?).and_return(false)
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(lantern_server).to receive(:primary?).and_return(true)
@@ -536,6 +538,7 @@ RSpec.describe LanternServer do
         reading_chg: Time.now - 30
       }
 
+      expect(lantern_server).to receive(:display_state).and_return("running")
       expect(lantern_server).to receive(:destroy_set?).and_return(false)
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(session[:db_connection]).to receive(:[]).and_raise(Sequel::DatabaseConnectionError)
@@ -567,6 +570,21 @@ RSpec.describe LanternServer do
       }
       expect(lantern_server).to receive(:destroy_set?).and_return(false)
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "destroy"))
+      lantern_server.check_pulse(session: session, previous_pulse: pulse)
+    end
+
+    it "does not check the pulse if not running" do
+      session = {
+        db_connection: instance_double(Sequel::Postgres::Database)
+      }
+      pulse = {
+        reading: "down",
+        reading_rpt: 5,
+        reading_chg: Time.now - 30
+      }
+      expect(lantern_server).to receive(:display_state).and_return("stopped")
+      expect(lantern_server).to receive(:destroy_set?).and_return(false)
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       lantern_server.check_pulse(session: session, previous_pulse: pulse)
     end
 

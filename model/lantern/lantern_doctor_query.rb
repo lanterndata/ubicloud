@@ -42,6 +42,10 @@ class LanternDoctorQuery < Sequel::Model
     parent&.fn_label || super
   end
 
+  def response_type
+    parent&.response_type || super
+  end
+
   def should_run?
     CronParser.new(schedule).next(last_checked || Time.new - 61) <= Time.new
   end
@@ -77,6 +81,7 @@ class LanternDoctorQuery < Sequel::Model
     any_failed = false
     dbs.each do |db|
       err_msg = ""
+      output = ""
 
       failed = false
       begin
@@ -88,9 +93,20 @@ class LanternDoctorQuery < Sequel::Model
           fail "BUG: non-system query without sql"
         end
 
-        if res != "f"
-          failed = true
-          any_failed = true
+        case response_type
+        when "bool"
+          if res != "f"
+            failed = true
+            any_failed = true
+          end
+        when "rows"
+          if res != ""
+            failed = true
+            any_failed = true
+          end
+          output = res
+        else
+          fail "BUG: invalid response type (#{response_type}) on query #{name}"
         end
       rescue => e
         failed = true
@@ -102,7 +118,7 @@ class LanternDoctorQuery < Sequel::Model
       pg = Page.from_tag_parts("LanternDoctorQueryFailed", id, db)
 
       if failed && !pg
-        Prog::PageNexus.assemble_with_logs("Healthcheck: #{name} failed on #{doctor.resource.name} (#{db})", [ubid, doctor.ubid, lantern_server.ubid], {"stderr" => err_msg}, severity, "LanternDoctorQueryFailed", id, db)
+        Prog::PageNexus.assemble_with_logs("Healthcheck: #{name} failed on #{doctor.resource.name} (#{db})", [ubid, doctor.ubid, lantern_server.ubid], {"stderr" => err_msg, "stdout" => output}, severity, "LanternDoctorQueryFailed", id, db)
       elsif !failed && pg
         pg.incr_resolve
       end

@@ -48,7 +48,7 @@ class LanternServer < Sequel::Model
   end
 
   def run_query(query, db: "postgres", user: "postgres")
-    vm.sshable.cmd("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -U #{user} -t --csv #{db}", stdin: query).chomp
+    vm.sshable.cmd("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U #{user} -t --csv #{db}", stdin: query).chomp
   end
 
   def run_query_all(query)
@@ -152,7 +152,7 @@ class LanternServer < Sequel::Model
   end
 
   def check_pulse(session:, previous_pulse:)
-    if destroy_set? || strand&.label != "wait"
+    if destroy_set? || strand&.label != "wait" || display_state != "running"
       # if there's an operation ongoing, do not check the pulse
       return previous_pulse
     end
