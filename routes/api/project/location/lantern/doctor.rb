@@ -42,6 +42,7 @@ class CloverApi
 
         r.post "resolve" do
           incident.resolve
+          incident.query.update(condition: "healthy")
           response.status = 204
           r.halt
         end

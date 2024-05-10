@@ -61,7 +61,11 @@ class LanternDoctorQuery < Sequel::Model
   end
 
   def active_pages
-    LanternDoctorPage.where(query_id: id, status: "triggered").all
+    LanternDoctorPage.where(query_id: id, status: ["triggered", "acknowledged"]).all
+  end
+
+  def new_and_active_pages
+    LanternDoctorPage.where(query_id: id, status: ["new", "triggered", "acknowledged"]).all
   end
 
   def run
@@ -110,10 +114,10 @@ class LanternDoctorQuery < Sequel::Model
         err_msg = e.message
       end
 
-      pg = LanternDoctorPage[query_id: id, db: db]
+      pg = LanternDoctorPage.where(query_id: id, db: db).where(Sequel.lit("status != 'resolved' ")).first
 
       if failed && !pg
-        LanternDoctorPage::create_incident(self, db, err: err_msg, output: output)
+        LanternDoctorPage.create_incident(self, db, err: err_msg, output: output)
       elsif !failed && pg
         pg.resolve
       end

@@ -298,8 +298,12 @@ RSpec.describe LanternDoctorQuery do
       expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
       expect(lantern_doctor_query).to receive(:should_run?).and_return(true)
       expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "failed"))
-      expect(LanternDoctorPage).to receive(:[]).with(query_id: lantern_doctor_query.id, db: "db1").and_return(instance_double(LanternDoctorPage))
-      expect(LanternDoctorPage).to receive(:[]).with(query_id: lantern_doctor_query.id, db: "db2").and_return(nil)
+      first_dataset = instance_double(Sequel::Dataset, first: instance_double(LanternDoctorPage))
+      second_dataset = instance_double(Sequel::Dataset, first: nil)
+      expect(first_dataset).to receive(:where).with(Sequel.lit("status != 'resolved' ")).and_return(first_dataset)
+      expect(second_dataset).to receive(:where).with(Sequel.lit("status != 'resolved' ")).and_return(second_dataset)
+      expect(LanternDoctorPage).to receive(:where).with(query_id: lantern_doctor_query.id, db: "db1").and_return(first_dataset)
+      expect(LanternDoctorPage).to receive(:where).with(query_id: lantern_doctor_query.id, db: "db2").and_return(second_dataset)
 
       expect { lantern_doctor_query.run }.not_to raise_error
     end
@@ -322,8 +326,12 @@ RSpec.describe LanternDoctorQuery do
       page1 = instance_double(LanternDoctorPage)
       page2 = instance_double(LanternDoctorPage)
 
-      expect(LanternDoctorPage).to receive(:[]).with(query_id: lantern_doctor_query.id, db: "db1").and_return(page1)
-      expect(LanternDoctorPage).to receive(:[]).with(query_id: lantern_doctor_query.id, db: "db2").and_return(page2)
+      first_dataset = instance_double(Sequel::Dataset, first: page1)
+      second_dataset = instance_double(Sequel::Dataset, first: page2)
+      expect(first_dataset).to receive(:where).with(Sequel.lit("status != 'resolved' ")).and_return(first_dataset)
+      expect(second_dataset).to receive(:where).with(Sequel.lit("status != 'resolved' ")).and_return(second_dataset)
+      expect(LanternDoctorPage).to receive(:where).with(query_id: lantern_doctor_query.id, db: "db1").and_return(first_dataset)
+      expect(LanternDoctorPage).to receive(:where).with(query_id: lantern_doctor_query.id, db: "db2").and_return(second_dataset)
       expect(page1).to receive(:resolve)
       expect(page2).to receive(:resolve)
 
@@ -393,7 +401,7 @@ RSpec.describe LanternDoctorQuery do
       serv = instance_double(LanternServer, ubid: "test-ubid")
       resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b", label: "test-label")
       doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
-      query = LanternDoctorQuery.create_with_id(type: "user")
+      query = described_class.create_with_id(type: "user")
       expect(query).to receive(:doctor).and_return(doctor).at_least(:once)
       p1 = LanternDoctorPage.create_incident(query, "pg1", err: "", output: "")
       p2 = LanternDoctorPage.create_incident(query, "pg2", err: "", output: "")
@@ -405,8 +413,27 @@ RSpec.describe LanternDoctorQuery do
       p3.ack
 
       pages = query.active_pages
-      expect(pages.size).to be(1)
+      expect(pages.size).to be(2)
       expect(pages[0].id).to eq(p1.id)
+    end
+
+    it "lists new and active pages" do
+      serv = instance_double(LanternServer, ubid: "test-ubid")
+      resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b", label: "test-label")
+      doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
+      query = described_class.create_with_id(type: "user")
+      expect(query).to receive(:doctor).and_return(doctor).at_least(:once)
+      p1 = LanternDoctorPage.create_incident(query, "pg1", err: "", output: "")
+      p2 = LanternDoctorPage.create_incident(query, "pg2", err: "", output: "")
+      p3 = LanternDoctorPage.create_incident(query, "pg3", err: "", output: "")
+      LanternDoctorPage.create_incident(query, "pg4", err: "", output: "")
+
+      p1.trigger
+      p2.resolve
+      p3.ack
+
+      pages = query.new_and_active_pages
+      expect(pages.size).to be(3)
     end
   end
 end

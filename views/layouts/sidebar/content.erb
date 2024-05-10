@@ -25,6 +25,15 @@
                 icon: "hero-circle-stack"
               }
             ) %>
+            <%== render(
+              "layouts/sidebar/item",
+              locals: {
+                name: "Lantern Doctor",
+                url: "#{@project_data[:path]}/lantern-doctor",
+                is_active: request.path.start_with?("#{@project_data[:path]}/lantern-doctor"),
+                icon: "hero-circle-stack"
+              }
+            ) %>
           <% else %>
             <%== render(
               "layouts/sidebar/item",
