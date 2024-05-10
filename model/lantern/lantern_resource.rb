@@ -41,6 +41,10 @@ class LanternResource < Sequel::Model
     "/location/#{location}/lantern/#{name}"
   end
 
+  def label
+    (!super.nil? && !super.empty?) ? super : "no-label"
+  end
+
   def display_state
     super || representative_server&.display_state || "unavailable"
   end

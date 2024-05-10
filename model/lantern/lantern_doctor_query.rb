@@ -9,8 +9,9 @@ class LanternDoctorQuery < Sequel::Model
   many_to_one :doctor, class: LanternDoctor, key: :doctor_id, primary_key: :id
   many_to_one :parent, class: self, key: :parent_id
   one_to_many :children, key: :parent_id, class: self
+  one_to_many :pages, key: :query_id, primary_key: :id, class: LanternDoctorPage
 
-  plugin :association_dependencies, children: :destroy
+  plugin :association_dependencies, children: :destroy, pages: :destroy
   dataset_module Pagination
 
   include ResourceMethods
@@ -60,13 +61,11 @@ class LanternDoctorQuery < Sequel::Model
   end
 
   def active_pages
-    tag = Page.generate_tag("LanternDoctorQueryFailed", id)
-    Page.active.where(Sequel.like(:tag, "%#{tag}-%")).all
+    LanternDoctorPage.where(query_id: id, status: ["triggered", "acknowledged"]).all
   end
 
-  def all_pages
-    tag = Page.generate_tag("LanternDoctorQueryFailed", id)
-    Page.where(Sequel.like(:tag, "%#{tag}-%")).all
+  def new_and_active_pages
+    LanternDoctorPage.where(query_id: id, status: ["new", "triggered", "acknowledged"]).all
   end
 
   def run
@@ -115,12 +114,12 @@ class LanternDoctorQuery < Sequel::Model
         err_msg = e.message
       end
 
-      pg = Page.from_tag_parts("LanternDoctorQueryFailed", id, db)
+      pg = LanternDoctorPage.where(query_id: id, db: db).where(Sequel.lit("status != 'resolved' ")).first
 
       if failed && !pg
-        Prog::PageNexus.assemble_with_logs("Healthcheck: #{name} failed on #{doctor.resource.name} (#{db})", [ubid, doctor.ubid, lantern_server.ubid], {"stderr" => err_msg, "stdout" => output}, severity, "LanternDoctorQueryFailed", id, db)
+        LanternDoctorPage.create_incident(self, db, err: err_msg, output: output)
       elsif !failed && pg
-        pg.incr_resolve
+        pg.resolve
       end
     end
 
