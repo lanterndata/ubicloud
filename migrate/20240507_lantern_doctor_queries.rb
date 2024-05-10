@@ -47,7 +47,7 @@ JOIN pg_class i ON i.oid = ix.indexrelid
 JOIN pg_am a ON i.relam = a.oid
 JOIN pg_namespace n ON n.oid = i.relnamespace
 WHERE a.amname = 'lantern_hnsw')
-SELECT idx_size.size::bigint > setting::bigint FROM idx_size, pg_settings WHERE name = 'shared_buffers';
+SELECT idx_size.size::bigint > setting::bigint * 8196 FROM idx_size, pg_settings WHERE name = 'shared_buffers';
 SQL
     DB[:lantern_doctor_query].insert(
       id: "98c0d832-90ea-85b7-9ba5-7c8e1da653ce",
