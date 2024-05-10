@@ -259,6 +259,7 @@ RSpec.describe LanternDoctorQuery do
       expect(lantern_doctor_query).to receive(:should_run?).and_return(true)
       expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "failed"))
       expect(LanternDoctorPage).to receive(:create_incident).with(lantern_doctor_query, "db1", err: "", output: "")
+
       expect { lantern_doctor_query.run }.not_to raise_error
     end
 

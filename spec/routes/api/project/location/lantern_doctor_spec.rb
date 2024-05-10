@@ -161,6 +161,7 @@ RSpec.describe Clover, "lantern-doctor" do
         expect(first_item["condition"]).to eq("failed")
         incidents = first_item["incidents"]
         expect(incidents.size).to eq(1)
+
         expect(incidents[0]["summary"]).to eq("Healthcheck: test system query failed on instance-1 - no-label (postgres)")
         expect(incidents[0]["error"]).to eq("test-err")
         expect(incidents[0]["output"]).to eq("test-out")
