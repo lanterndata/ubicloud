@@ -21,7 +21,7 @@
               locals: {
                 name: "Lantern",
                 url: "#{@project_data[:path]}/lantern",
-                is_active: request.path.start_with?("#{@project_data[:path]}/lantern"),
+                is_active: request.path.start_with?("#{@project_data[:path]}/lantern") && !request.path.start_with?("#{@project_data[:path]}/lantern-doctor"),
                 icon: "hero-circle-stack"
               }
             ) %>

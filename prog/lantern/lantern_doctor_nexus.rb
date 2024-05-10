@@ -61,7 +61,7 @@ class Prog::Lantern::LanternDoctorNexus < Prog::Base
     decr_destroy
 
     lantern_doctor.failed_queries.each {
-      _1.active_pages.each { |pg| pg.incr_resolve }
+      _1.new_and_active_pages.each { |pg| pg.resolve }
     }
 
     lantern_doctor.destroy

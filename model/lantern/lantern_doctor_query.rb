@@ -9,7 +9,7 @@ class LanternDoctorQuery < Sequel::Model
   many_to_one :doctor, class: LanternDoctor, key: :doctor_id, primary_key: :id
   many_to_one :parent, class: self, key: :parent_id
   one_to_many :children, key: :parent_id, class: self
-  one_to_many :pages, key: :id, primary_key: :query_id, class: LanternDoctorPage
+  one_to_many :pages, key: :query_id, primary_key: :id, class: LanternDoctorPage
 
   plugin :association_dependencies, children: :destroy, pages: :destroy
   dataset_module Pagination

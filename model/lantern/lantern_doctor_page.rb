@@ -7,7 +7,6 @@ class LanternDoctorPage < Sequel::Model
   many_to_one :query, class: LanternDoctorQuery, key: :query_id, primary_key: :id
 
   include ResourceMethods
-  plugin :association_dependencies, page: :destroy
 
   def self.create_incident(query, db_name, err: "", output: "")
     pg = Prog::PageNexus.assemble_with_logs("Healthcheck: #{query.name} failed on #{query.doctor.resource.name} - #{query.doctor.resource.label} (#{db_name})", [query.ubid, query.doctor.ubid], {"stderr" => err, "stdout" => output}, query.severity, "LanternDoctorQueryFailed", query.id, db_name)
