@@ -101,6 +101,7 @@ class LanternServer < Sequel::Model
 
     JSON.generate({
       enable_coredumps: true,
+      skip_deps: Config.lantern_gcp_image_cached,
       org_id: resource.org_id,
       instance_id: resource.name,
       instance_type: instance_type,

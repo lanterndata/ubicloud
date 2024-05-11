@@ -240,6 +240,7 @@ RSpec.describe LanternServer do
         db_user_password: "pwd123",
         superuser_password: "pwd1234",
         restore_target: nil)
+      expect(Config).to receive(:lantern_gcp_image_cached).and_return(false).at_least(:once)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
       expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
       expect(Config).to receive(:gcp_creds_logging_b64).and_return("test-creds").at_least(:once)
@@ -254,6 +255,7 @@ RSpec.describe LanternServer do
       walg_conf = timeline.generate_walg_config
       expected_conf = JSON.generate({
         enable_coredumps: true,
+        skip_deps: false,
         org_id: resource.org_id,
         instance_id: resource.name,
         instance_type: lantern_server.standby? ? "reader" : "writer",
@@ -313,6 +315,7 @@ RSpec.describe LanternServer do
       walg_conf = timeline.generate_walg_config
       expected_conf = JSON.generate({
         enable_coredumps: true,
+        skip_deps: true,
         org_id: resource.org_id,
         instance_id: resource.name,
         instance_type: lantern_server.standby? ? "reader" : "writer",
@@ -370,6 +373,7 @@ RSpec.describe LanternServer do
       walg_conf = timeline.generate_walg_config
       expected_conf = JSON.generate({
         enable_coredumps: true,
+        skip_deps: true,
         org_id: resource.org_id,
         instance_id: resource.name,
         instance_type: lantern_server.standby? ? "reader" : "writer",
@@ -428,6 +432,7 @@ RSpec.describe LanternServer do
       walg_conf = timeline.generate_walg_config
       expected_conf = JSON.generate({
         enable_coredumps: true,
+        skip_deps: true,
         org_id: resource.org_id,
         instance_id: resource.name,
         instance_type: lantern_server.standby? ? "reader" : "writer",

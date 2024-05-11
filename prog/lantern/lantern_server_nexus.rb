@@ -33,7 +33,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
         location: resource.location,
         size: target_vm_size,
         storage_size_gib: target_storage_size_gib,
-        boot_image: "ubuntu-2204-jammy-v20240319",
+        boot_image: Config.lantern_gcp_image,
         labels: {"parent" => resource.name}
       )
 

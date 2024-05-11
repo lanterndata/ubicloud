@@ -123,15 +123,18 @@ def setup_initial_compose_file
   end
 end
 
-install_dependencies
-puts "dependencies installed"
+if $configure_hash[:skip_deps].nil?
+  install_dependencies
+  puts "dependencies installed"
+  configure_gcr($configure_hash["gcp_creds_gcr_b64"], $configure_hash["container_image"])
+  puts "GCR repo ready"
+end
+
 setup_fs
 puts "filesystem ready"
 setup_env
 puts ".env setted up"
 setup_initial_compose_file
 puts "docker-compose.yaml ready"
-configure_gcr($configure_hash["gcp_creds_gcr_b64"], $configure_hash["container_image"])
-puts "GCR repo ready"
 run_database($configure_hash["container_image"])
 puts "database ready"

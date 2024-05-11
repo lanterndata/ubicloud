@@ -42,7 +42,7 @@ class Hosting::GcpApis
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
 
     loop do
-      response = connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/operations/#{operation}/wait", expects: [200])
+      response = connection.post(path: "/compute/v1/projects/#{@project}/#{(zone == "global") ? "" : "zones/"}#{zone}/operations/#{operation}/wait", expects: [200])
       body = JSON.parse(response.body)
       break unless body["status"] != "DONE"
     rescue Excon::Error::Timeout
@@ -72,7 +72,7 @@ class Hosting::GcpApis
           initializeParams: {
             diskSizeGb: disk_size_gb,
             diskType: "projects/#{@project}/zones/#{zone}/diskTypes/pd-ssd",
-            sourceImage: "projects/ubuntu-os-cloud/global/images/#{image}"
+            sourceImage: image
           },
           mode: "READ_WRITE",
           type: "PERSISTENT"
@@ -329,5 +329,24 @@ class Hosting::GcpApis
     response = connection.put(path: "/storage/v1/b/#{bucket_name}/iam", body: JSON.dump(policy), expects: [200, 400, 403])
 
     Hosting::GcpApis.check_errors(response)
+  end
+
+  def create_image(name:, vm_name:, zone:, description: "", family: "lantern-ubuntu")
+    connection = Excon.new(@host[:connection_string], headers: @host[:headers])
+    body = {
+      kind: "compute#image",
+      description: description,
+      name: name,
+      family: family,
+      sourceDisk: "projects/#{@project}/zones/#{zone}/disks/#{vm_name}",
+      storageLocations: [
+        "us"
+      ]
+    }
+
+    response = connection.post(path: "/compute/beta/projects/#{@project}/global/images", body: JSON.dump(body), expects: 200)
+    Hosting::GcpApis.check_errors(response)
+    data = JSON.parse(response.body)
+    wait_for_operation("global", data["id"])
   end
 end
