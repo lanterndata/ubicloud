@@ -133,17 +133,6 @@ module Config
   optional :ubicloud_images_blob_storage_secret_key, string, clear: true
   optional :ubicloud_images_blob_storage_certs, string
 
-  # Lantern
-  override :lantern_top_domain, "db.lantern.dev", string
-  override :lantern_dns_email, "varik@lantern.dev", string
-  override :lantern_default_version, "0.2.5", string
-  override :lantern_extras_default_version, "0.1.5", string
-  override :lantern_minor_default_version, "2", string
-  override :lantern_backup_bucket, "walg-dev-backups"
-  override :e2e_test, "0"
-  override :backup_retention_days, 7, int
-  optional :lantern_backend_database_url, string
-
   # GCP
   override :gcp_project_id, "lantern-development", string
   override :gcp_compute_service_account, "339254316100-compute@developer.gserviceaccount.com", string
@@ -153,6 +142,23 @@ module Config
   optional :gcp_creds_walg_b64, string
   optional :prom_password, string
   override :gcr_image, "gcr.io/ringed-griffin-394922/lantern-bitnami"
+
+  # Lantern
+  override :lantern_top_domain, "db.lantern.dev", string
+  override :lantern_dns_email, "varik@lantern.dev", string
+  override :lantern_default_version, "0.2.7", string
+  override :lantern_extras_default_version, "0.1.5", string
+  override :lantern_minor_default_version, "1", string
+  override :lantern_backup_bucket, "walg-dev-backups"
+  override :e2e_test, "0"
+  override :backup_retention_days, 7, int
+  optional :lantern_backend_database_url, string
+
+  # To use default ubuntu image pass these env vars to overwrite
+  # LANTERN_GCP_IMAGE=projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy-v20240319
+  # LANTERN_GCP_IMAGE_CACHED=false
+  override :lantern_gcp_image, "projects/#{gcp_project_id}/global/images/ubuntu-lantern-#{lantern_default_version.tr(".", "-")}-extras-#{lantern_extras_default_version.tr(".", "-")}-minor-#{lantern_minor_default_version}", string
+  override :lantern_gcp_image_cached, true, bool
 
   # Cloudflare
   optional :cf_token, string
