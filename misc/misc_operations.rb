@@ -162,9 +162,10 @@ class MiscOperations
     }
   end
 
-  def self.create_image(name, description, image_tag, vm: nil)
+  def self.create_image(lantern_version: "0.2.7", extras_version: "0.1.5", minor_version: "1", vm: nil)
     gcp_api = Hosting::GcpApis.new
-    container_image = "#{Config.gcr_image}:#{image_tag}"
+    name = "ubuntu-lantern-#{lantern_version.tr(".", "-")}-extras-#{extras_version.tr(".", "-")}-minor-#{minor_version}"
+    container_image = "#{Config.gcr_image}:lantern-#{lantern_version}-extras-#{extras_version}-minor-#{minor_version}"
 
     if vm.nil?
       vm = Prog::GcpVm::Nexus.assemble_with_sshable("lantern", Project.first.id, name: "imagecreation-machine", storage_size_gib: 10)

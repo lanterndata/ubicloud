@@ -4,9 +4,6 @@ require_relative "../spec_helper"
 
 RSpec.describe Clover, "lantern" do
   let(:user) { create_account }
-
-  let(:project) { user.create_project_with_default_policy("project-1", provider: "gcp") }
-
   let(:pg) do
     st = Prog::Lantern::LanternResourceNexus.assemble(
       project_id: project.id,
@@ -17,6 +14,12 @@ RSpec.describe Clover, "lantern" do
       org_id: 0
     )
     LanternResource[st.id]
+  end
+
+  let(:project) { user.create_project_with_default_policy("project-1", provider: "gcp") }
+
+  before do
+    allow(LanternServer).to receive(:get_vm_image).and_return(Config.gcp_default_image)
   end
 
   describe "unauthenticated" do

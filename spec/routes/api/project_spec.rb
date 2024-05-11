@@ -7,6 +7,10 @@ RSpec.describe Clover, "vm" do
 
   let(:project) { user.create_project_with_default_policy("project-1") }
 
+  before do
+    allow(LanternServer).to receive(:get_vm_image).and_return(Config.gcp_default_image)
+  end
+
   describe "unauthenticated" do
     it "not list" do
       get "/api/project"
