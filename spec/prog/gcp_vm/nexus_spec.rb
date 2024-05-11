@@ -12,7 +12,7 @@ RSpec.describe Prog::GcpVm::Nexus do
 
   let(:st) { Strand.new }
   let(:gcp_vm) {
-    vm = GcpVm.new_with_id(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "us-central1", storage_size_gib: 50)
+    vm = GcpVm.new_with_id(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "us-central1", storage_size_gib: 50, boot_image: Config.lantern_gcp_image)
     vm
   }
   let(:prj) { Project.create_with_id(name: "default", provider: "gcp").tap { _1.associate_with_project(_1) } }
@@ -71,7 +71,7 @@ RSpec.describe Prog::GcpVm::Nexus do
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
       frame = {"labels" => {"parent" => "test-label"}}
-      expect(gcp_api).to receive(:create_vm).with("dummy-vm", "us-central1-a", nil, nil, nil, "standard-1", 50, labels: frame["labels"])
+      expect(gcp_api).to receive(:create_vm).with("dummy-vm", "us-central1-a", gcp_vm.boot_image, nil, nil, "standard-1", 50, labels: frame["labels"])
       expect(nx).to receive(:frame).and_return(frame)
       expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
       expect(nx.strand).to receive(:modified!).with(:stack).at_least(:once)

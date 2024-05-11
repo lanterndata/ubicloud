@@ -161,4 +161,51 @@ class MiscOperations
       end
     }
   end
+
+  def self.create_image(name, description, image_tag, vm: nil)
+    gcp_api = Hosting::GcpApis.new
+    container_image = "#{Config.gcr_image}:#{image_tag}"
+
+    if vm.nil?
+      vm = Prog::GcpVm::Nexus.assemble_with_sshable("lantern", Project.first.id, name: "imagecreation-machine", storage_size_gib: 10)
+
+      # wait vm available
+      loop do
+        break if Strand[vm.id].label == "wait"
+        sleep 10
+      end
+
+      vm = GcpVm[vm.id]
+      puts "VM Created"
+    end
+
+    key_data = vm.sshable.keys.map(&:private_key)
+    Util.rootish_ssh(vm.sshable.host, "lantern", key_data, <<SH)
+set -euo pipefail
+sudo apt update && sudo apt-get -y install software-properties-common make ruby-bundler
+curl -fsSL https://get.docker.com > /tmp/get-docker.sh
+chmod +x /tmp/get-docker.sh
+/tmp/get-docker.sh
+rm -rf /tmp/get-docker.sh
+sudo sed -i 's/ulimit -Hn/ulimit -n/' /etc/init.d/docker
+sudo service docker restart
+echo #{Config.gcp_creds_gcr_b64} | base64 -d | sudo docker login -u _json_key --password-stdin https://gcr.io
+sudo docker pull #{container_image}
+sudo docker logout
+history -cw
+SH
+    puts "Dependencies installed"
+
+    vm.incr_stop_vm
+    # wait vm stopped
+    loop do
+      break if GcpVm[vm.id].display_state == "stopped"
+      sleep 10
+    end
+
+    puts "VM stopped creating image"
+    gcp_api.create_image(name: name, vm_name: vm.name, zone: "#{vm.location}-a", description: description)
+    puts "Image created"
+    vm.incr_destroy
+  end
 end

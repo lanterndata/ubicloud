@@ -288,6 +288,14 @@ RSpec.describe Hosting::GcpApis do
     end
 
     describe "#wait_for_operation" do
+      it "waits for global operation to be done at first attempt" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/global/operations/test-op/wait").to_return(status: 200, body: JSON.dump({"status" => "DONE"}), headers: {"Content-Type" => "application/json"})
+
+        api = described_class.new
+        expect { api.wait_for_operation("global", "test-op") }.not_to raise_error
+      end
+
       it "waits for operation to be done at first attempt" do
         stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
         stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/operations/test-op/wait").to_return(status: 200, body: JSON.dump({"status" => "DONE"}), headers: {"Content-Type" => "application/json"})
@@ -314,6 +322,20 @@ RSpec.describe Hosting::GcpApis do
 
         api = described_class.new
         expect { api.wait_for_operation("us-central1-a", "test-op") }.not_to raise_error
+      end
+    end
+
+    describe "#create_image" do
+      it "cerates image" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:post, "https://compute.googleapis.com/compute/beta/projects/test-project/global/images")
+          .with(
+            body: "{\"kind\":\"compute#image\",\"description\":\"test-desc\",\"name\":\"test-name\",\"family\":\"lantern-ubuntu\",\"sourceDisk\":\"projects/test-project/zones/us-central1-a/disks/inst-name\",\"storageLocations\":[\"us\"]}"
+          )
+          .to_return(status: 200, body: JSON.dump({"id" => "test-op"}), headers: {})
+        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/global/operations/test-op/wait").to_return(status: 200, body: JSON.dump({"status" => "DONE"}), headers: {"Content-Type" => "application/json"})
+        api = described_class.new
+        expect { api.create_image(name: "test-name", vm_name: "inst-name", zone: "us-central1-a", description: "test-desc") }.not_to raise_error
       end
     end
   end
