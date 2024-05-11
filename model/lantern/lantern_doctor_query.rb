@@ -48,7 +48,7 @@ class LanternDoctorQuery < Sequel::Model
   end
 
   def should_run?
-    CronParser.new(schedule).next(last_checked || Time.new - 61) <= Time.new
+    CronParser.new(schedule).next(last_checked || Time.new - 365 * 24 * 60 * 60) <= Time.new
   end
 
   def is_system?
