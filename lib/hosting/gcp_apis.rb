@@ -344,9 +344,21 @@ class Hosting::GcpApis
       ]
     }
 
-    response = connection.post(path: "/compute/beta/projects/#{@project}/global/images", body: JSON.dump(body), expects: 200)
+    response = connection.post(path: "/compute/v1/projects/#{@project}/global/images", body: JSON.dump(body), expects: 200)
     Hosting::GcpApis.check_errors(response)
     data = JSON.parse(response.body)
     wait_for_operation("global", data["id"])
+  end
+
+  def get_image(name)
+    connection = Excon.new(@host[:connection_string], headers: @host[:headers])
+    response = connection.get(path: "/compute/v1/projects/#{@project}/global/images/#{name}")
+
+    if response.status == 404
+      return nil
+    end
+
+    Hosting::GcpApis.check_errors(response)
+    JSON.parse(response.body).merge({"resource_name" => "projects/#{@project}/global/images/#{name}"})
   end
 end

@@ -21,6 +21,10 @@ RSpec.describe Clover, "lantern-doctor" do
     LanternResource[st.id]
   end
 
+  before do
+    allow(LanternServer).to receive(:get_vm_image).and_return(Config.gcp_default_image)
+  end
+
   describe "authenticated" do
     before do
       login_api(user.email)

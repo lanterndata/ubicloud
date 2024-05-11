@@ -328,7 +328,7 @@ RSpec.describe Hosting::GcpApis do
     describe "#create_image" do
       it "cerates image" do
         stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
-        stub_request(:post, "https://compute.googleapis.com/compute/beta/projects/test-project/global/images")
+        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/global/images")
           .with(
             body: "{\"kind\":\"compute#image\",\"description\":\"test-desc\",\"name\":\"test-name\",\"family\":\"lantern-ubuntu\",\"sourceDisk\":\"projects/test-project/zones/us-central1-a/disks/inst-name\",\"storageLocations\":[\"us\"]}"
           )
@@ -336,6 +336,24 @@ RSpec.describe Hosting::GcpApis do
         stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/global/operations/test-op/wait").to_return(status: 200, body: JSON.dump({"status" => "DONE"}), headers: {"Content-Type" => "application/json"})
         api = described_class.new
         expect { api.create_image(name: "test-name", vm_name: "inst-name", zone: "us-central1-a", description: "test-desc") }.not_to raise_error
+      end
+    end
+
+    describe "#get_image" do
+      it "gets image" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/test-project/global/images/test-image")
+          .to_return(status: 200, body: JSON.dump({}), headers: {})
+        api = described_class.new
+        expect(api.get_image("test-image")).to eq({"resource_name" => "projects/test-project/global/images/test-image"})
+      end
+
+      it "gets nil" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/test-project/global/images/test-image")
+          .to_return(status: 404, body: JSON.dump({}), headers: {})
+        api = described_class.new
+        expect(api.get_image("test-image")).to be_nil
       end
     end
   end

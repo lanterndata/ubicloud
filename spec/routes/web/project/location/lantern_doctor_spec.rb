@@ -3,6 +3,10 @@
 require_relative "../../spec_helper"
 
 RSpec.describe Clover, "lantern-doctor" do
+  before do
+    allow(LanternServer).to receive(:get_vm_image).and_return(Config.gcp_default_image)
+  end
+
   let(:user) { create_account }
 
   let(:project) { user.create_project_with_default_policy("project-1", provider: "gcp") }
