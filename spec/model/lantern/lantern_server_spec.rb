@@ -7,6 +7,11 @@ RSpec.describe LanternServer do
     described_class.new { _1.id = "c068cac7-ed45-82db-bf38-a003582b36ee" }
   }
 
+  before do
+    allow(described_class).to receive(:get_vm_image).and_return(Config.gcp_default_image)
+    allow(lantern_server).to receive(:gcp_vm).and_return(vm)
+  end
+
   let(:vm) {
     instance_double(
       GcpVm,
@@ -14,10 +19,6 @@ RSpec.describe LanternServer do
       mem_gib: 8
     )
   }
-
-  before do
-    allow(lantern_server).to receive(:gcp_vm).and_return(vm)
-  end
 
   describe "#instance_type" do
     it "returns reader" do
@@ -240,7 +241,6 @@ RSpec.describe LanternServer do
         db_user_password: "pwd123",
         superuser_password: "pwd1234",
         restore_target: nil)
-      expect(Config).to receive(:lantern_gcp_image_cached).and_return(false).at_least(:once)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
       expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
       expect(Config).to receive(:gcp_creds_logging_b64).and_return("test-creds").at_least(:once)
@@ -251,6 +251,7 @@ RSpec.describe LanternServer do
       expect(lantern_server).to receive(:lantern_version).and_return("0.2.2").at_least(:once)
       expect(lantern_server).to receive(:extras_version).and_return("0.1.4").at_least(:once)
       expect(lantern_server).to receive(:minor_version).and_return("1").at_least(:once)
+      expect(vm).to receive(:boot_image).and_return(Config.gcp_default_image).at_least(:once)
 
       walg_conf = timeline.generate_walg_config
       expected_conf = JSON.generate({
@@ -311,6 +312,7 @@ RSpec.describe LanternServer do
       expect(lantern_server).to receive(:lantern_version).and_return("0.2.2").at_least(:once)
       expect(lantern_server).to receive(:extras_version).and_return("0.1.4").at_least(:once)
       expect(lantern_server).to receive(:minor_version).and_return("1").at_least(:once)
+      expect(vm).to receive(:boot_image).and_return("custom-image").at_least(:once)
 
       walg_conf = timeline.generate_walg_config
       expected_conf = JSON.generate({
@@ -369,6 +371,7 @@ RSpec.describe LanternServer do
       expect(lantern_server).to receive(:lantern_version).and_return("0.2.2").at_least(:once)
       expect(lantern_server).to receive(:extras_version).and_return("0.1.4").at_least(:once)
       expect(lantern_server).to receive(:minor_version).and_return("1").at_least(:once)
+      expect(vm).to receive(:boot_image).and_return("custom-image").at_least(:once)
 
       walg_conf = timeline.generate_walg_config
       expected_conf = JSON.generate({
@@ -428,6 +431,7 @@ RSpec.describe LanternServer do
       expect(lantern_server).to receive(:lantern_version).and_return("0.2.2").at_least(:once)
       expect(lantern_server).to receive(:extras_version).and_return("0.1.4").at_least(:once)
       expect(lantern_server).to receive(:minor_version).and_return("1").at_least(:once)
+      expect(vm).to receive(:boot_image).and_return("custom-image").at_least(:once)
 
       walg_conf = timeline.generate_walg_config
       expected_conf = JSON.generate({
@@ -627,6 +631,24 @@ SQL
     it "returns list of all databases" do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec postgresql psql -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'").and_return("postgres\ndb2\n")
       expect(lantern_server.list_all_databases).to eq(["postgres", "db2"])
+    end
+  end
+
+  describe "#get_vm_image" do
+    it "returns default image" do
+      allow(described_class).to receive(:get_vm_image).and_call_original
+      api = instance_double(Hosting::GcpApis)
+      expect(Hosting::GcpApis).to receive(:new).and_return(api)
+      expect(api).to receive(:get_image).and_return(nil)
+      expect(described_class.get_vm_image("0.2.7", "0.1.5", "1")).to eq(Config.gcp_default_image)
+    end
+
+    it "returns custom image" do
+      allow(described_class).to receive(:get_vm_image).and_call_original
+      api = instance_double(Hosting::GcpApis)
+      expect(Hosting::GcpApis).to receive(:new).and_return(api)
+      expect(api).to receive(:get_image).and_return({"resource_name" => "custom-image"})
+      expect(described_class.get_vm_image("0.2.7", "0.1.5", "1")).to eq("custom-image")
     end
   end
 end

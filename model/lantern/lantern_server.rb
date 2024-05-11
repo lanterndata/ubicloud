@@ -101,7 +101,7 @@ class LanternServer < Sequel::Model
 
     JSON.generate({
       enable_coredumps: true,
-      skip_deps: Config.lantern_gcp_image_cached,
+      skip_deps: vm.boot_image != Config.gcp_default_image,
       org_id: resource.org_id,
       instance_id: resource.name,
       instance_type: instance_type,
@@ -150,6 +150,14 @@ class LanternServer < Sequel::Model
     {
       db_connection: nil
     }
+  end
+
+  def self.get_vm_image(lantern_version, extras_version, minor_version)
+    api = Hosting::GcpApis.new
+    image_name = "ubuntu-lantern-#{lantern_version.tr(".", "-")}-extras-#{extras_version.tr(".", "-")}-minor-#{minor_version}"
+    image = api.get_image(image_name)
+
+    image.nil? ? Config.gcp_default_image : image["resource_name"]
   end
 
   def check_pulse(session:, previous_pulse:)

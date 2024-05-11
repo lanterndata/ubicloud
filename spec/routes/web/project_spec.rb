@@ -10,6 +10,10 @@ RSpec.describe Clover, "project" do
 
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", policy_body: []) }
 
+  before do
+    allow(LanternServer).to receive(:get_vm_image).and_return(Config.gcp_default_image)
+  end
+
   describe "unauthenticated" do
     it "can not list without login" do
       visit "/project"
