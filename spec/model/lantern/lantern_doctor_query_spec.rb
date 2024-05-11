@@ -91,6 +91,7 @@ RSpec.describe LanternDoctorQuery do
       min = Time.new.min
       modified_min = (min == 59) ? 0 : min + 1
 
+      expect(lantern_doctor_query).to receive(:last_checked).and_return(Time.new)
       expect(lantern_doctor_query).to receive(:schedule).and_return("#{modified_min} * * * *").at_least(:once)
       expect(lantern_doctor_query.should_run?).to be(false)
     end
