@@ -33,7 +33,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
         location: resource.location,
         size: target_vm_size,
         storage_size_gib: target_storage_size_gib,
-        boot_image: Config.lantern_gcp_image,
+        boot_image: LanternServer.get_vm_image(lantern_version, extras_version, minor_version),
         labels: {"parent" => resource.name}
       )
 

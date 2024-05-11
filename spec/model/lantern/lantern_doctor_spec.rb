@@ -9,6 +9,10 @@ RSpec.describe LanternDoctor do
     end
   }
 
+  before do
+    allow(LanternServer).to receive(:get_vm_image).and_return(Config.gcp_default_image)
+  end
+
   describe "#system_queries" do
     it "returns cached queries" do
       expect(lantern_doctor).to receive(:system_queries).and_return([instance_double(LanternDoctorQuery)])

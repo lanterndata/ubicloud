@@ -18,7 +18,7 @@ class Prog::GcpVm::Nexus < Prog::Base
   semaphore :destroy, :start_vm, :stop_vm, :update_storage, :update_size
 
   def self.assemble(public_key, project_id, name: nil, size: "n1-standard-2",
-    unix_user: "lantern", location: "us-central1", boot_image: Config.lantern_gcp_image,
+    unix_user: "lantern", location: "us-central1", boot_image: Config.gcp_default_image,
     storage_size_gib: nil, arch: "x64", labels: {})
 
     unless (project = Project[project_id])

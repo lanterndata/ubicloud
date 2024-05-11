@@ -3,6 +3,10 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Pagination do
+  before do
+    allow(LanternServer).to receive(:get_vm_image).and_return(Config.gcp_default_image)
+  end
+
   let(:project) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
 
   let!(:first_server) do

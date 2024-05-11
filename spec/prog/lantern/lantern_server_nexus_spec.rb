@@ -37,6 +37,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
   }
 
   before do
+    allow(LanternServer).to receive(:get_vm_image).and_return(Config.gcp_default_image)
     allow(nx).to receive(:lantern_server).and_return(lantern_server)
   end
 
