@@ -165,6 +165,7 @@ class MiscOperations
   def self.create_image(lantern_version: "0.2.7", extras_version: "0.1.5", minor_version: "1", vm: nil)
     gcp_api = Hosting::GcpApis.new
     name = "ubuntu-lantern-#{lantern_version.tr(".", "-")}-extras-#{extras_version.tr(".", "-")}-minor-#{minor_version}"
+    description = "Time: #{Time.new}, Lantern - #{lantern_version}, Extras - #{extras_version}, Minor - #{minor_version}"
     container_image = "#{Config.gcr_image}:lantern-#{lantern_version}-extras-#{extras_version}-minor-#{minor_version}"
 
     if vm.nil?
