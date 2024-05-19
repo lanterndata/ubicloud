@@ -151,4 +151,16 @@ class LanternDoctorQuery < Sequel::Model
 
     failed ? "t" : "f"
   end
+
+  def check_disk_space_usage(_db, _query_user)
+    output = ""
+    doctor.resource.servers.each do |serv|
+      usage_percent = serv.vm.sshable.cmd("df | awk '$1 == \"/dev/root\" {print $5}' | sed 's/%//'").strip.to_i
+      if usage_percent > 90
+        server_type = serv.primary? ? "primary" : "standby"
+        output += "#{server_type} server - usage #{usage_percent}%\n"
+      end
+    end
+    output.chomp
+  end
 end
