@@ -43,6 +43,7 @@ class Hosting::GcpApis
 
     loop do
       response = connection.post(path: "/compute/v1/projects/#{@project}/#{(zone == "global") ? "" : "zones/"}#{zone}/operations/#{operation}/wait", expects: [200])
+      Hosting::GcpApis.check_errors(response)
       body = JSON.parse(response.body)
       break unless body["status"] != "DONE"
     rescue Excon::Error::Timeout

@@ -323,6 +323,16 @@ RSpec.describe Hosting::GcpApis do
         api = described_class.new
         expect { api.wait_for_operation("us-central1-a", "test-op") }.not_to raise_error
       end
+
+      it "throws error" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/operations/test-op/wait")
+          .to_return(status: 200, body: JSON.dump({"status" => "RUNNING"}), headers: {"Content-Type" => "application/json"})
+          .to_return(status: 200, body: JSON.dump({"status" => "DONE", "error" => {"errors" => [{"message" => "test"}]}}), headers: {"Content-Type" => "application/json"})
+
+        api = described_class.new
+        expect { api.wait_for_operation("us-central1-a", "test-op") }.to raise_error "test"
+      end
     end
 
     describe "#create_image" do
