@@ -54,4 +54,20 @@ RSpec.describe GcpVm do
       expect(gcp_vm.inhost_name).to eq("pvr1mcnh")
     end
   end
+
+  describe "is_stopped" do
+    it "returns false" do
+      api = instance_double(Hosting::GcpApis)
+      expect(Hosting::GcpApis).to receive(:new).and_return(api)
+      expect(api).to receive(:get_vm).with(gcp_vm.name, "#{gcp_vm.location}-a").and_return({"status" => "RUNNING"})
+      expect(gcp_vm.is_stopped?).to be(false)
+    end
+
+    it "returns true" do
+      api = instance_double(Hosting::GcpApis)
+      expect(Hosting::GcpApis).to receive(:new).and_return(api)
+      expect(api).to receive(:get_vm).with(gcp_vm.name, "#{gcp_vm.location}-a").and_return({"status" => "TERMINATED"})
+      expect(gcp_vm.is_stopped?).to be(true)
+    end
+  end
 end

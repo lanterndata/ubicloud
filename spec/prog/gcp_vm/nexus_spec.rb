@@ -221,13 +221,12 @@ RSpec.describe Prog::GcpVm::Nexus do
 
   describe "#update_storage" do
     it "stops vm before updating" do
-      expect(gcp_vm).to receive(:display_state).and_return("running")
+      expect(gcp_vm).to receive(:is_stopped?).and_return(false)
       expect { nx.update_storage }.to hop("stop_vm")
     end
 
     it "resizes vm disk" do
-      expect(gcp_vm).to receive(:display_state).and_return("stopped")
-      expect(gcp_vm).to receive(:update).with({display_state: "updating"})
+      expect(gcp_vm).to receive(:is_stopped?).and_return(true)
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
       expect(gcp_api).to receive(:get_vm).with("dummy-vm", "us-central1-a").and_return({"disks" => [{"source" => "https://compute.googleapis.com/compute/v1/projects/test/zones/us-central1-a/disks/test-disk"}]})
@@ -236,8 +235,7 @@ RSpec.describe Prog::GcpVm::Nexus do
     end
 
     it "resizes vm disk and hop to vm size update" do
-      expect(gcp_vm).to receive(:display_state).and_return("stopped")
-      expect(gcp_vm).to receive(:update).with({display_state: "updating"})
+      expect(gcp_vm).to receive(:is_stopped?).and_return(true)
       expect(nx).to receive(:when_update_size_set?).and_yield
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
@@ -249,12 +247,12 @@ RSpec.describe Prog::GcpVm::Nexus do
 
   describe "#update_size" do
     it "hops to stop_vm" do
+      expect(gcp_vm).to receive(:is_stopped?).and_return(false)
       expect { nx.update_size }.to hop("stop_vm")
     end
 
     it "updates vm size" do
-      expect(gcp_vm).to receive(:display_state).and_return("stopped")
-      expect(gcp_vm).to receive(:update).with({display_state: "updating"})
+      expect(gcp_vm).to receive(:is_stopped?).and_return(true)
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
       expect(gcp_api).to receive(:update_vm_type).with("dummy-vm", "us-central1-a", "standard-1")
@@ -263,8 +261,7 @@ RSpec.describe Prog::GcpVm::Nexus do
     end
 
     it "hops to update_storage after vm size update" do
-      expect(gcp_vm).to receive(:display_state).and_return("stopped")
-      expect(gcp_vm).to receive(:update).with({display_state: "updating"})
+      expect(gcp_vm).to receive(:is_stopped?).and_return(true)
       expect(nx).to receive(:when_update_storage_set?).and_yield
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)

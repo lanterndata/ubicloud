@@ -57,6 +57,12 @@ class GcpVm < Sequel::Model
     self.class.ubid_to_name(UBID.from_uuidish(id))
   end
 
+  def is_stopped?
+    gcp_client = Hosting::GcpApis.new
+    vm = gcp_client.get_vm(name, "#{location}-a")
+    vm["status"] == "TERMINATED"
+  end
+
   def self.redacted_columns
     super + [:public_key]
   end
