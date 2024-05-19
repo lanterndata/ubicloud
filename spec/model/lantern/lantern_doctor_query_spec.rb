@@ -341,6 +341,38 @@ RSpec.describe LanternDoctorQuery do
     end
   end
 
+  describe "#check_disk_space_usage" do
+    it "fails if primary disk server usage is above 90%" do
+      serv1 = instance_double(LanternServer, primary?: true, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      serv2 = instance_double(LanternServer, primary?: false, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      expect(serv1.vm.sshable).to receive(:cmd).and_return("91")
+      expect(serv2.vm.sshable).to receive(:cmd).and_return("80")
+      doctor = instance_double(LanternDoctor, resource: instance_double(LanternResource, servers: [serv1, serv2]), ubid: "test-ubid")
+      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
+      expect(lantern_doctor_query.check_disk_space_usage("postgres", "postgres")).to eq("primary server - usage 91%")
+    end
+
+    it "fails if standby disk usage is above 90%" do
+      serv1 = instance_double(LanternServer, primary?: true, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      serv2 = instance_double(LanternServer, primary?: false, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      expect(serv1.vm.sshable).to receive(:cmd).and_return("11")
+      expect(serv2.vm.sshable).to receive(:cmd).and_return("92")
+      doctor = instance_double(LanternDoctor, resource: instance_double(LanternResource, servers: [serv1, serv2]), ubid: "test-ubid")
+      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
+      expect(lantern_doctor_query.check_disk_space_usage("postgres", "postgres")).to eq("standby server - usage 92%")
+    end
+
+    it "succceds if all servers disk usage is under 90%" do
+      serv1 = instance_double(LanternServer, primary?: true, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      serv2 = instance_double(LanternServer, primary?: false, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      expect(serv1.vm.sshable).to receive(:cmd).and_return("11")
+      expect(serv2.vm.sshable).to receive(:cmd).and_return("22")
+      doctor = instance_double(LanternDoctor, resource: instance_double(LanternResource, servers: [serv1, serv2]), ubid: "test-ubid")
+      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
+      expect(lantern_doctor_query.check_disk_space_usage("postgres", "postgres")).to eq("")
+    end
+  end
+
   describe "#check_daemon_embedding_jobs" do
     it "fails if not backend db connection" do
       expect(LanternBackend).to receive(:db).and_return(nil)
