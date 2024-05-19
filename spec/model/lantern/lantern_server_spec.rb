@@ -51,6 +51,12 @@ RSpec.describe LanternServer do
       expect(lantern_server.display_state).to eq("updating")
     end
 
+    it "shows updating from vm status" do
+      expect(lantern_server.vm).to receive(:display_state).and_return("updating").at_least(:once)
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait")).at_least(:once)
+      expect(lantern_server.display_state).to eq("updating")
+    end
+
     it "shows updating if init_sql" do
       expect(lantern_server.vm).to receive(:display_state).and_return("running").at_least(:once)
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "init_sql")).at_least(:once)

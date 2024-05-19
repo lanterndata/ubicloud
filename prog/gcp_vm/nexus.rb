@@ -165,9 +165,7 @@ class Prog::GcpVm::Nexus < Prog::Base
   end
 
   label def wait_vm_stopped
-    gcp_client = Hosting::GcpApis.new
-    vm = gcp_client.get_vm(gcp_vm.name, "#{gcp_vm.location}-a")
-    if vm["status"] == "TERMINATED"
+    if gcp_vm.is_stopped?
       gcp_vm.update(display_state: "stopped")
       hop_wait
     end
@@ -193,11 +191,10 @@ class Prog::GcpVm::Nexus < Prog::Base
   end
 
   label def update_storage
-    if gcp_vm.display_state != "stopped"
+    if !gcp_vm.is_stopped?
       hop_stop_vm
     end
     decr_update_storage
-    gcp_vm.update(display_state: "updating")
     gcp_client = Hosting::GcpApis.new
     zone = "#{gcp_vm.location}-a"
     vm = gcp_client.get_vm(gcp_vm.name, zone)
@@ -212,11 +209,10 @@ class Prog::GcpVm::Nexus < Prog::Base
   end
 
   label def update_size
-    if gcp_vm.display_state != "stopped"
+    if !gcp_vm.is_stopped?
       hop_stop_vm
     end
     decr_update_size
-    gcp_vm.update(display_state: "updating")
     gcp_client = Hosting::GcpApis.new
     gcp_client.update_vm_type(gcp_vm.name, "#{gcp_vm.location}-a", gcp_vm.display_size)
 
