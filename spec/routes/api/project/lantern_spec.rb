@@ -3,6 +3,15 @@
 require_relative "../spec_helper"
 
 RSpec.describe Clover, "lantern" do
+  before do
+    api = instance_double(Hosting::GcpApis)
+    allow(Hosting::GcpApis).to receive(:new).and_return(api)
+    allow(api).to receive_messages(create_service_account: {"email" => "test-sa"}, export_service_account_key: "test-key")
+    allow(api).to receive(:allow_bucket_usage_by_prefix)
+    allow(api).to receive(:allow_access_to_big_query_table)
+    allow(LanternServer).to receive(:get_vm_image).and_return(Config.gcp_default_image)
+  end
+
   let(:user) { create_account }
   let(:pg) do
     st = Prog::Lantern::LanternResourceNexus.assemble(
@@ -17,10 +26,6 @@ RSpec.describe Clover, "lantern" do
   end
 
   let(:project) { user.create_project_with_default_policy("project-1", provider: "gcp") }
-
-  before do
-    allow(LanternServer).to receive(:get_vm_image).and_return(Config.gcp_default_image)
-  end
 
   describe "unauthenticated" do
     it "not list" do

@@ -191,6 +191,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       lantern_server.timeline_id = timeline_id
       lantern_server.timeline_access = "push"
       lantern_server.save_changes
+      lantern_server.resource.allow_timeline_access_to_bucket
 
       lantern_version = lantern_server.run_query("SELECT extversion FROM pg_extension WHERE extname='lantern'")
       extras_version = lantern_server.run_query("SELECT extversion FROM pg_extension WHERE extname='lantern_extras'")

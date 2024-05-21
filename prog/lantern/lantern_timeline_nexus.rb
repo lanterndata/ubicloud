@@ -10,14 +10,15 @@ class Prog::Lantern::LanternTimelineNexus < Prog::Base
 
   semaphore :destroy
 
-  def self.assemble(parent_id: nil)
+  def self.assemble(gcp_creds_b64: nil, parent_id: nil)
     if parent_id && (LanternTimeline[parent_id]).nil?
       fail "No existing parent"
     end
 
     DB.transaction do
       lantern_timeline = LanternTimeline.create_with_id(
-        parent_id: parent_id
+        parent_id: parent_id,
+        gcp_creds_b64: gcp_creds_b64
       )
       Strand.create(prog: "Lantern::LanternTimelineNexus", label: "start") { _1.id = lantern_timeline.id }
     end
@@ -32,11 +33,6 @@ class Prog::Lantern::LanternTimelineNexus < Prog::Base
   end
 
   label def start
-    api = Hosting::GcpApis.new
-    service_account = api.create_service_account("lt-#{lantern_timeline.ubid}", "Service Account for Timeline #{lantern_timeline.ubid}")
-    key = api.export_service_account_key(service_account["email"])
-    api.allow_bucket_usage_by_prefix(service_account["email"], Config.lantern_backup_bucket, lantern_timeline.ubid)
-    lantern_timeline.update(service_account_name: service_account["email"], gcp_creds_b64: key)
     hop_wait_leader
   end
 
@@ -92,9 +88,5 @@ class Prog::Lantern::LanternTimelineNexus < Prog::Base
   def destroy_blob_storage
     # TODO
     # Remove all backups
-    if lantern_timeline.service_account_name
-      api = Hosting::GcpApis.new
-      api.remove_service_account(lantern_timeline.service_account_name)
-    end
   end
 end
