@@ -4,11 +4,6 @@ require_relative "../spec_helper"
 
 RSpec.describe Clover, "lantern" do
   before do
-    api = instance_double(Hosting::GcpApis)
-    allow(Hosting::GcpApis).to receive(:new).and_return(api)
-    allow(api).to receive_messages(create_service_account: {"email" => "test-sa"}, export_service_account_key: "test-key")
-    allow(api).to receive(:allow_bucket_usage_by_prefix)
-    allow(api).to receive(:allow_access_to_big_query_table)
     allow(LanternServer).to receive(:get_vm_image).and_return(Config.gcp_default_image)
   end
 
@@ -161,9 +156,6 @@ RSpec.describe Clover, "lantern" do
         visit "#{project.path}/lantern/create"
 
         gcp_api = instance_double(Hosting::GcpApis)
-        allow(gcp_api).to receive_messages(create_service_account: {"email" => "test-sa"}, export_service_account_key: "test-key")
-        allow(gcp_api).to receive(:allow_bucket_usage_by_prefix)
-        allow(gcp_api).to receive(:allow_access_to_big_query_table)
         expect(gcp_api).to receive(:list_objects).and_return([{key: "1_backup_stop_sentinel.json", last_modified: Time.new("2024-04-07 10:10:10")}]).at_least(:once)
         expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api).at_least(:once)
 

@@ -77,4 +77,51 @@ RSpec.describe LanternResource do
       expect { lantern_resource.dissociate_forks }.not_to raise_error
     end
   end
+
+  describe "#setup_service_account" do
+    it "sets up service account and updates resource" do
+      api = instance_double(Hosting::GcpApis)
+      allow(Hosting::GcpApis).to receive(:new).and_return(api)
+      allow(api).to receive_messages(create_service_account: {"email" => "test-sa"}, export_service_account_key: "test-key")
+      expect(lantern_resource).to receive(:update).with(gcp_creds_b64: "test-key", service_account_name: "test-sa")
+      expect { lantern_resource.setup_service_account }.not_to raise_error
+    end
+  end
+
+  describe "#create_logging_table" do
+    it "create bigquery table and gives access" do
+      instance_double(LanternTimeline, ubid: "test")
+      api = instance_double(Hosting::GcpApis)
+      expect(lantern_resource).to receive(:big_query_table).and_return("test-table-name").at_least(:once)
+      expect(lantern_resource).to receive(:service_account_name).and_return("test-sa").at_least(:once)
+
+      allow(Hosting::GcpApis).to receive(:new).and_return(api)
+      allow(api).to receive(:create_big_query_table)
+      allow(api).to receive(:allow_access_to_big_query_dataset)
+      allow(api).to receive(:allow_access_to_big_query_table)
+
+      expect { lantern_resource.create_logging_table }.not_to raise_error
+    end
+  end
+
+  describe "#allow_timeline_access_to_bucket" do
+    it "allows access to bucket by prefix" do
+      timeline = instance_double(LanternTimeline, ubid: "test")
+      expect(lantern_resource).to receive(:gcp_creds_b64).and_return("test-creds")
+      expect(lantern_resource).to receive(:service_account_name).and_return("test-sa")
+      expect(lantern_resource).to receive(:timeline).and_return(timeline).at_least(:once)
+      expect(timeline).to receive(:update).with(gcp_creds_b64: "test-creds")
+
+      api = instance_double(Hosting::GcpApis)
+      allow(Hosting::GcpApis).to receive(:new).and_return(api)
+      allow(api).to receive(:allow_bucket_usage_by_prefix).with("test-sa", Config.lantern_backup_bucket, timeline.ubid)
+      expect { lantern_resource.allow_timeline_access_to_bucket }.not_to raise_error
+    end
+  end
+
+  describe "#big_query_table" do
+    it "returns table name" do
+      expect(lantern_resource.big_query_table).to eq("#{lantern_resource.name}_logs")
+    end
+  end
 end

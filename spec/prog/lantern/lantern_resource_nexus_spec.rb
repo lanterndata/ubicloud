@@ -35,14 +35,6 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
   end
 
   describe ".assemble" do
-    before do
-      api = instance_double(Hosting::GcpApis)
-      allow(Hosting::GcpApis).to receive(:new).and_return(api)
-      allow(api).to receive_messages(create_service_account: {"email" => "test-sa"}, export_service_account_key: "test-key")
-      allow(api).to receive(:allow_bucket_usage_by_prefix)
-      allow(api).to receive(:allow_access_to_big_query_table)
-    end
-
     let(:lantern_project) { Project.create_with_id(name: "default", provider: "gcp").tap { _1.associate_with_project(_1) } }
 
     it "validates input" do
@@ -116,14 +108,21 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
   end
 
   describe "#start" do
-    it "naps if vm not ready" do
-      expect(lantern_resource.representative_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "prep"))
-      expect { nx.start }.to nap(5)
+    it "sets up gcp service account and allows bucket usage" do
+      expect(lantern_resource).to receive(:setup_service_account)
+      expect(lantern_resource).to receive(:create_logging_table)
+      expect(lantern_resource).to receive(:parent_id).and_return("test-parent")
+      expect(lantern_resource).not_to receive(:allow_timeline_access_to_bucket)
+      expect(nx).to receive(:register_deadline)
+      expect { nx.start }.to hop("wait_servers")
     end
 
-    it "registers deadline and hops" do
-      expect(lantern_resource.representative_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
-      # expect(nx).to receive(:register_deadline)
+    it "sets up gcp service account" do
+      expect(lantern_resource).to receive(:setup_service_account)
+      expect(lantern_resource).to receive(:create_logging_table)
+      expect(lantern_resource).to receive(:parent_id).and_return(nil)
+      expect(lantern_resource).to receive(:allow_timeline_access_to_bucket)
+      expect(nx).to receive(:register_deadline)
       expect { nx.start }.to hop("wait_servers")
     end
 

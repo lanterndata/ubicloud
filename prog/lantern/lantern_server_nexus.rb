@@ -67,7 +67,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   end
 
   label def start
-    nap 5 unless vm.strand.label == "wait" && lantern_server.timeline.strand.label != "start"
+    nap 5 unless vm.strand.label == "wait" && lantern_server.resource.strand.label != "start"
 
     lantern_server.incr_initial_provisioning
 
