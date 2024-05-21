@@ -85,9 +85,6 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
       ) { _1.id = ubid.to_uuid }
       lantern_resource.associate_with_project(project)
 
-      lantern_resource.setup_service_account
-      lantern_resource.allow_access_to_big_query
-
       Prog::Lantern::LanternServerNexus.assemble(
         resource_id: lantern_resource.id,
         lantern_version: lantern_version,
@@ -100,10 +97,6 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
         timeline_access: timeline_access,
         representative_at: Time.now
       )
-
-      if parent_id.nil?
-        lantern_resource.allow_timeline_access_to_bucket
-      end
 
       lantern_resource.required_standby_count.times do
         Prog::Lantern::LanternServerNexus.assemble(resource_id: lantern_resource.id, timeline_id: timeline_id, timeline_access: "fetch")
@@ -122,11 +115,14 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   end
 
   label def start
-    nap 5 unless representative_server.vm.strand.label == "wait"
-    register_deadline(:wait, 10 * 60)
-    # bud self.class, frame, :trigger_pg_current_xact_id_on_parent if lantern_resource.parent
+    lantern_resource.setup_service_account
+    lantern_resource.create_logging_table
 
-    # hop_wait_trigger_pg_current_xact_id_on_parent
+    if lantern_resource.parent_id.nil?
+      lantern_resource.allow_timeline_access_to_bucket
+    end
+
+    register_deadline(:wait, 10 * 60)
     hop_wait_servers
   end
 
