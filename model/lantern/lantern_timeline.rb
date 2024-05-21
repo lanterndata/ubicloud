@@ -5,7 +5,6 @@ require_relative "../../model"
 class LanternTimeline < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :parent, key: :parent_id, class: self
-  one_to_many :children, key: :parent_id, class: self
   one_to_one :leader, class: LanternServer, key: :timeline_id, conditions: {timeline_access: "push"}
 
   include ResourceMethods

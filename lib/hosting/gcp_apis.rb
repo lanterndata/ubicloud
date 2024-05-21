@@ -332,6 +332,14 @@ class Hosting::GcpApis
     Hosting::GcpApis.check_errors(response)
   end
 
+  def allow_access_to_big_query_table(service_account_email, dataset, table)
+    # TODO
+  end
+
+  def remove_big_query_table(dataset, table)
+    # TODO
+  end
+
   def create_image(name:, vm_name:, zone:, description: "", family: "lantern-ubuntu")
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
     body = {

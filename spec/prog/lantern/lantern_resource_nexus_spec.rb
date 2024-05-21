@@ -35,6 +35,14 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
   end
 
   describe ".assemble" do
+    before do
+      api = instance_double(Hosting::GcpApis)
+      allow(Hosting::GcpApis).to receive(:new).and_return(api)
+      allow(api).to receive_messages(create_service_account: {"email" => "test-sa"}, export_service_account_key: "test-key")
+      allow(api).to receive(:allow_bucket_usage_by_prefix)
+      allow(api).to receive(:allow_access_to_big_query_table)
+    end
+
     let(:lantern_project) { Project.create_with_id(name: "default", provider: "gcp").tap { _1.associate_with_project(_1) } }
 
     it "validates input" do
@@ -88,7 +96,7 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
     end
 
     it "creates additional servers for HA" do
-      expect(Prog::Lantern::LanternServerNexus).to receive(:assemble).with(hash_including(timeline_access: "push"))
+      expect(Prog::Lantern::LanternServerNexus).to receive(:assemble).with(hash_including(timeline_access: "push")).and_call_original
       expect(Prog::Lantern::LanternServerNexus).to receive(:assemble).with(hash_including(timeline_access: "fetch")).twice
       described_class.assemble(project_id: lantern_project.id, location: "us-central1", name: "pg-name-2", target_vm_size: "n1-standard-2", target_storage_size_gib: 100, ha_type: "sync")
     end
@@ -195,6 +203,7 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(lantern_resource).to receive(:dissociate_with_project)
       expect(lantern_resource).to receive(:destroy)
       expect(lantern_resource).to receive(:doctor).and_return(nil)
+      expect(lantern_resource).to receive(:service_account_name).and_return(nil)
 
       expect { nx.destroy }.to exit({"msg" => "lantern resource is deleted"})
     end
@@ -206,6 +215,10 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(lantern_resource).to receive(:servers).and_return([])
       expect(lantern_resource).to receive(:dissociate_with_project)
       expect(lantern_resource).to receive(:destroy)
+      api = instance_double(Hosting::GcpApis)
+      allow(Hosting::GcpApis).to receive(:new).and_return(api)
+      allow(api).to receive(:remove_big_query_table).with(Config.lantern_log_dataset, lantern_resource.big_query_table)
+      allow(api).to receive(:remove_service_account).with(lantern_resource.service_account_name)
       doctor = instance_double(LanternDoctor)
       expect(lantern_resource).to receive(:doctor).and_return(doctor)
       expect(doctor).to receive(:incr_destroy)

@@ -27,10 +27,15 @@ class LanternResource < Sequel::Model
     enc.column :superuser_password
     enc.column :db_user_password
     enc.column :repl_password
+    enc.column :gcp_creds_b64
   end
 
   def self.ubid_to_name(id)
     id.to_s[0..7]
+  end
+
+  def big_query_table
+    "#{name}_logs"
   end
 
   def hyper_tag_name(project)
@@ -63,6 +68,24 @@ class LanternResource < Sequel::Model
       _1.update(parent_id: nil)
       _1.timeline.update(parent_id: nil)
     }
+  end
+
+  def setup_service_account
+    api = Hosting::GcpApis.new
+    service_account = api.create_service_account("lt-#{ubid}", "Service Account for Lantern #{name}")
+    key = api.export_service_account_key(service_account["email"])
+    update(gcp_creds_b64: key, service_account_name: service_account["email"])
+  end
+
+  def allow_timeline_access_to_bucket
+    timeline.update(gcp_creds_b64: gcp_creds_b64)
+    api = Hosting::GcpApis.new
+    api.allow_bucket_usage_by_prefix(service_account_name, Config.lantern_backup_bucket, timeline.ubid)
+  end
+
+  def allow_access_to_big_query
+    api = Hosting::GcpApis.new
+    api.allow_access_to_big_query_table(service_account_name, Config.lantern_log_dataset, big_query_table)
   end
 
   module HaType
