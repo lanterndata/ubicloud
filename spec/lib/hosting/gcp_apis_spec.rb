@@ -366,5 +366,93 @@ RSpec.describe Hosting::GcpApis do
         expect(api.get_image("test-image")).to be_nil
       end
     end
+
+    describe "#allow_access_to_big_query_table" do
+      it "allows access" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:post, "https://bigquery.googleapis.com/bigquery/v2/projects/test-project/datasets/test-dataset/tables/test-table:getIamPolicy")
+          .to_return(status: 200, body: JSON.dump({"bindings" => [], "etag" => "etag-value"}), headers: {})
+
+        stub_request(:post, "https://bigquery.googleapis.com/bigquery/v2/projects/test-project/datasets/test-dataset/tables/test-table:setIamPolicy")
+          .with(body: JSON.dump({
+            policy: {
+              bindings: [
+                {
+                  role: "roles/bigquery.dataEditor",
+                  members: ["serviceAccount:test-sa-email"]
+                }
+              ],
+              etag: "etag-value"
+            }
+          }))
+          .to_return(status: 200, body: JSON.dump({}), headers: {})
+
+        api = described_class.new
+        expect { api.allow_access_to_big_query_table("test-sa-email", "test-dataset", "test-table") }.not_to raise_error
+      end
+    end
+
+    describe "#remove_big_query_table" do
+      it "removes the table" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:delete, "https://bigquery.googleapis.com/bigquery/v2/projects/test-project/datasets/test-dataset/tables/test-table")
+          .to_return(status: 204, body: "", headers: {})
+
+        api = described_class.new
+        expect { api.remove_big_query_table("test-dataset", "test-table") }.not_to raise_error
+      end
+    end
+
+    describe "#create_big_query_table" do
+      it "creates a table successfully" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        schema = [{name: "log_time", type: "TIMESTAMP", mode: "NULLABLE"}]
+        stub_request(:post, "https://bigquery.googleapis.com/bigquery/v2/projects/test-project/datasets/test-dataset/tables")
+          .with(
+            body: JSON.dump({
+              tableReference: {
+                projectId: "test-project",
+                datasetId: "test-dataset",
+                tableId: "test-table"
+              },
+              schema: {
+                fields: schema
+              }
+            })
+          )
+          .to_return(status: 200, body: JSON.dump({}), headers: {})
+
+        api = described_class.new
+        expect { api.create_big_query_table("test-dataset", "test-table", schema) }.not_to raise_error
+      end
+    end
+
+    describe "#assign_metadata_viewer_role" do
+      it "assigns the metadata viewer role with a condition successfully" do
+        project_id = "test-project"
+        dataset_id = "test-dataset"
+        service_account_email = "test-sa-email"
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:get, "https://bigquery.googleapis.com/bigquery/v2/projects/#{project_id}/datasets/#{dataset_id}")
+          .to_return(status: 200, body: JSON.dump({"access" => [{role: "test"}], "etag" => "etag-value"}), headers: {"Content-Type" => "application/json"})
+
+        stub_request(:patch, "https://bigquery.googleapis.com/bigquery/v2/projects/#{project_id}/datasets/#{dataset_id}")
+          .with(
+            body: JSON.dump({
+              access: [
+                {role: "test"},
+                {
+                  role: "roles/bigquery.metadataViewer",
+                  userByEmail: service_account_email
+                }
+              ]
+            })
+          )
+          .to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+
+        api = described_class.new
+        expect { api.allow_access_to_big_query_dataset(service_account_email, dataset_id) }.not_to raise_error
+      end
+    end
   end
 end

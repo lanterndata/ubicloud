@@ -128,15 +128,15 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect { nx.start }.to nap(5)
     end
 
-    it "naps if timeline not ready" do
+    it "naps if resource not ready" do
       expect(lantern_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
-      expect(lantern_server.timeline).to receive(:strand).and_return(instance_double(Strand, label: "start"))
+      expect(lantern_server.resource).to receive(:strand).and_return(instance_double(Strand, label: "start"))
       expect { nx.start }.to nap(5)
     end
 
     it "hops to bootstrap_rhizome" do
       expect(lantern_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
-      expect(lantern_server.timeline).to receive(:strand).and_return(instance_double(Strand, label: "wait_leader"))
+      expect(lantern_server.resource).to receive(:strand).and_return(instance_double(Strand, label: "wait_servers"))
       expect(lantern_server).to receive(:incr_initial_provisioning)
       expect { nx.start }.to hop("bootstrap_rhizome")
     end

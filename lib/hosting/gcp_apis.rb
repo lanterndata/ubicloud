@@ -332,12 +332,89 @@ class Hosting::GcpApis
     Hosting::GcpApis.check_errors(response)
   end
 
+  def create_big_query_table(dataset, table, schema)
+    connection = Excon.new("https://bigquery.googleapis.com", headers: @host[:headers])
+
+    request_body = {
+      tableReference: {
+        projectId: @project,
+        datasetId: dataset,
+        tableId: table
+      },
+      schema: {
+        fields: schema
+      }
+    }
+
+    response = connection.post(
+      path: "/bigquery/v2/projects/#{@project}/datasets/#{dataset}/tables",
+      body: JSON.dump(request_body),
+      headers: {"Content-Type" => "application/json"},
+      expects: [200, 400, 403]
+    )
+
+    Hosting::GcpApis.check_errors(response)
+  end
+
+  def allow_access_to_big_query_dataset(service_account_email, dataset)
+    connection = Excon.new("https://bigquery.googleapis.com", headers: @host[:headers])
+    response = connection.get(
+      path: "/bigquery/v2/projects/#{@project}/datasets/#{dataset}",
+      expects: [200, 400, 403]
+    )
+
+    Hosting::GcpApis.check_errors(response)
+    body = JSON.parse(response.body)
+    access = body["access"]
+    access << {
+      role: "roles/bigquery.metadataViewer",
+      userByEmail: service_account_email
+    }
+
+    response = connection.patch(
+      path: "/bigquery/v2/projects/#{@project}/datasets/#{dataset}",
+      body: JSON.dump({
+        access: access
+      }),
+      expects: [200, 400, 403]
+    )
+    Hosting::GcpApis.check_errors(response)
+  end
+
   def allow_access_to_big_query_table(service_account_email, dataset, table)
-    # TODO
+    connection = Excon.new("https://bigquery.googleapis.com", headers: @host[:headers])
+    response = connection.post(
+      path: "/bigquery/v2/projects/#{@project}/datasets/#{dataset}/tables/#{table}:getIamPolicy",
+      body: JSON.dump({}),
+      expects: [200, 400, 403]
+    )
+
+    Hosting::GcpApis.check_errors(response)
+
+    policy = JSON.parse(response.body)
+
+    policy["bindings"] ||= []
+    policy["bindings"] << {
+      role: "roles/bigquery.dataEditor",
+      members: ["serviceAccount:#{service_account_email}"]
+    }
+
+    response = connection.post(
+      path: "/bigquery/v2/projects/#{@project}/datasets/#{dataset}/tables/#{table}:setIamPolicy",
+      body: JSON.dump({policy: policy}),
+      expects: [200, 400, 403]
+    )
+
+    Hosting::GcpApis.check_errors(response)
   end
 
   def remove_big_query_table(dataset, table)
-    # TODO
+    connection = Excon.new("https://bigquery.googleapis.com", headers: @host[:headers])
+
+    connection.delete(
+      path: "/bigquery/v2/projects/#{@project}/datasets/#{dataset}/tables/#{table}",
+      expects: [204, 404]
+    )
   end
 
   def create_image(name:, vm_name:, zone:, description: "", family: "lantern-ubuntu")

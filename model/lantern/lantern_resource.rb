@@ -83,8 +83,38 @@ class LanternResource < Sequel::Model
     api.allow_bucket_usage_by_prefix(service_account_name, Config.lantern_backup_bucket, timeline.ubid)
   end
 
-  def allow_access_to_big_query
+  def create_logging_table
     api = Hosting::GcpApis.new
+    schema = [
+      {name: "log_time", type: "TIMESTAMP", mode: "NULLABLE"},
+      {name: "user_name", type: "STRING", mode: "NULLABLE"},
+      {name: "database_name", type: "STRING", mode: "NULLABLE"},
+      {name: "process_id", type: "INTEGER", mode: "NULLABLE"},
+      {name: "connection_from", type: "STRING", mode: "NULLABLE"},
+      {name: "session_id", type: "STRING", mode: "NULLABLE"},
+      {name: "session_line_num", type: "INTEGER", mode: "NULLABLE"},
+      {name: "command_tag", type: "STRING", mode: "NULLABLE"},
+      {name: "session_start_time", type: "TIMESTAMP", mode: "NULLABLE"},
+      {name: "virtual_transaction_id", type: "STRING", mode: "NULLABLE"},
+      {name: "transaction_id", type: "INTEGER", mode: "NULLABLE"},
+      {name: "error_severity", type: "STRING", mode: "NULLABLE"},
+      {name: "sql_state_code", type: "STRING", mode: "NULLABLE"},
+      {name: "duration", type: "FLOAT", mode: "NULLABLE"},
+      {name: "message", type: "STRING", mode: "NULLABLE"},
+      {name: "detail", type: "STRING", mode: "NULLABLE"},
+      {name: "hint", type: "STRING", mode: "NULLABLE"},
+      {name: "internal_query", type: "STRING", mode: "NULLABLE"},
+      {name: "internal_query_pos", type: "INTEGER", mode: "NULLABLE"},
+      {name: "context", type: "STRING", mode: "NULLABLE"},
+      {name: "query", type: "STRING", mode: "NULLABLE"},
+      {name: "query_pos", type: "INTEGER", mode: "NULLABLE"},
+      {name: "location", type: "STRING", mode: "NULLABLE"},
+      {name: "application_name", type: "STRING", mode: "NULLABLE"}
+    ]
+    api.create_big_query_table(Config.lantern_log_dataset, big_query_table, schema)
+    # Add metadata viewer access
+    api.allow_access_to_big_query_dataset(service_account_name, Config.lantern_log_dataset)
+    # Add access to only this table
     api.allow_access_to_big_query_table(service_account_name, Config.lantern_log_dataset, big_query_table)
   end
 
