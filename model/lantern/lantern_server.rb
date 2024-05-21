@@ -124,7 +124,9 @@ class LanternServer < Sequel::Model
       postgresql_recover_from_backup: backup_label,
       postgresql_recovery_target_time: resource.restore_target || "",
       gcp_creds_walg_b64: walg_config[:gcp_creds_b64],
-      walg_gs_prefix: walg_config[:walg_gs_prefix]
+      walg_gs_prefix: walg_config[:walg_gs_prefix],
+      gcp_creds_big_query_b64: resource.gcp_creds_b64,
+      big_query_dataset: Config.lantern_log_dataset
     })
   end
 

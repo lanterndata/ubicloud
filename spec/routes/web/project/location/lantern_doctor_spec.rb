@@ -4,6 +4,11 @@ require_relative "../../spec_helper"
 
 RSpec.describe Clover, "lantern-doctor" do
   before do
+    api = instance_double(Hosting::GcpApis)
+    allow(Hosting::GcpApis).to receive(:new).and_return(api)
+    allow(api).to receive_messages(create_service_account: {"email" => "test-sa"}, export_service_account_key: "test-key")
+    allow(api).to receive(:allow_bucket_usage_by_prefix)
+    allow(api).to receive(:allow_access_to_big_query_table)
     allow(LanternServer).to receive(:get_vm_image).and_return(Config.gcp_default_image)
   end
 

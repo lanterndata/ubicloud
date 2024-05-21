@@ -20,6 +20,8 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
         name: "test",
         db_name: "postgres",
         db_user: "postgres",
+        service_account_name: "test-sa",
+        gcp_creds_b64: "test-creds",
         superuser_password: "pwd123"),
       vm: instance_double(
         GcpVm,
@@ -30,7 +32,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
         LanternTimeline,
         id: "6ae7e513-c34a-8039-a72a-7be45b53f2a0",
         gcp_creds_b64: "test-creds",
-        service_account_name: "test-sa",
         bucket_name: "test-bucket"
       )
     )
@@ -342,6 +343,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
   describe "#wait_recovery_completion" do
     it "hop to wait if recovery finished" do
+      expect(lantern_server.resource).to receive(:allow_timeline_access_to_bucket)
       expect(lantern_server).to receive(:run_query).and_return("t", "paused", "t", lantern_server.lantern_version, lantern_server.extras_version)
       expect(lantern_server).to receive(:timeline_id=)
       expect(lantern_server).to receive(:timeline_access=).with("push")
@@ -351,6 +353,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
 
     it "hop to wait if not in recovery" do
+      expect(lantern_server.resource).to receive(:allow_timeline_access_to_bucket)
       expect(lantern_server).to receive(:run_query).and_return("f", lantern_server.lantern_version, lantern_server.extras_version)
       expect(lantern_server).to receive(:timeline_id=)
       expect(lantern_server).to receive(:timeline_access=).with("push")
@@ -360,6 +363,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
 
     it "update extension on version mismatch" do
+      expect(lantern_server.resource).to receive(:allow_timeline_access_to_bucket)
       expect(lantern_server).to receive(:run_query).and_return("t", "paused", "t", "0.2.4", "0.1.4")
       expect(lantern_server).to receive(:timeline_id=)
       expect(lantern_server).to receive(:timeline_access=).with("push")
