@@ -85,6 +85,9 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
       ) { _1.id = ubid.to_uuid }
       lantern_resource.associate_with_project(project)
 
+      lantern_resource.setup_service_account
+      lantern_resource.allow_access_to_big_query
+
       Prog::Lantern::LanternServerNexus.assemble(
         resource_id: lantern_resource.id,
         lantern_version: lantern_version,
@@ -97,6 +100,10 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
         timeline_access: timeline_access,
         representative_at: Time.now
       )
+
+      if parent_id.nil?
+        lantern_resource.allow_timeline_access_to_bucket
+      end
 
       lantern_resource.required_standby_count.times do
         Prog::Lantern::LanternServerNexus.assemble(resource_id: lantern_resource.id, timeline_id: timeline_id, timeline_access: "fetch")
@@ -166,6 +173,13 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
     end
 
     lantern_resource.doctor&.incr_destroy
+
+    if lantern_resource.service_account_name
+      api = Hosting::GcpApis.new
+      api.remove_big_query_table(Config.lantern_log_dataset, lantern_resource.big_query_table)
+      api.remove_service_account(lantern_resource.service_account_name)
+    end
+
     lantern_resource.dissociate_with_project(lantern_resource.project)
     lantern_resource.destroy
 

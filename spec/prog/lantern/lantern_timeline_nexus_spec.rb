@@ -13,7 +13,6 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
       ubid: "6ae7e513-c34a-8039-a72a-7be45b53f2a0",
       id: "6ae7e513-c34a-8039-a72a-7be45b53f2a0",
       gcp_creds_b64: "test-creds",
-      service_account_name: "test-sa",
       bucket_name: "test-bucket",
       parent: nil
     )
@@ -54,14 +53,6 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
 
   describe "#start" do
     it "hops to wait leader" do
-      api = instance_double(Hosting::GcpApis)
-      allow(api).to receive(:create_service_account).and_return({"email" => "sa-email"})
-      allow(api).to receive(:export_service_account_key).with("sa-email").and_return("gcp-creds")
-      allow(api).to receive(:allow_bucket_usage_by_prefix)
-      allow(Hosting::GcpApis).to receive(:new).and_return(api)
-
-      allow(timeline).to receive(:update).with({service_account_name: "sa-email", gcp_creds_b64: "gcp-creds"})
-
       expect { nx.start }.to hop("wait_leader")
     end
   end
@@ -166,16 +157,7 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
   end
 
   describe "#destroy" do
-    it "exits with message without deleting sa" do
-      expect(lantern_server.timeline).to receive(:destroy)
-      expect(lantern_server.timeline).to receive(:service_account_name).and_return(nil)
-      expect { nx.destroy }.to exit({"msg" => "lantern timeline is deleted"})
-    end
-
     it "exits with message" do
-      api = instance_double(Hosting::GcpApis)
-      allow(api).to receive(:remove_service_account)
-      allow(Hosting::GcpApis).to receive(:new).and_return(api)
       expect(lantern_server.timeline).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "lantern timeline is deleted"})
     end

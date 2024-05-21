@@ -3,16 +3,21 @@
 require_relative "spec_helper"
 
 RSpec.describe Clover, "project" do
+  before do
+    api = instance_double(Hosting::GcpApis)
+    allow(Hosting::GcpApis).to receive(:new).and_return(api)
+    allow(api).to receive_messages(create_service_account: {"email" => "test-sa"}, export_service_account_key: "test-key")
+    allow(api).to receive(:allow_bucket_usage_by_prefix)
+    allow(api).to receive(:allow_access_to_big_query_table)
+    allow(LanternServer).to receive(:get_vm_image).and_return(Config.gcp_default_image)
+  end
+
   let(:user) { create_account }
   let(:user2) { create_account("user2@example.com") }
 
   let(:project) { user.create_project_with_default_policy("project-1") }
 
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", policy_body: []) }
-
-  before do
-    allow(LanternServer).to receive(:get_vm_image).and_return(Config.gcp_default_image)
-  end
 
   describe "unauthenticated" do
     it "can not list without login" do
