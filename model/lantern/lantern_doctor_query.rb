@@ -145,7 +145,7 @@ class LanternDoctorQuery < Sequel::Model
 
     lantern_server = doctor.resource.representative_server
     failed = jobs.any? do |job|
-      res = lantern_server.run_query("SELECT (SELECT COUNT(*) FROM \"#{job[:schema]}\".\"#{job[:table]}\" WHERE \"#{job[:src_column]}\" IS NOT NULL AND \"#{job[:src_column]}\" != '' AND \"#{job[:dst_column]}\" IS NULL) > 1000", db: db, user: query_user).strip
+      res = lantern_server.run_query("SELECT (SELECT COUNT(*) FROM \"#{job[:schema]}\".\"#{job[:table]}\" WHERE \"#{job[:src_column]}\" IS NOT NULL AND \"#{job[:src_column]}\" != '' AND \"#{job[:src_column]}\" != 'Error: Summary failed (llm)' AND \"#{job[:dst_column]}\" IS NULL) > 1000", db: db, user: query_user).strip
       res == "t"
     end
 
