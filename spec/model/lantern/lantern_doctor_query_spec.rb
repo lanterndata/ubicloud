@@ -391,8 +391,13 @@ RSpec.describe LanternDoctorQuery do
             where: instance_double(Sequel::Dataset,
               where: instance_double(Sequel::Dataset,
                 where: instance_double(Sequel::Dataset,
-                  all: [{schema: "public", table: "test", src_column: "test-src", dst_column: "test-dst"}]))))))
-      expect(serv).to receive(:run_query).with("SELECT (SELECT COUNT(*) FROM \"public\".\"test\" WHERE \"test-src\" IS NOT NULL AND \"test-src\" != '' AND \"test-src\" != 'Error: Summary failed (llm)' AND \"test-dst\" IS NULL) > 2000", db: "postgres", user: "postgres").and_return("t")
+                  where: instance_double(Sequel::Dataset,
+                    all: [{schema: "public", table: "test", src_column: "test-src", dst_column: "test-dst"}])))))))
+      expect(serv).to receive(:run_query).and_return("t")
+      expect(serv).to receive(:run_query).and_return("public,test2,test-src,test-dst\npublic,test3,test-src,test-dst")
+      expect(serv).to receive(:run_query).and_return("f")
+      expect(serv).to receive(:run_query).and_return("f")
+      expect(serv).to receive(:run_query).and_return("t")
       expect(lantern_doctor_query.check_daemon_embedding_jobs("postgres", "postgres")).to eq("t")
     end
 
@@ -408,7 +413,9 @@ RSpec.describe LanternDoctorQuery do
             where: instance_double(Sequel::Dataset,
               where: instance_double(Sequel::Dataset,
                 where: instance_double(Sequel::Dataset,
-                  all: []))))))
+                  where: instance_double(Sequel::Dataset,
+                    all: [])))))))
+      expect(serv).to receive(:run_query).and_return("f")
       expect(lantern_doctor_query.check_daemon_embedding_jobs("postgres", "postgres")).to eq("f")
     end
   end
@@ -425,8 +432,10 @@ RSpec.describe LanternDoctorQuery do
           where: instance_double(Sequel::Dataset,
             where: instance_double(Sequel::Dataset,
               where: instance_double(Sequel::Dataset,
-                all: [{schema: "public", table: "test", src_column: "test-src", dst_column: "test-dst"}]))))))
-    expect(serv).to receive(:run_query).with("SELECT (SELECT COUNT(*) FROM \"public\".\"test\" WHERE \"test-src\" IS NOT NULL AND \"test-src\" != '' AND \"test-src\" != 'Error: Summary failed (llm)' AND \"test-dst\" IS NULL) > 2000", db: "postgres", user: "postgres").and_return("f")
+                where: instance_double(Sequel::Dataset,
+                  all: [{schema: "public", table: "test", src_column: "test-src", dst_column: "test-dst"}])))))))
+    expect(serv).to receive(:run_query).and_return("f")
+    expect(serv).to receive(:run_query).and_return("f")
     expect(lantern_doctor_query.check_daemon_embedding_jobs("postgres", "postgres")).to eq("f")
   end
 
