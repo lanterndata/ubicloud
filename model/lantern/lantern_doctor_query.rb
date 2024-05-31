@@ -131,19 +131,42 @@ class LanternDoctorQuery < Sequel::Model
       fail "No connection to lantern backend database specified"
     end
 
+    # TODO:: the backend db connection will be removed after daemon version update is done
     jobs = LanternBackend.db
       .select(:schema, :table, :src_column, :dst_column)
       .from(:embedding_generation_jobs)
       .where(database_id: doctor.resource.name)
       .where(Sequel.like(:db_connection, "%/#{db}"))
       .where(Sequel.lit("init_finished_at IS NOT NULL"))
+      .where(Sequel.lit("canceled_at IS NULL"))
       .all
+
+    lantern_server = doctor.resource.representative_server
+    new_jobs_exists = lantern_server.run_query(<<SQL).chomp.strip
+      SELECT EXISTS (
+       SELECT FROM pg_catalog.pg_class c
+       JOIN   pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+       WHERE  n.nspname = '_lantern_internal'
+       AND    c.relname = 'embedding_generation_jobs'
+       AND    c.relkind = 'r'
+     );
+SQL
+
+    if new_jobs_exists == "t"
+      new_jobs = lantern_server.run_query("SELECT \"schema\", \"table\", src_column, dst_column FROM _lantern_internal.embedding_generation_jobs WHERE init_finished_at IS NOT NULL AND canceled_at IS NULL;")
+
+      new_jobs = new_jobs.split("\n").map do |row|
+        values = row.split(",")
+        {schema: values[0], table: values[1], src_column: values[2], dst_column: values[3]}
+      end
+
+      jobs.concat new_jobs
+    end
 
     if jobs.empty?
       return "f"
     end
 
-    lantern_server = doctor.resource.representative_server
     failed = jobs.any? do |job|
       res = lantern_server.run_query("SELECT (SELECT COUNT(*) FROM \"#{job[:schema]}\".\"#{job[:table]}\" WHERE \"#{job[:src_column]}\" IS NOT NULL AND \"#{job[:src_column]}\" != '' AND \"#{job[:src_column]}\" != 'Error: Summary failed (llm)' AND \"#{job[:dst_column]}\" IS NULL) > 2000", db: db, user: query_user).strip
       res == "t"
