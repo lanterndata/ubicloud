@@ -127,22 +127,8 @@ class LanternDoctorQuery < Sequel::Model
   end
 
   def check_daemon_embedding_jobs(db, query_user)
-    if !LanternBackend.db
-      fail "No connection to lantern backend database specified"
-    end
-
-    # TODO:: the backend db connection will be removed after daemon version update is done
-    jobs = LanternBackend.db
-      .select(:schema, :table, :src_column, :dst_column)
-      .from(:embedding_generation_jobs)
-      .where(database_id: doctor.resource.name)
-      .where(Sequel.like(:db_connection, "%/#{db}"))
-      .where(Sequel.lit("init_finished_at IS NOT NULL"))
-      .where(Sequel.lit("canceled_at IS NULL"))
-      .all
-
     lantern_server = doctor.resource.representative_server
-    new_jobs_exists = lantern_server.run_query(<<SQL).chomp.strip
+    jobs_table_exists = lantern_server.run_query(<<SQL).chomp.strip
       SELECT EXISTS (
        SELECT FROM pg_catalog.pg_class c
        JOIN   pg_catalog.pg_namespace n ON n.oid = c.relnamespace
@@ -152,15 +138,15 @@ class LanternDoctorQuery < Sequel::Model
      );
 SQL
 
-    if new_jobs_exists == "t"
-      new_jobs = lantern_server.run_query("SELECT \"schema\", \"table\", src_column, dst_column FROM _lantern_internal.embedding_generation_jobs WHERE init_finished_at IS NOT NULL AND canceled_at IS NULL;")
+    if jobs_table_exists == "f"
+      return "f"
+    end
 
-      new_jobs = new_jobs.split("\n").map do |row|
-        values = row.split(",")
-        {schema: values[0], table: values[1], src_column: values[2], dst_column: values[3]}
-      end
+    jobs = lantern_server.run_query("SELECT \"schema\", \"table\", src_column, dst_column FROM _lantern_internal.embedding_generation_jobs WHERE init_finished_at IS NOT NULL AND canceled_at IS NULL;")
 
-      jobs.concat new_jobs
+    jobs = jobs.chomp.strip.split("\n").map do |row|
+      values = row.split(",")
+      {schema: values[0], table: values[1], src_column: values[2], dst_column: values[3]}
     end
 
     if jobs.empty?
