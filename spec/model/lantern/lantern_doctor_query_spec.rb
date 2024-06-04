@@ -374,28 +374,13 @@ RSpec.describe LanternDoctorQuery do
   end
 
   describe "#check_daemon_embedding_jobs" do
-    it "fails if not backend db connection" do
-      expect(LanternBackend).to receive(:db).and_return(nil)
-      expect { lantern_doctor_query.check_daemon_embedding_jobs "postgres", "postgres" }.to raise_error "No connection to lantern backend database specified"
-    end
-
     it "get jobs and fails" do
       serv = instance_double(LanternServer, ubid: "test-ubid")
       resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b")
       doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
       expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-      expect(LanternBackend).to receive(:db).and_return(DB).at_least(:once)
-      expect(LanternBackend.db).to receive(:select)
-        .and_return(instance_double(Sequel::Dataset,
-          from: instance_double(Sequel::Dataset,
-            where: instance_double(Sequel::Dataset,
-              where: instance_double(Sequel::Dataset,
-                where: instance_double(Sequel::Dataset,
-                  where: instance_double(Sequel::Dataset,
-                    all: [{schema: "public", table: "test", src_column: "test-src", dst_column: "test-dst"}])))))))
       expect(serv).to receive(:run_query).and_return("t")
       expect(serv).to receive(:run_query).and_return("public,test2,test-src,test-dst\npublic,test3,test-src,test-dst")
-      expect(serv).to receive(:run_query).and_return("f")
       expect(serv).to receive(:run_query).and_return("f")
       expect(serv).to receive(:run_query).and_return("t")
       expect(lantern_doctor_query.check_daemon_embedding_jobs("postgres", "postgres")).to eq("t")
@@ -406,37 +391,31 @@ RSpec.describe LanternDoctorQuery do
       resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b")
       doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
       expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-      expect(LanternBackend).to receive(:db).and_return(DB).at_least(:once)
-      expect(LanternBackend.db).to receive(:select)
-        .and_return(instance_double(Sequel::Dataset,
-          from: instance_double(Sequel::Dataset,
-            where: instance_double(Sequel::Dataset,
-              where: instance_double(Sequel::Dataset,
-                where: instance_double(Sequel::Dataset,
-                  where: instance_double(Sequel::Dataset,
-                    all: [])))))))
+      expect(serv).to receive(:run_query).and_return("t")
+      expect(serv).to receive(:run_query).and_return(" \n")
+      expect(lantern_doctor_query.check_daemon_embedding_jobs("postgres", "postgres")).to eq("f")
+    end
+
+    it "get jobs and succceds" do
+      serv = instance_double(LanternServer, ubid: "test-ubid")
+      resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b")
+      doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
+      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
+      expect(serv).to receive(:run_query).and_return("t")
+      expect(serv).to receive(:run_query).and_return("public,test2,test-src,test-dst\npublic,test3,test-src,test-dst")
+      expect(serv).to receive(:run_query).and_return("f")
       expect(serv).to receive(:run_query).and_return("f")
       expect(lantern_doctor_query.check_daemon_embedding_jobs("postgres", "postgres")).to eq("f")
     end
-  end
 
-  it "get jobs and succceds" do
-    serv = instance_double(LanternServer, ubid: "test-ubid")
-    resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b")
-    doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
-    expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-    expect(LanternBackend).to receive(:db).and_return(DB).at_least(:once)
-    expect(LanternBackend.db).to receive(:select)
-      .and_return(instance_double(Sequel::Dataset,
-        from: instance_double(Sequel::Dataset,
-          where: instance_double(Sequel::Dataset,
-            where: instance_double(Sequel::Dataset,
-              where: instance_double(Sequel::Dataset,
-                where: instance_double(Sequel::Dataset,
-                  all: [{schema: "public", table: "test", src_column: "test-src", dst_column: "test-dst"}])))))))
-    expect(serv).to receive(:run_query).and_return("f")
-    expect(serv).to receive(:run_query).and_return("f")
-    expect(lantern_doctor_query.check_daemon_embedding_jobs("postgres", "postgres")).to eq("f")
+    it "job table does not exist" do
+      serv = instance_double(LanternServer, ubid: "test-ubid")
+      resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b")
+      doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
+      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
+      expect(serv).to receive(:run_query).and_return("f")
+      expect(lantern_doctor_query.check_daemon_embedding_jobs("postgres", "postgres")).to eq("f")
+    end
   end
 
   describe "#page" do
