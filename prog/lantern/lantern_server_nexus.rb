@@ -75,8 +75,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   end
 
   label def update_rhizome
-    register_deadline(:wait, 10 * 60)
-
     decr_update_rhizome
     bud Prog::UpdateRhizome, {"target_folder" => "lantern", "subject_id" => vm.id, "user" => "lantern"}
     hop_wait_update_rhizome
@@ -103,7 +101,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   end
 
   label def bootstrap_rhizome
-    register_deadline(:wait, 10 * 60)
+    register_deadline(:setup_docker_stack, 10 * 60)
 
     bud Prog::BootstrapRhizome, {"target_folder" => "lantern", "subject_id" => vm.id, "user" => "lantern"}
     hop_wait_bootstrap_rhizome
@@ -112,7 +110,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   label def wait_bootstrap_rhizome
     reap
     if leaf?
-      register_deadline(:wait, 10 * 60)
+      register_deadline(:wait_db_available, 10 * 60)
       hop_setup_docker_stack
     end
     donate
@@ -132,6 +130,15 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       if !lantern_server.domain.nil?
         lantern_server.incr_add_domain
       end
+
+      # set higher deadline for secondary as it needs time
+      # to download backcup and replay wal
+      if lantern_server.primary?
+        register_deadline(:wait, 40 * 60)
+      else
+        register_deadline(:wait, 120 * 60)
+      end
+
       hop_wait_db_available
     when "Failed", "NotStarted"
       vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/configure' configure_lantern", stdin: lantern_server.configure_hash)
@@ -226,7 +233,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       decr_initial_provisioning
 
       if lantern_server.primary?
-        register_deadline(:wait, 40 * 60)
         hop_init_sql
       end
       hop_wait_catch_up if lantern_server.standby?
