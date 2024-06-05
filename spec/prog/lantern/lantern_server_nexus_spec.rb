@@ -236,6 +236,8 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_lantern")
       expect(lantern_server).to receive(:domain).and_return("db.lantern.dev")
       expect(lantern_server).to receive(:incr_add_domain)
+      expect(lantern_server).to receive(:primary?).and_return(true)
+      expect(nx).to receive(:register_deadline).with(:wait, 40 * 60)
       expect { nx.setup_docker_stack }.to hop("wait_db_available")
     end
 
@@ -244,6 +246,8 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_lantern").and_return("Succeeded")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_lantern")
       expect(lantern_server).to receive(:domain).and_return(nil)
+      expect(lantern_server).to receive(:primary?).and_return(false)
+      expect(nx).to receive(:register_deadline).with(:wait, 120 * 60)
       expect { nx.setup_docker_stack }.to hop("wait_db_available")
     end
 
