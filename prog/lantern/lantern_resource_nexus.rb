@@ -120,9 +120,11 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
 
     if lantern_resource.parent_id.nil?
       lantern_resource.allow_timeline_access_to_bucket
+      register_deadline(:wait, 10 * 60)
+    else
+      register_deadline(:wait, 120 * 60)
     end
 
-    register_deadline(:wait, 10 * 60)
     hop_wait_servers
   end
 
