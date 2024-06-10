@@ -35,8 +35,11 @@ class LanternTimeline < Sequel::Model
     return false if leader.nil?
 
     status = leader.vm.sshable.cmd("common/bin/daemonizer --check take_postgres_backup")
+    Clog.emit("need_backup?::status") { {status: status, ubid: ubid} }
     return true if ["Failed", "NotStarted"].include?(status)
+    Clog.emit("need_backup?::latest_backup_started_at") { {status: status, ubid: ubid, latest_backup_started_at: latest_backup_started_at, one_day_ago: Time.now - 60 * 60 * 24} }
     return true if status == "Succeeded" && (latest_backup_started_at.nil? || latest_backup_started_at < Time.now - 60 * 60 * 24)
+    Clog.emit("need_backup?::false") { {status: status, ubid: ubid, latest_backup_started_at: latest_backup_started_at, one_day_ago: Time.now - 60 * 60 * 24} }
 
     false
   end
@@ -51,6 +54,7 @@ class LanternTimeline < Sequel::Model
   end
 
   def take_backup
+    Clog.emit("Taking backup::::::::") { {ubid: ubid} }
     leader.vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/take_backup' take_postgres_backup")
     update(latest_backup_started_at: Time.now)
   end
