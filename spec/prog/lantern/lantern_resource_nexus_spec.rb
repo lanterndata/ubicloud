@@ -87,6 +87,17 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       described_class.assemble(project_id: lantern_project.id, location: "us-central1", name: "pg-name-2", target_vm_size: "n1-standard-2", target_storage_size_gib: 100, parent_id: parent.id, restore_target: restore_target, lantern_version: "0.2.2", extras_version: "0.1.4", minor_version: "2")
     end
 
+    it "uses different version if version_upgrade is specified on fork" do
+      parent = described_class.assemble(project_id: lantern_project.id, location: "us-central1", name: "pg-name", target_vm_size: "n1-standard-2", target_storage_size_gib: 100, lantern_version: "0.3.2", extras_version: "0.1.4", minor_version: "2").subject
+      restore_target = Time.now
+      parent.timeline.update(earliest_backup_completed_at: restore_target - 10 * 60)
+      expect(parent.timeline).to receive(:refresh_earliest_backup_completion_time).and_return(restore_target - 10 * 60)
+      expect(LanternResource).to receive(:[]).with(parent.id).and_return(parent)
+      expect(Prog::Lantern::LanternServerNexus).to receive(:assemble).with(hash_including(timeline_id: parent.timeline.id, timeline_access: "fetch", domain: nil, lantern_version: "0.3.2", extras_version: "0.1.4", minor_version: "2"))
+
+      described_class.assemble(project_id: lantern_project.id, location: "us-central1", name: "pg-name-2", target_vm_size: "n1-standard-2", target_storage_size_gib: 100, parent_id: parent.id, restore_target: restore_target, lantern_version: "0.3.2", extras_version: "0.1.4", minor_version: "2", version_upgrade: true)
+    end
+
     it "creates additional servers for HA" do
       expect(Prog::Lantern::LanternServerNexus).to receive(:assemble).with(hash_including(timeline_access: "push")).and_call_original
       expect(Prog::Lantern::LanternServerNexus).to receive(:assemble).with(hash_including(timeline_access: "fetch")).twice

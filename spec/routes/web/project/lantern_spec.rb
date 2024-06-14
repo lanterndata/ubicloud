@@ -166,6 +166,8 @@ RSpec.describe Clover, "lantern" do
         choose option: "n1-standard-2"
         find_by_id("parent_id").find(:xpath, "option[2]").select_option
         find_by_id("restore_target", visible: :all).set("2024-04-08 10:10")
+        find_by_id("recovery_target_lsn", visible: :all).set("16/B374D848")
+        find_by_id("version_upgrade-1", visible: :all).set(true)
 
         click_button "Create"
 

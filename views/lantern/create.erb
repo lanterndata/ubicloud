@@ -108,6 +108,16 @@
               </div>
               <div class="sm:col-span-3">
                 <%== render(
+                  "components/form/checkbox",
+                  locals: {
+                    options: ["1"],
+                    name: "version_upgrade",
+                    label: "Version Upgrade"
+                  }
+                ) %>
+              </div>
+              <div class="sm:col-span-3">
+                <%== render(
                   "components/form/text",
                   locals: {
                     name: "db_name",
@@ -231,6 +241,17 @@
                           max_date: Time.now,
                           name: "restore_target",
                           label: "Restore target time"
+                        }
+                      ) %>
+                      <%== render(
+                        "components/form/text",
+                        locals: {
+                          label: "Recovery LSN",
+                          name: "recovery_target_lsn",
+                          type: "text",
+                          attributes: {
+                            placeholder: "16/B374D848"
+                          }
                         }
                       ) %>
                   </fieldset>

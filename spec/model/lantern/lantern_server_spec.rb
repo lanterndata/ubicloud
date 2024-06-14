@@ -247,6 +247,7 @@ RSpec.describe LanternServer do
         db_user_password: "pwd123",
         superuser_password: "pwd1234",
         gcp_creds_b64: "test-creds",
+        recovery_target_lsn: nil,
         restore_target: nil)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
       expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
@@ -285,6 +286,7 @@ RSpec.describe LanternServer do
         container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}",
         postgresql_recover_from_backup: "",
         postgresql_recovery_target_time: resource.restore_target || "",
+        postgresql_recovery_target_lsn: resource.recovery_target_lsn || "",
         gcp_creds_walg_b64: walg_conf[:gcp_creds_b64],
         walg_gs_prefix: walg_conf[:walg_gs_prefix],
         gcp_creds_big_query_b64: resource.gcp_creds_b64,
@@ -310,6 +312,7 @@ RSpec.describe LanternServer do
         db_user_password: "pwd123",
         superuser_password: "pwd1234",
         gcp_creds_b64: "test-creds",
+        recovery_target_lsn: nil,
         restore_target: Time.now)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
       expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
@@ -348,6 +351,7 @@ RSpec.describe LanternServer do
         container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}",
         postgresql_recover_from_backup: "test-label",
         postgresql_recovery_target_time: resource.restore_target || "",
+        postgresql_recovery_target_lsn: resource.recovery_target_lsn || "",
         gcp_creds_walg_b64: walg_conf[:gcp_creds_b64],
         walg_gs_prefix: walg_conf[:walg_gs_prefix],
         gcp_creds_big_query_b64: resource.gcp_creds_b64,
@@ -373,6 +377,7 @@ RSpec.describe LanternServer do
         db_user_password: "pwd123",
         superuser_password: "pwd1234",
         gcp_creds_b64: "test-creds",
+        recovery_target_lsn: "16/B374D848",
         restore_target: nil)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
       expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
@@ -410,6 +415,7 @@ RSpec.describe LanternServer do
         container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}",
         postgresql_recover_from_backup: "LATEST",
         postgresql_recovery_target_time: resource.restore_target || "",
+        postgresql_recovery_target_lsn: resource.recovery_target_lsn,
         gcp_creds_walg_b64: walg_conf[:gcp_creds_b64],
         walg_gs_prefix: walg_conf[:walg_gs_prefix],
         gcp_creds_big_query_b64: resource.gcp_creds_b64,
@@ -435,6 +441,7 @@ RSpec.describe LanternServer do
         db_user_password: "pwd123",
         superuser_password: "pwd1234",
         gcp_creds_b64: "test-creds",
+        recovery_target_lsn: "16/B374D848",
         restore_target: Time.now)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
       expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
@@ -473,7 +480,8 @@ RSpec.describe LanternServer do
 
         container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}",
         postgresql_recover_from_backup: "LATEST",
-        postgresql_recovery_target_time: resource.restore_target || "",
+        postgresql_recovery_target_time: "",
+        postgresql_recovery_target_lsn: resource.recovery_target_lsn,
         gcp_creds_walg_b64: walg_conf[:gcp_creds_b64],
         walg_gs_prefix: walg_conf[:walg_gs_prefix],
         gcp_creds_big_query_b64: resource.gcp_creds_b64,
