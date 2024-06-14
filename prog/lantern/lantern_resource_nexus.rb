@@ -12,10 +12,10 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
 
   semaphore :destroy
 
-  def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, ha_type: LanternResource::HaType::NONE, parent_id: nil, restore_target: nil,
+  def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, ha_type: LanternResource::HaType::NONE, parent_id: nil, restore_target: nil, recovery_target_lsn: nil,
     org_id: nil, db_name: "postgres", db_user: "postgres", db_user_password: nil, superuser_password: nil, repl_password: nil, app_env: Config.rack_env,
     lantern_version: Config.lantern_default_version, extras_version: Config.lantern_extras_default_version, minor_version: Config.lantern_minor_default_version, domain: nil, enable_debug: false,
-    label: "")
+    label: "", version_upgrade: false)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -67,11 +67,14 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
         superuser_password = parent.superuser_password
         repl_user = parent.repl_user
         repl_password = parent.repl_password
-        lantern_version = parent.representative_server.lantern_version
-        extras_version = parent.representative_server.extras_version
-        minor_version = parent.representative_server.minor_version
-        target_storage_size_gib = parent.representative_server.target_storage_size_gib
 
+        if !version_upgrade
+          lantern_version = parent.representative_server.lantern_version
+          extras_version = parent.representative_server.extras_version
+          minor_version = parent.representative_server.minor_version
+        end
+
+        target_storage_size_gib = parent.representative_server.target_storage_size_gib
       end
 
       lantern_doctor = Prog::Lantern::LanternDoctorNexus.assemble
@@ -81,7 +84,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
         superuser_password: superuser_password, ha_type: ha_type, parent_id: parent_id,
         restore_target: restore_target, db_name: db_name, db_user: db_user,
         db_user_password: db_user_password, repl_user: repl_user, repl_password: repl_password,
-        label: label, doctor_id: lantern_doctor.id
+        label: label, doctor_id: lantern_doctor.id, recovery_target_lsn: recovery_target_lsn, version_upgrade: version_upgrade
       ) { _1.id = ubid.to_uuid }
       lantern_resource.associate_with_project(project)
 
