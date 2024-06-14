@@ -200,17 +200,19 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       lantern_server.save_changes
       lantern_server.resource.allow_timeline_access_to_bucket
 
-      lantern_version = lantern_server.run_query("SELECT extversion FROM pg_extension WHERE extname='lantern'")
-      extras_version = lantern_server.run_query("SELECT extversion FROM pg_extension WHERE extname='lantern_extras'")
+      if !lantern_server.resource.version_upgrade
+        lantern_version = lantern_server.run_query("SELECT extversion FROM pg_extension WHERE extname='lantern'")
+        extras_version = lantern_server.run_query("SELECT extversion FROM pg_extension WHERE extname='lantern_extras'")
 
-      if lantern_version != lantern_server.lantern_version
-        incr_update_lantern_extension
-        lantern_server.update(lantern_version: lantern_version)
-      end
+        if lantern_version != lantern_server.lantern_version
+          incr_update_lantern_extension
+          lantern_server.update(lantern_version: lantern_version)
+        end
 
-      if extras_version != lantern_server.extras_version
-        incr_update_extras_extension
-        lantern_server.update(extras_version: extras_version)
+        if extras_version != lantern_server.extras_version
+          incr_update_extras_extension
+          lantern_server.update(extras_version: extras_version)
+        end
       end
 
       hop_wait_timeline_available
