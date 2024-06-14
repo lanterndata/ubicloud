@@ -62,6 +62,7 @@ def setup_env
       f.puts("WALG_GS_PREFIX=#{$configure_hash["walg_gs_prefix"]}")
       f.puts("POSTGRESQL_RECOVER_FROM_BACKUP=#{$configure_hash["postgresql_recover_from_backup"]}")
       f.puts("POSTGRESQL_RECOVERY_TARGET_TIME=#{$configure_hash["postgresql_recovery_target_time"]}")
+      f.puts("POSTGRESQL_RECOVERY_TARGET_LSN=#{$configure_hash["postgresql_recovery_target_lsn"]}")
       f.puts("POSTGRESQL_LOG_LINE_PREFIX=lantern-logline: app: %a user: %u time: %t proc_start: %s pid: %p linenumber: %l === ")
       f.puts("POSTGRESQL_LOG_DURATION=true")
       f.puts("POSTGRESQL_LOG_MIN_DURATION_STATEMENT=250ms")

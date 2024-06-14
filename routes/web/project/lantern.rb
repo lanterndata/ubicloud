@@ -18,6 +18,7 @@ class CloverWeb
       parsed_size = Validation.validate_lantern_size(r.params["size"])
       parent_id = r.params["parent_id"].empty? ? nil : r.params["parent_id"]
       restore_target = r.params["restore_target"].empty? ? nil : Time.new("#{r.params["restore_target"]}:00 UTC")
+      recovery_target_lsn = r.params["recovery_target_lsn"].empty? ? nil : r.params["recovery_target_lsn"]
 
       st = Prog::Lantern::LanternResourceNexus.assemble(
         project_id: @project.id,
@@ -34,7 +35,9 @@ class CloverWeb
         db_name: r.params["db_name"],
         db_user: r.params["db_user"],
         parent_id: parent_id,
-        restore_target: restore_target
+        restore_target: restore_target,
+        recovery_target_lsn: recovery_target_lsn,
+        version_upgrade: r.params["version_upgrade"] == "1"
       )
 
       flash["notice"] = "'#{r.params["name"]}' will be ready in a few minutes"

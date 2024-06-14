@@ -22,6 +22,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
         db_user: "postgres",
         service_account_name: "test-sa",
         gcp_creds_b64: "test-creds",
+        version_upgrade: false,
         superuser_password: "pwd123"),
       vm: instance_double(
         GcpVm,
@@ -362,6 +363,17 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server).to receive(:timeline_id=)
       expect(lantern_server).to receive(:timeline_access=).with("push")
       expect(lantern_server).to receive(:save_changes)
+      expect(Prog::Lantern::LanternTimelineNexus).to receive(:assemble).and_return(instance_double(Strand, id: "104b0033-b3f6-8214-ae27-0cd3cef18ce5"))
+      expect { nx.wait_recovery_completion }.to hop("wait_timeline_available")
+    end
+
+    it "do not update extension on upgrade" do
+      expect(lantern_server.resource).to receive(:allow_timeline_access_to_bucket)
+      expect(lantern_server).to receive(:run_query).and_return("f")
+      expect(lantern_server).to receive(:timeline_id=)
+      expect(lantern_server).to receive(:timeline_access=).with("push")
+      expect(lantern_server).to receive(:save_changes)
+      expect(lantern_server.resource).to receive(:version_upgrade).and_return(true)
       expect(Prog::Lantern::LanternTimelineNexus).to receive(:assemble).and_return(instance_double(Strand, id: "104b0033-b3f6-8214-ae27-0cd3cef18ce5"))
       expect { nx.wait_recovery_completion }.to hop("wait_timeline_available")
     end
