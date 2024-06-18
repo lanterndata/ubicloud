@@ -102,7 +102,16 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
       )
 
       lantern_resource.required_standby_count.times do
-        Prog::Lantern::LanternServerNexus.assemble(resource_id: lantern_resource.id, timeline_id: timeline_id, timeline_access: "fetch")
+        Prog::Lantern::LanternServerNexus.assemble(
+          resource_id: lantern_resource.id,
+          timeline_id: timeline_id,
+          timeline_access: "fetch",
+          lantern_version: lantern_version,
+          extras_version: extras_version,
+          minor_version: minor_version,
+          target_vm_size: target_vm_size,
+          target_storage_size_gib: target_storage_size_gib
+        )
       end
 
       Strand.create(prog: "Lantern::LanternResourceNexus", label: "start") { _1.id = lantern_resource.id }
@@ -152,7 +161,16 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   label def wait
     # Create missing standbys
     (lantern_resource.required_standby_count + 1 - lantern_resource.servers.count).times do
-      Prog::Lantern::LanternServerNexus.assemble(resource_id: lantern_resource.id, timeline_id: lantern_resource.timeline.id, timeline_access: "fetch")
+      Prog::Lantern::LanternServerNexus.assemble(
+        resource_id: lantern_resource.id,
+        lantern_version: lantern_resource.representative_server.lantern_version,
+        extras_version: lantern_resource.representative_server.extras_version,
+        minor_version: lantern_resource.representative_server.minor_version,
+        target_vm_size: lantern_resource.representative_server.target_vm_size,
+        target_storage_size_gib: lantern_resource.representative_server.target_storage_size_gib,
+        timeline_id: lantern_resource.timeline.id,
+        timeline_access: "fetch"
+      )
     end
 
     if lantern_resource.display_state == "failed"
