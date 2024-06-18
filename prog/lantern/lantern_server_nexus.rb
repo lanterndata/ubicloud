@@ -164,7 +164,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   end
 
   label def wait_catch_up
-    query = "SELECT pg_current_wal_lsn() - replay_lsn FROM pg_stat_replication WHERE application_name = '#{lantern_server.ubid}'"
+    query = "SELECT pg_current_wal_lsn() - replay_lsn FROM pg_stat_replication WHERE application_name = 'walreceiver'"
     lag = lantern_server.resource.representative_server.run_query(query).chomp
 
     nap 30 if lag.empty? || lag.to_i > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
@@ -175,7 +175,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   end
 
   label def wait_synchronization
-    query = "SELECT sync_state FROM pg_stat_replication WHERE application_name = '#{lantern_server.ubid}'"
+    query = "SELECT sync_state FROM pg_stat_replication WHERE application_name = 'walreceiver'"
     sync_state = lantern_server.resource.representative_server.run_query(query).chomp
     hop_wait if ["quorum", "sync"].include?(sync_state)
 
@@ -442,7 +442,50 @@ SQL
       hop_update_vm_size
     end
 
+    when_take_over_set? do
+      hop_take_over
+    end
+
     nap 30
+  end
+
+  label def take_over
+    decr_take_over
+    if !lantern_server.standby?
+      hop_wait
+    end
+
+    current_master = lantern_server.resource.representative_server
+    api = Hosting::GcpApis.new
+
+    current_master_host = current_master.vm.sshable.host
+    new_master_host = lantern_server.vm.sshable.host
+    current_master_domain = current_master.domain
+    new_master_domain = lantern_server.domain
+
+    api.swap_ips(
+      vm_name1: current_master.vm.name,
+      vm_name2: lantern_server.vm.name,
+      zone1: "#{current_master.vm.location}-a",
+      zone2: "#{lantern_server.vm.location}-a",
+      ip1: current_master_host,
+      ip2: new_master_host
+    )
+
+    lantern_server.vm.sshable.update(host: current_master_host)
+    current_master.vm.sshable.update(host: new_master_host)
+    lantern_server.update(domain: current_master_domain)
+    current_master.update(domain: new_master_domain)
+
+    current_master_addr_name = current_master.vm.address_name
+    new_master_addr_name = lantern_server.vm.address_name
+    lantern_server.vm.update(address_name: current_master_addr_name)
+    current_master.vm.update(address_name: new_master_addr_name)
+
+    lantern_server.run_query("SELECT pg_promote(true, 120);")
+    current_master.lazy_change_replication_mode("slave")
+    lantern_server.lazy_change_replication_mode("master")
+    hop_wait
   end
 
   label def unavailable

@@ -15,7 +15,7 @@ RSpec.describe LanternServer do
   let(:vm) {
     instance_double(
       GcpVm,
-      sshable: instance_double(Sshable),
+      sshable: instance_double(Sshable, host: "127.0.0.1"),
       mem_gib: 8
     )
   }
@@ -248,6 +248,7 @@ RSpec.describe LanternServer do
         superuser_password: "pwd1234",
         gcp_creds_b64: "test-creds",
         recovery_target_lsn: nil,
+        representative_server: lantern_server,
         restore_target: nil)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
       expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
@@ -278,6 +279,8 @@ RSpec.describe LanternServer do
         db_user: resource.db_user || "",
         db_user_password: resource.db_user_password || "",
         postgres_password: resource.superuser_password || "",
+        master_host: resource.representative_server.hostname,
+        master_port: 5432,
         prom_password: Config.prom_password,
         gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
         gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
@@ -313,6 +316,7 @@ RSpec.describe LanternServer do
         superuser_password: "pwd1234",
         gcp_creds_b64: "test-creds",
         recovery_target_lsn: nil,
+        representative_server: lantern_server,
         restore_target: Time.now)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
       expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
@@ -344,6 +348,8 @@ RSpec.describe LanternServer do
         db_user: resource.db_user || "",
         db_user_password: resource.db_user_password || "",
         postgres_password: resource.superuser_password || "",
+        master_host: resource.representative_server.hostname,
+        master_port: 5432,
         prom_password: Config.prom_password,
         gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
         gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
@@ -378,6 +384,7 @@ RSpec.describe LanternServer do
         superuser_password: "pwd1234",
         gcp_creds_b64: "test-creds",
         recovery_target_lsn: "16/B374D848",
+        representative_server: lantern_server,
         restore_target: nil)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
       expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
@@ -408,6 +415,8 @@ RSpec.describe LanternServer do
         db_user: resource.db_user || "",
         db_user_password: resource.db_user_password || "",
         postgres_password: resource.superuser_password || "",
+        master_host: resource.representative_server.hostname,
+        master_port: 5432,
         prom_password: Config.prom_password,
         gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
         gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
@@ -442,6 +451,7 @@ RSpec.describe LanternServer do
         superuser_password: "pwd1234",
         gcp_creds_b64: "test-creds",
         recovery_target_lsn: "16/B374D848",
+        representative_server: lantern_server,
         restore_target: Time.now)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
       expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
@@ -473,6 +483,8 @@ RSpec.describe LanternServer do
         db_user: resource.db_user || "",
         db_user_password: resource.db_user_password || "",
         postgres_password: resource.superuser_password || "",
+        master_host: resource.representative_server.hostname,
+        master_port: 5432,
         prom_password: Config.prom_password,
         gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
         gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
@@ -675,6 +687,30 @@ SQL
       expect(Hosting::GcpApis).to receive(:new).and_return(api)
       expect(api).to receive(:get_image).and_return({"resource_name" => "custom-image"})
       expect(described_class.get_vm_image("0.2.7", "0.1.5", "1")).to eq("custom-image")
+    end
+  end
+
+  describe "#lazy_change_replication_mode" do
+    it "changes to master" do
+      time = Time.new
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo lantern/bin/lazy_update_env", stdin: JSON.generate([
+        ["POSTGRESQL_REPLICATION_MODE", "master"],
+        ["INSTANCE_TYPE", "writer"],
+        ["POSTGRESQL_RECOVER_FROM_BACKUP", ""]
+      ]))
+      expect(Time).to receive(:new).and_return(time)
+      expect(lantern_server).to receive(:update).with(timeline_access: "push", representative_at: time)
+      lantern_server.lazy_change_replication_mode("master")
+    end
+
+    it "changes to slave" do
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo lantern/bin/lazy_update_env", stdin: JSON.generate([
+        ["POSTGRESQL_REPLICATION_MODE", "slave"],
+        ["INSTANCE_TYPE", "reader"],
+        ["POSTGRESQL_RECOVER_FROM_BACKUP", ""]
+      ]))
+      expect(lantern_server).to receive(:update).with(timeline_access: "fetch", representative_at: nil)
+      lantern_server.lazy_change_replication_mode("slave")
     end
   end
 end

@@ -92,15 +92,17 @@ RSpec.describe Prog::GcpVm::Nexus do
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
       expect(gcp_api).to receive(:get_vm).with("dummy-vm", "us-central1-a").and_return({"status" => "RUNNING"})
-      expect(gcp_api).to receive(:create_static_ipv4).with("dummy-vm", "us-central1").and_return({})
+      expect(gcp_api).to receive(:create_static_ipv4).with("dummy-vm-addr", "us-central1").and_return({})
       expect(gcp_vm).to receive(:strand).and_return(instance_double(Strand, prog: "GcpVm", stack: [{}])).at_least(:once)
+      expect(gcp_vm).to receive(:update).with(address_name: "dummy-vm-addr")
       expect { nx.wait_create_vm }.to hop("wait_ipv4")
     end
 
     it "naps if ip4 is not yet reserved" do
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
-      expect(gcp_api).to receive(:get_static_ipv4).with("dummy-vm", "us-central1").and_return({"status" => "CREATING", "address" => "1.1.1.1"})
+      expect(gcp_vm).to receive(:address_name).and_return("dummy-vm-addr")
+      expect(gcp_api).to receive(:get_static_ipv4).with("dummy-vm-addr", "us-central1").and_return({"status" => "CREATING", "address" => "1.1.1.1"})
       expect { nx.wait_ipv4 }.to nap(10)
     end
 
@@ -109,7 +111,8 @@ RSpec.describe Prog::GcpVm::Nexus do
       expect(gcp_vm).to receive(:sshable).and_return(sshable)
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
-      expect(gcp_api).to receive(:get_static_ipv4).with("dummy-vm", "us-central1").and_return({"status" => "RESERVED", "address" => "1.1.1.1"})
+      expect(gcp_vm).to receive(:address_name).and_return("dummy-vm-addr")
+      expect(gcp_api).to receive(:get_static_ipv4).with("dummy-vm-addr", "us-central1").and_return({"status" => "RESERVED", "address" => "1.1.1.1"})
       expect(gcp_api).to receive(:delete_ephermal_ipv4).with("dummy-vm", "us-central1-a")
       expect(gcp_api).to receive(:assign_static_ipv4).with("dummy-vm", "1.1.1.1", "us-central1-a")
       expect(gcp_vm).to receive(:update).with({has_static_ipv4: true})
@@ -174,7 +177,8 @@ RSpec.describe Prog::GcpVm::Nexus do
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
       expect(gcp_api).to receive(:delete_vm).with("dummy-vm", "us-central1-a")
-      expect(gcp_api).to receive(:release_ipv4).with("dummy-vm", "us-central1")
+      expect(gcp_vm).to receive(:address_name).and_return("dummy-vm-addr")
+      expect(gcp_api).to receive(:release_ipv4).with("dummy-vm-addr", "us-central1")
       expect { nx.destroy }.to exit({"msg" => "gcp vm deleted"})
     end
   end

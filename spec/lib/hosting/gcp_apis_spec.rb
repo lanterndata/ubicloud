@@ -96,7 +96,7 @@ RSpec.describe Hosting::GcpApis do
         stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/regions/us-central1/addresses").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
         stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/test-project/regions/us-central1/addresses/dummy-vm-addr").to_return(status: 200, body: JSON.dump({status: "CREATING", address: "1.1.1.1"}), headers: {"Content-Type" => "application/json"})
         api = described_class.new
-        expect(api.get_static_ipv4("dummy-vm", "us-central1")).to eq({"status" => "CREATING", "address" => "1.1.1.1"})
+        expect(api.get_static_ipv4("dummy-vm-addr", "us-central1")).to eq({"status" => "CREATING", "address" => "1.1.1.1"})
       end
     end
 
@@ -155,7 +155,7 @@ RSpec.describe Hosting::GcpApis do
         api = described_class.new
         stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
         stub_request(:delete, "https://compute.googleapis.com/compute/v1/projects/test-project/regions/us-central1/addresses/dummy-vm-addr")
-        expect { api.release_ipv4("dummy-vm", "us-central1") }.not_to raise_error
+        expect { api.release_ipv4("dummy-vm-addr", "us-central1") }.not_to raise_error
       end
     end
 
@@ -452,6 +452,17 @@ RSpec.describe Hosting::GcpApis do
 
         api = described_class.new
         expect { api.allow_access_to_big_query_dataset(service_account_email, dataset_id) }.not_to raise_error
+      end
+    end
+
+    describe "#swap_ips" do
+      it "swap server ips" do
+        api = described_class.new
+        expect(api).to receive(:delete_ephermal_ipv4).with("vm1", "zone1")
+        expect(api).to receive(:delete_ephermal_ipv4).with("vm2", "zone2")
+        expect(api).to receive(:assign_static_ipv4).with("vm1", "ip2", "zone1")
+        expect(api).to receive(:assign_static_ipv4).with("vm2", "ip1", "zone2")
+        expect { api.swap_ips(vm_name1: "vm1", vm_name2: "vm2", zone1: "zone1", zone2: "zone2", ip1: "ip1", ip2: "ip2") }.not_to raise_error
       end
     end
   end

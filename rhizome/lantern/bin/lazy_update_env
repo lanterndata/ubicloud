@@ -1,0 +1,11 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "yaml"
+require_relative "../../common/lib/util"
+require_relative "../lib/common"
+
+env_arr = JSON.parse($stdin.read)
+
+append_env(env_arr)

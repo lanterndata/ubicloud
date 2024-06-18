@@ -149,9 +149,8 @@ class Hosting::GcpApis
     JSON.parse(response.body)
   end
 
-  def create_static_ipv4(vm_name, region)
+  def create_static_ipv4(address_name, region)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
-    address_name = "#{vm_name}-addr"
     body = {
       name: address_name,
       networkTier: "PREMIUM",
@@ -161,9 +160,8 @@ class Hosting::GcpApis
     Hosting::GcpApis.check_errors(response)
   end
 
-  def get_static_ipv4(vm_name, region)
+  def get_static_ipv4(address_name, region)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
-    address_name = "#{vm_name}-addr"
     response = connection.get(path: "/compute/v1/projects/#{@project}/regions/#{region}/addresses/#{address_name}", expects: 200)
     JSON.parse(response.body)
   end
@@ -194,9 +192,8 @@ class Hosting::GcpApis
     wait_for_operation(zone, data["id"])
   end
 
-  def release_ipv4(vm_name, region)
+  def release_ipv4(address_name, region)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
-    address_name = "#{vm_name}-addr"
     connection.delete(path: "/compute/v1/projects/#{@project}/regions/#{region}/addresses/#{address_name}", expects: [200, 404])
   end
 
@@ -446,5 +443,12 @@ class Hosting::GcpApis
 
     Hosting::GcpApis.check_errors(response)
     JSON.parse(response.body).merge({"resource_name" => "projects/#{@project}/global/images/#{name}"})
+  end
+
+  def swap_ips(vm_name1:, vm_name2:, zone1:, zone2:, ip1:, ip2:)
+    delete_ephermal_ipv4(vm_name1, zone1)
+    delete_ephermal_ipv4(vm_name2, zone2)
+    assign_static_ipv4(vm_name1, ip2, zone1)
+    assign_static_ipv4(vm_name2, ip1, zone2)
   end
 end
