@@ -77,6 +77,7 @@ RSpec.describe Serializers::Web::Lantern do
       instance_type: "writer",
       hostname: "db.lantern.dev",
       primary?: true,
+      strand: instance_double(Strand, label: "wait"),
       connection_string: "postgres://postgres:test123@db.lantern.dev:6432")
     expect(lantern).to receive(:representative_server).and_return(leader).at_least(:once)
     expect(lantern).to receive(:servers).and_return([leader]).at_least(:once)

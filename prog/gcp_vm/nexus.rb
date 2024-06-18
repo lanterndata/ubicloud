@@ -66,7 +66,7 @@ class Prog::GcpVm::Nexus < Prog::Base
 
   label def wait_ipv4
     gcp_client = Hosting::GcpApis.new
-    addr_info = gcp_client.get_static_ipv4(gcp_vm.name, gcp_vm.location)
+    addr_info = gcp_client.get_static_ipv4(gcp_vm.address_name, gcp_vm.location)
     if addr_info["status"] == "RESERVED"
       gcp_client.delete_ephermal_ipv4(gcp_vm.name, "#{gcp_vm.location}-a")
       gcp_client.assign_static_ipv4(gcp_vm.name, addr_info["address"], "#{gcp_vm.location}-a")
@@ -82,7 +82,9 @@ class Prog::GcpVm::Nexus < Prog::Base
     gcp_client = Hosting::GcpApis.new
     vm = gcp_client.get_vm(gcp_vm.name, "#{gcp_vm.location}-a")
     if vm["status"] == "RUNNING"
-      gcp_client.create_static_ipv4(gcp_vm.name, gcp_vm.location)
+      address_name = "#{gcp_vm.name}-addr"
+      gcp_client.create_static_ipv4(address_name, gcp_vm.location)
+      gcp_vm.update(address_name: address_name)
       register_deadline(:wait, 5 * 60)
       hop_wait_ipv4
     else
@@ -229,7 +231,7 @@ class Prog::GcpVm::Nexus < Prog::Base
       gcp_client = Hosting::GcpApis.new
       gcp_client.delete_vm(gcp_vm.name, "#{gcp_vm.location}-a")
       if gcp_vm.has_static_ipv4
-        gcp_client.release_ipv4(gcp_vm.name, gcp_vm.location)
+        gcp_client.release_ipv4(gcp_vm.address_name, gcp_vm.location)
       end
       strand.children.each { _1.destroy }
       gcp_vm.projects.map { gcp_vm.dissociate_with_project(_1) }

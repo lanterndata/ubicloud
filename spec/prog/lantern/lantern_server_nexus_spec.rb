@@ -703,6 +703,11 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect { nx.wait }.to hop("unavailable")
     end
 
+    it "hops to take_over" do
+      nx.incr_take_over
+      expect { nx.wait }.to hop("take_over")
+    end
+
     it "decrements checkup" do
       nx.incr_checkup
       expect(nx).to receive(:available?).and_return(true)
@@ -912,6 +917,46 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server).to receive(:update_walg_creds)
       expect(nx).to receive(:decr_initial_provisioning)
       expect { nx.wait_timeline_available }.to hop("wait_db_available")
+    end
+  end
+
+  describe "#take_over" do
+    it "returns if primary" do
+      expect(lantern_server).to receive(:standby?).and_return(false)
+      expect(lantern_server).not_to receive(:run_query)
+      expect { nx.take_over }.to hop("wait")
+    end
+
+    it "promotes to master" do
+      expect(lantern_server).to receive(:standby?).and_return(true)
+      expect(lantern_server).to receive(:run_query).with("SELECT pg_promote(true, 120);")
+      expect(lantern_server.vm.sshable).to receive(:host).and_return("127.0.0.2").at_least(:once)
+      expect(lantern_server.vm).to receive(:name).and_return("new-master").at_least(:once)
+      expect(lantern_server.vm).to receive(:location).and_return("us-central1").at_least(:once)
+      expect(lantern_server.vm).to receive(:address_name).and_return("new-addr").at_least(:once)
+      current_master = instance_double(LanternServer, domain: "db1.lantern.dev", vm: instance_double(GcpVm, sshable: instance_double(Sshable, host: "127.0.0.1"), name: "old-master", location: "us-east1", address_name: "old-addr"))
+      current_master_host = current_master.vm.sshable.host
+      new_master_host = lantern_server.vm.sshable.host
+      expect(lantern_server.vm.sshable).to receive(:update).with(host: current_master_host).at_least(:once)
+      expect(current_master.vm.sshable).to receive(:update).with(host: new_master_host).at_least(:once)
+      expect(current_master).to receive(:update).with(domain: lantern_server.domain).at_least(:once)
+      expect(lantern_server).to receive(:update).with(domain: current_master.domain).at_least(:once)
+      expect(lantern_server.vm).to receive(:update).with(address_name: "old-addr").at_least(:once)
+      expect(current_master.vm).to receive(:update).with(address_name: "new-addr").at_least(:once)
+      expect(lantern_server.resource).to receive(:representative_server).and_return(current_master).at_least(:once)
+      gcp_api = instance_double(Hosting::GcpApis)
+      expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api).at_least(:once)
+      expect(gcp_api).to receive(:swap_ips).with(
+        vm_name1: current_master.vm.name,
+        vm_name2: lantern_server.vm.name,
+        zone1: "#{current_master.vm.location}-a",
+        zone2: "#{lantern_server.vm.location}-a",
+        ip1: current_master_host,
+        ip2: new_master_host
+      )
+      expect(current_master).to receive(:lazy_change_replication_mode).with("slave")
+      expect(lantern_server).to receive(:lazy_change_replication_mode).with("master")
+      expect { nx.take_over }.to hop("wait")
     end
   end
 end

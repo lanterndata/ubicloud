@@ -114,8 +114,8 @@ class LanternServer < Sequel::Model
       db_user: resource.db_user || "",
       db_user_password: resource.db_user_password || "",
       postgres_password: resource.superuser_password || "",
-      # master_host: lantern_server.master_host,
-      # master_port: lantern_server.master_port,
+      master_host: resource.representative_server.hostname,
+      master_port: 5432,
       prom_password: Config.prom_password,
       gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
       gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
@@ -129,6 +129,15 @@ class LanternServer < Sequel::Model
       gcp_creds_big_query_b64: resource.gcp_creds_b64,
       big_query_dataset: Config.lantern_log_dataset
     })
+  end
+
+  def lazy_change_replication_mode(replication_mode)
+    update(timeline_access: (replication_mode == "master") ? "push" : "fetch", representative_at: (replication_mode == "master") ? Time.new : nil)
+    vm.sshable.cmd("sudo lantern/bin/lazy_update_env", stdin: JSON.generate([
+      ["POSTGRESQL_REPLICATION_MODE", replication_mode],
+      ["INSTANCE_TYPE", (replication_mode == "master") ? "writer" : "reader"],
+      ["POSTGRESQL_RECOVER_FROM_BACKUP", ""]
+    ]))
   end
 
   def update_walg_creds

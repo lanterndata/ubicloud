@@ -21,6 +21,12 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       )],
       representative_server: instance_double(
         LanternServer,
+        lantern_version: Config.lantern_default_version,
+        extras_version: Config.lantern_extras_default_version,
+        minor_version: Config.lantern_minor_default_version,
+        target_vm_size: "n1-standard-2",
+        target_storage_size_gib: 64,
+
         vm: instance_double(
           GcpVm,
           id: "104b0033-b3f6-8214-ae27-0cd3cef18ce5"
