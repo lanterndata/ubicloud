@@ -29,6 +29,16 @@ RSpec.describe LanternResource do
     expect(lantern_resource.display_state).to eq("running")
   end
 
+  it "returns failed as display state" do
+    expect(lantern_resource).to receive(:display_state).and_return("failed")
+    expect(lantern_resource.display_state).to eq("failed")
+  end
+
+  it "returns failover" do
+    expect(lantern_resource).to receive(:servers).and_return([instance_double(LanternServer, strand: instance_double(Strand, label: "take_over"))])
+    expect(lantern_resource.display_state).to eq("failover")
+  end
+
   it "returns unavailable as display state if no representative_server" do
     expect(lantern_resource).to receive(:representative_server).and_return(nil)
     expect(lantern_resource.display_state).to eq("unavailable")
