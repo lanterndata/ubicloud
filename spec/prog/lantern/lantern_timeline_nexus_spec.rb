@@ -90,6 +90,7 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
       expect(lantern_server.vm.sshable).to receive(:cmd).with(a_string_matching("common/bin/daemonizer 'docker compose -f /var/lib/lantern/docker-compose.yaml exec -T -u root postgresql bash -c"))
       expect(lantern_server.timeline).to receive(:backups).and_return([{last_modified: Time.now - 1 * 24 * 60 * 60}])
       expect(lantern_server.timeline).to receive(:leader).and_return(lantern_server)
+      expect(lantern_server.timeline).to receive(:last_checkpoint_file_exists?).and_return(true)
       expect { nx.wait }.to nap(20 * 60)
     end
 
@@ -99,6 +100,7 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
       expect(lantern_server.timeline).to receive(:backups).and_return([{last_modified: Time.now - 3 * 24 * 60 * 60}])
       expect(lantern_server.timeline).to receive(:leader).and_return(lantern_server)
       expect(lantern_server.timeline).to receive(:ubid).and_return(lantern_server.timeline.id)
+      expect(lantern_server.timeline).to receive(:last_checkpoint_file_exists?).and_return(true)
       expect { nx.wait }.to nap(20 * 60)
       expect(Page.first).not_to be_nil
     end
@@ -108,6 +110,7 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
       expect(lantern_server.timeline).to receive(:need_cleanup?).and_return(false)
       expect(lantern_server.timeline).to receive(:backups).and_return([{last_modified: Time.now - 1 * 24 * 60 * 60}])
       expect(lantern_server.timeline).to receive(:leader).and_return(lantern_server)
+      expect(lantern_server.timeline).to receive(:last_checkpoint_file_exists?).and_return(true)
       expect { nx.wait }.to nap(20 * 60)
       expect(Page.first).to be_nil
     end
@@ -118,11 +121,36 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
       expect(lantern_server.timeline).to receive(:backups).and_return([])
       expect(lantern_server.timeline).to receive(:leader).and_return(nil)
       expect(lantern_server.timeline).to receive(:created_at).and_return(Time.now - 1 * 24 * 60 * 60)
+      expect(lantern_server.timeline).to receive(:last_checkpoint_file_exists?).and_return(true)
       page = instance_double(Page)
       expect(Page).to receive(:from_tag_parts).and_return(page)
+      expect(Page).to receive(:from_tag_parts).and_return(nil)
       expect(page).to receive(:incr_resolve)
       expect { nx.wait }.to nap(20 * 60)
       expect(Page.first).to be_nil
+    end
+
+    it "creates alert for missing wal file" do
+      expect(lantern_server.timeline).to receive(:need_backup?).and_return(false)
+      expect(lantern_server.timeline).to receive(:need_cleanup?).and_return(false)
+      expect(lantern_server.timeline).to receive(:backups).and_return([{last_modified: Time.now - 1 * 24 * 60 * 60}])
+      expect(lantern_server.timeline).to receive(:leader).and_return(lantern_server)
+      expect(lantern_server.timeline).to receive(:last_checkpoint_file_exists?).and_return(false)
+      expect { nx.wait }.to nap(20 * 60)
+      expect(Page.from_tag_parts("MissingWALFile", lantern_server.timeline.id)).not_to be_nil
+    end
+
+    it "resolves alert for missing wal file" do
+      expect(lantern_server.timeline).to receive(:need_backup?).and_return(false)
+      expect(lantern_server.timeline).to receive(:need_cleanup?).and_return(false)
+      expect(lantern_server.timeline).to receive(:backups).and_return([])
+      expect(lantern_server.timeline).to receive(:leader).and_return(nil)
+      expect(lantern_server.timeline).to receive(:created_at).and_return(Time.now - 1 * 24 * 60 * 60)
+      expect(lantern_server.timeline).to receive(:last_checkpoint_file_exists?).and_return(true)
+      page = instance_double(Page)
+      expect(Page).to receive(:from_tag_parts).and_return(nil, page)
+      expect(page).to receive(:incr_resolve)
+      expect { nx.wait }.to nap(20 * 60)
     end
   end
 

@@ -82,6 +82,13 @@ class LanternTimeline < Sequel::Model
       .list_objects(Config.lantern_backup_bucket, "#{ubid}/basebackups_005/*_backup_stop_sentinel.json")
   end
 
+  def last_checkpoint_file_exists?
+    redo_wal_file = leader.run_query("SELECT redo_wal_file FROM pg_control_checkpoint() WHERE checkpoint_time < NOW() - interval '2 minute'").chomp.strip
+    return true if redo_wal_file.empty? # file is new it may need some time to sync into storage
+
+    !blob_storage_client.list_objects(Config.lantern_backup_bucket, "#{ubid}/wal_005/#{redo_wal_file}.lz4").empty?
+  end
+
   def backups_with_metadata
     storage_client = blob_storage_client
     mutex = Mutex.new

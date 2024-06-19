@@ -64,6 +64,12 @@ class Prog::Lantern::LanternTimelineNexus < Prog::Base
       Page.from_tag_parts("MissingBackup", lantern_timeline.id)&.incr_resolve
     end
 
+    if !lantern_timeline.last_checkpoint_file_exists?
+      Prog::PageNexus.assemble("Missing WAL file at #{lantern_timeline}!", [lantern_timeline.ubid], "MissingWALFile", lantern_timeline.id)
+    else
+      Page.from_tag_parts("MissingWALFile", lantern_timeline.id)&.incr_resolve
+    end
+
     nap 20 * 60
   end
 
