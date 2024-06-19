@@ -35,7 +35,7 @@ RSpec.describe LanternResource do
   end
 
   it "returns failover" do
-    expect(lantern_resource).to receive(:servers).and_return([instance_double(LanternServer, strand: instance_double(Strand, label: "take_over"))])
+    expect(lantern_resource).to receive(:servers).and_return([instance_double(LanternServer, display_state: "running", strand: instance_double(Strand, label: "wait")), instance_double(LanternServer, display_state: "failover", strand: instance_double(Strand, label: "take_over"))])
     expect(lantern_resource.display_state).to eq("failover")
   end
 
