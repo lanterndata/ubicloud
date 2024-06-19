@@ -66,4 +66,30 @@ class GcpVm < Sequel::Model
   def self.redacted_columns
     super + [:public_key]
   end
+
+  def swap_ip(vm)
+    # swap ips in gcp
+    gcp_client = Hosting::GcpApis.new
+    zone1 = "#{location}-a"
+    zone2 = "#{vm.location}-a"
+    gcp_client.delete_ephermal_ipv4(name, zone1)
+    gcp_client.delete_ephermal_ipv4(vm.name, zone2)
+    gcp_client.assign_static_ipv4(name, vm.sshable.host, zone1)
+    gcp_client.assign_static_ipv4(vm.name, sshable.host, zone2)
+
+    # update sshable hosts
+    current_host = sshable.host
+    new_host = vm.sshable.host
+    sshable.update(host: "temp_#{name}")
+    vm.sshable.update(host: current_host)
+    sshable.update(host: new_host)
+    current_address_name = address_name
+
+    # update address names
+    update(address_name: vm.address_name)
+    vm.update(address_name: current_address_name)
+
+    sshable.invalidate_cache_entry
+    vm.sshable.invalidate_cache_entry
+  end
 end

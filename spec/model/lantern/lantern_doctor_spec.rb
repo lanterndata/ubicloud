@@ -53,17 +53,17 @@ RSpec.describe LanternDoctor do
 
   describe "#should_run" do
     it "returns true" do
-      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, representative_server: instance_double(LanternServer, display_state: "running", strand: instance_double(Strand, label: "wait")))).at_least(:once)
+      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, display_state: "running", representative_server: instance_double(LanternServer, strand: instance_double(Strand, label: "wait")))).at_least(:once)
       expect(lantern_doctor.should_run?).to be(true)
     end
 
     it "returns false if not running" do
-      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, representative_server: instance_double(LanternServer, display_state: "stopped", strand: instance_double(Strand, label: "start")))).at_least(:once)
+      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, display_state: "failover", representative_server: instance_double(LanternServer, strand: instance_double(Strand, label: "start")))).at_least(:once)
       expect(lantern_doctor.should_run?).to be(false)
     end
 
     it "returns false" do
-      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, representative_server: instance_double(LanternServer, display_state: "running", strand: instance_double(Strand, label: "start")))).at_least(:once)
+      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, display_state: "running", representative_server: instance_double(LanternServer, display_state: "running", strand: instance_double(Strand, label: "start")))).at_least(:once)
       expect(lantern_doctor.should_run?).to be(false)
     end
 

@@ -115,6 +115,24 @@ RSpec.describe LanternServer do
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "unknown")).at_least(:once)
       expect(lantern_server.display_state).to eq("failed")
     end
+
+    it "shows failover when label is take_over" do
+      expect(lantern_server.vm).to receive(:display_state).and_return("running").at_least(:once)
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "take_over")).at_least(:once)
+      expect(lantern_server.display_state).to eq("failover")
+    end
+
+    it "shows failover when label is wait_swap_ip" do
+      expect(lantern_server.vm).to receive(:display_state).and_return("running").at_least(:once)
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait_swap_ip")).at_least(:once)
+      expect(lantern_server.display_state).to eq("failover")
+    end
+
+    it "shows failover when label is promote_server" do
+      expect(lantern_server.vm).to receive(:display_state).and_return("running").at_least(:once)
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "promote_server")).at_least(:once)
+      expect(lantern_server.display_state).to eq("failover")
+    end
   end
 
   it "returns name from ubid" do
@@ -531,7 +549,7 @@ RSpec.describe LanternServer do
 
   describe "Lsn monitor" do
     it "fails to initiate a new health monitor session" do
-      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "setup domain")).at_least(:once)
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "setup domain")).at_least(:once).at_least(:once)
       expect { lantern_server.init_health_monitor_session }.to raise_error "server is not ready to initialize session"
     end
 
@@ -551,8 +569,8 @@ RSpec.describe LanternServer do
       }
 
       expect(lantern_server).to receive(:destroy_set?).and_return(false)
-      expect(lantern_server).to receive(:display_state).and_return("running")
-      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      expect(lantern_server).to receive(:display_state).and_return("running").at_least(:once)
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait")).at_least(:once)
       expect(lantern_server).not_to receive(:incr_checkup)
       lantern_server.check_pulse(session: session, previous_pulse: pulse)
     end
@@ -567,9 +585,9 @@ RSpec.describe LanternServer do
         reading_chg: Time.now - 30
       }
 
-      expect(lantern_server).to receive(:display_state).and_return("running")
+      expect(lantern_server).to receive(:display_state).and_return("running").at_least(:once)
       expect(lantern_server).to receive(:destroy_set?).and_return(false)
-      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait")).at_least(:once)
       expect(lantern_server).to receive(:primary?).and_return(true)
       expect(lantern_server).not_to receive(:incr_checkup)
       lantern_server.check_pulse(session: session, previous_pulse: pulse)
@@ -585,9 +603,9 @@ RSpec.describe LanternServer do
         reading_chg: Time.now - 30
       }
 
-      expect(lantern_server).to receive(:display_state).and_return("running")
+      expect(lantern_server).to receive(:display_state).and_return("running").at_least(:once)
       expect(lantern_server).to receive(:destroy_set?).and_return(false)
-      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "wait")).at_least(:once)
       expect(session[:db_connection]).to receive(:[]).and_raise(Sequel::DatabaseConnectionError)
       expect(lantern_server).to receive(:incr_checkup)
       lantern_server.check_pulse(session: session, previous_pulse: pulse)
