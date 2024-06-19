@@ -449,43 +449,43 @@ SQL
     nap 30
   end
 
+  label def promote_server
+    current_master = lantern_server.resource.representative_server
+    current_master_domain = current_master.domain
+    new_master_domain = lantern_server.domain
+
+    lantern_server.update(domain: current_master_domain)
+    current_master.update(domain: new_master_domain)
+
+    lantern_server.run_query("SELECT pg_promote(true, 120);")
+    current_master.lazy_change_replication_mode("slave")
+    lantern_server.lazy_change_replication_mode("master")
+
+    hop_wait
+  end
+
+  label def wait_swap_ip
+    # wait until ip change will propogate
+    begin
+      is_in_recovery = lantern_server.run_query("SELECT pg_is_in_recovery()").chomp == "t"
+      nap 5 if !is_in_recovery
+    rescue
+      nap 5
+    end
+
+    hop_promote_server
+  end
+
   label def take_over
     decr_take_over
     if !lantern_server.standby?
       hop_wait
     end
 
-    current_master = lantern_server.resource.representative_server
-    api = Hosting::GcpApis.new
+    lantern_server.vm.swap_ip(lantern_server.resource.representative_server.vm)
 
-    current_master_host = current_master.vm.sshable.host
-    new_master_host = lantern_server.vm.sshable.host
-    current_master_domain = current_master.domain
-    new_master_domain = lantern_server.domain
-
-    api.swap_ips(
-      vm_name1: current_master.vm.name,
-      vm_name2: lantern_server.vm.name,
-      zone1: "#{current_master.vm.location}-a",
-      zone2: "#{lantern_server.vm.location}-a",
-      ip1: current_master_host,
-      ip2: new_master_host
-    )
-
-    lantern_server.vm.sshable.update(host: current_master_host)
-    current_master.vm.sshable.update(host: new_master_host)
-    lantern_server.update(domain: current_master_domain)
-    current_master.update(domain: new_master_domain)
-
-    current_master_addr_name = current_master.vm.address_name
-    new_master_addr_name = lantern_server.vm.address_name
-    lantern_server.vm.update(address_name: current_master_addr_name)
-    current_master.vm.update(address_name: new_master_addr_name)
-
-    lantern_server.run_query("SELECT pg_promote(true, 120);")
-    current_master.lazy_change_replication_mode("slave")
-    lantern_server.lazy_change_replication_mode("master")
-    hop_wait
+    register_deadline(:promote_server, 5 * 60)
+    hop_wait_swap_ip
   end
 
   label def unavailable
