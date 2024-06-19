@@ -169,6 +169,7 @@ SQL
         server_type = serv.primary? ? "primary" : "standby"
         output += "#{server_type} server - usage #{usage_percent}%\n"
       end
+    rescue
     end
     output.chomp
   end
