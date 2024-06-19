@@ -249,4 +249,35 @@ RSpec.describe LanternTimeline do
       expect(lantern_timeline.need_cleanup?).to be(true)
     end
   end
+
+  describe "#last_checkpoint_file_exists?" do
+    it "returns empty from query" do
+      leader = instance_double(LanternServer)
+      expect(lantern_timeline).to receive(:leader).and_return(leader).at_least(:once)
+      expect(leader).to receive(:run_query).and_return("")
+      expect(lantern_timeline.last_checkpoint_file_exists?).to be(true)
+    end
+
+    it "returns no backups" do
+      leader = instance_double(LanternServer)
+      expect(lantern_timeline).to receive(:leader).and_return(leader).at_least(:once)
+      expect(leader).to receive(:run_query).and_return("000000010000000000000072")
+      gcp_api = instance_double(Hosting::GcpApis)
+      expect(gcp_api).to receive(:list_objects).with(Config.lantern_backup_bucket, "pvr1mcnhzd8p0qwwa00tr5cvex/wal_005/000000010000000000000072.lz4").and_return([])
+      expect(lantern_timeline).to receive(:blob_storage_client).and_return(gcp_api)
+
+      expect(lantern_timeline.last_checkpoint_file_exists?).to be(false)
+    end
+
+    it "returns backup file" do
+      leader = instance_double(LanternServer)
+      expect(lantern_timeline).to receive(:leader).and_return(leader).at_least(:once)
+      expect(leader).to receive(:run_query).and_return("000000010000000000000072")
+      gcp_api = instance_double(Hosting::GcpApis)
+      expect(gcp_api).to receive(:list_objects).with(Config.lantern_backup_bucket, "pvr1mcnhzd8p0qwwa00tr5cvex/wal_005/000000010000000000000072.lz4").and_return([{}])
+      expect(lantern_timeline).to receive(:blob_storage_client).and_return(gcp_api)
+
+      expect(lantern_timeline.last_checkpoint_file_exists?).to be(true)
+    end
+  end
 end
