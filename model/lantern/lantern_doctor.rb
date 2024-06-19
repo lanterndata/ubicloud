@@ -25,7 +25,7 @@ class LanternDoctor < Sequel::Model
 
   def should_run?
     return false unless resource
-    resource.representative_server.display_state == "running" && resource.representative_server.strand.label == "wait"
+    resource.display_state == "running" && resource.representative_server.strand.label == "wait"
   end
 
   def sync_system_queries

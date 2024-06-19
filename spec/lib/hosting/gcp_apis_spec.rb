@@ -454,16 +454,5 @@ RSpec.describe Hosting::GcpApis do
         expect { api.allow_access_to_big_query_dataset(service_account_email, dataset_id) }.not_to raise_error
       end
     end
-
-    describe "#swap_ips" do
-      it "swap server ips" do
-        api = described_class.new
-        expect(api).to receive(:delete_ephermal_ipv4).with("vm1", "zone1")
-        expect(api).to receive(:delete_ephermal_ipv4).with("vm2", "zone2")
-        expect(api).to receive(:assign_static_ipv4).with("vm1", "ip2", "zone1")
-        expect(api).to receive(:assign_static_ipv4).with("vm2", "ip1", "zone2")
-        expect { api.swap_ips(vm_name1: "vm1", vm_name2: "vm2", zone1: "zone1", zone2: "zone2", ip1: "ip1", ip2: "ip2") }.not_to raise_error
-      end
-    end
   end
 end

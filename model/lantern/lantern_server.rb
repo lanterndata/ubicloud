@@ -66,6 +66,7 @@ class LanternServer < Sequel::Model
     return "updating" if vm.display_state == "updating" || strand.label.include?("update") || strand.label == "init_sql"
     return "unavailable" if strand.label == "wait_db_available"
     return "running" if strand.label == "wait"
+    return "failover" if ["take_over", "wait_swap_ip", "promote_server"].include?(strand.label)
     "creating"
   end
 
