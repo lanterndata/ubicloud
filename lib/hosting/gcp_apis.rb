@@ -444,11 +444,4 @@ class Hosting::GcpApis
     Hosting::GcpApis.check_errors(response)
     JSON.parse(response.body).merge({"resource_name" => "projects/#{@project}/global/images/#{name}"})
   end
-
-  def swap_ips(vm_name1:, vm_name2:, zone1:, zone2:, ip1:, ip2:)
-    delete_ephermal_ipv4(vm_name1, zone1)
-    delete_ephermal_ipv4(vm_name2, zone2)
-    assign_static_ipv4(vm_name1, ip2, zone1)
-    assign_static_ipv4(vm_name2, ip1, zone2)
-  end
 end
