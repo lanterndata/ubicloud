@@ -51,7 +51,7 @@ class LanternResource < Sequel::Model
   end
 
   def display_state
-    return "failover" if servers.find { _1.strand.label == "take_over" }
+    return "failover" if servers.find { _1.display_state == "failover" }
     super || representative_server&.display_state || "unavailable"
   end
 
