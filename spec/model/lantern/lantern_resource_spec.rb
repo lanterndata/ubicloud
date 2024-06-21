@@ -134,4 +134,126 @@ RSpec.describe LanternResource do
       expect(lantern_resource.big_query_table).to eq("#{lantern_resource.name}_logs")
     end
   end
+
+  describe "#create_ddl_log" do
+    it "create ddl log table" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(lantern_resource.representative_server).to receive(:run_query_all).with(a_string_matching(/ddl_log/))
+      expect { lantern_resource.create_ddl_log }.not_to raise_error
+    end
+  end
+
+  describe "#listen_ddl_log" do
+    it "listends ddl log table" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(lantern_resource.representative_server).to receive(:run_query_all).with(a_string_matching(/execute_ddl_command/))
+      expect { lantern_resource.listen_ddl_log }.not_to raise_error
+    end
+  end
+
+  describe "#set_to_readonly" do
+    it "convert server to readonly" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(lantern_resource.representative_server).to receive(:run_query).with(a_string_matching(/default_transaction_read_only TO on/))
+      expect { lantern_resource.set_to_readonly }.not_to raise_error
+    end
+
+    it "convert server to writable" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(lantern_resource.representative_server).to receive(:run_query).with(a_string_matching(/default_transaction_read_only TO off/))
+      expect { lantern_resource.set_to_readonly(status: "off") }.not_to raise_error
+    end
+  end
+
+  describe "#create_replication_slot" do
+    it "creates new replication slot" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(lantern_resource.representative_server).to receive(:run_query).with("SELECT lsn FROM pg_create_logical_replication_slot('test', 'pgoutput');").and_return("0/6002748 \n")
+      expect(lantern_resource.create_replication_slot("test")).to eq("0/6002748")
+    end
+  end
+
+  describe "#create_publication" do
+    it "creates new publication" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(lantern_resource.representative_server).to receive(:run_query_all).with("CREATE PUBLICATION test FOR ALL TABLES")
+      expect { lantern_resource.create_publication("test") }.not_to raise_error
+    end
+  end
+
+  describe "#create_and_enable_subscription" do
+    it "creates new subscription" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(lantern_resource.representative_server).to receive(:list_all_databases).and_return(["db1"])
+      expect(lantern_resource.representative_server).to receive(:run_query).with(a_string_matching(/CREATE SUBSCRIPTION/))
+      expect(lantern_resource).to receive(:connection_string).and_return("postgres://localhost:5432")
+      expect(lantern_resource).to receive(:parent).and_return(lantern_resource)
+      expect { lantern_resource.create_and_enable_subscription }.not_to raise_error
+    end
+  end
+
+  describe "#disable_logical_subscription" do
+    it "disables subscription" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(lantern_resource.representative_server).to receive(:run_query_all).with("ALTER SUBSCRIPTION sub_#{lantern_resource.ubid} DISABLE")
+      expect { lantern_resource.disable_logical_subscription }.not_to raise_error
+    end
+  end
+
+  describe "#create_logical_replica" do
+    it "create logical replica with current version" do
+      representative_server = instance_double(LanternServer,
+        target_vm_size: "n1-standard-1",
+        target_storage_size_gib: 120,
+        lantern_version: Config.lantern_default_version,
+        extras_version: Config.lantern_extras_default_version,
+        minor_version: Config.lantern_minor_default_version)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      timeline = instance_double(LanternTimeline,
+        latest_restore_time: Time.new)
+      expect(lantern_resource).to receive(:timeline).and_return(timeline).at_least(:once)
+      expect(lantern_resource).to receive(:create_replication_slot)
+      expect(lantern_resource).to receive(:create_ddl_log)
+      expect(lantern_resource).to receive(:create_publication)
+      expect(Prog::Lantern::LanternResourceNexus).to receive(:assemble).with(hash_including(
+        parent_id: lantern_resource.id,
+        version_upgrade: true,
+        logical_replication: true,
+        lantern_version: representative_server.lantern_version,
+        extras_version: representative_server.extras_version,
+        minor_version: representative_server.minor_version
+      ))
+      expect { lantern_resource.create_logical_replica }.not_to raise_error
+    end
+  end
+
+  it "create logical replica with specified version" do
+    representative_server = instance_double(LanternServer,
+      target_vm_size: "n1-standard-1",
+      target_storage_size_gib: 120)
+    expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+    timeline = instance_double(LanternTimeline,
+      latest_restore_time: Time.new)
+    expect(lantern_resource).to receive(:timeline).and_return(timeline).at_least(:once)
+    expect(lantern_resource).to receive(:create_replication_slot)
+    expect(lantern_resource).to receive(:create_ddl_log)
+    expect(lantern_resource).to receive(:create_publication)
+    expect(Prog::Lantern::LanternResourceNexus).to receive(:assemble).with(hash_including(
+      parent_id: lantern_resource.id,
+      version_upgrade: true,
+      logical_replication: true,
+      lantern_version: "0.3.0",
+      extras_version: "0.2.6",
+      minor_version: "1"
+    ))
+    expect { lantern_resource.create_logical_replica(lantern_version: "0.3.0", extras_version: "0.2.6", minor_version: "1") }.not_to raise_error
+  end
 end

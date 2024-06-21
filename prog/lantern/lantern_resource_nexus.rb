@@ -10,17 +10,16 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   extend Forwardable
   def_delegators :lantern_resource, :servers, :representative_server
 
-  semaphore :destroy
+  semaphore :destroy, :swap_leaders_with_parent
 
-  def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, ha_type: LanternResource::HaType::NONE, parent_id: nil, restore_target: nil, recovery_target_lsn: nil,
+  def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, ubid: LanternResource.generate_ubid, ha_type: LanternResource::HaType::NONE, parent_id: nil, restore_target: nil, recovery_target_lsn: nil,
     org_id: nil, db_name: "postgres", db_user: "postgres", db_user_password: nil, superuser_password: nil, repl_password: nil, app_env: Config.rack_env,
     lantern_version: Config.lantern_default_version, extras_version: Config.lantern_extras_default_version, minor_version: Config.lantern_minor_default_version, domain: nil, enable_debug: false,
-    label: "", version_upgrade: false)
+    label: "", version_upgrade: false, logical_replication: false)
     unless (project = Project[project_id])
       fail "No existing project"
     end
 
-    ubid = LanternResource.generate_ubid
     name ||= LanternResource.ubid_to_name(ubid)
 
     Validation.validate_location(location, project.provider)
@@ -84,7 +83,8 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
         superuser_password: superuser_password, ha_type: ha_type, parent_id: parent_id,
         restore_target: restore_target, db_name: db_name, db_user: db_user,
         db_user_password: db_user_password, repl_user: repl_user, repl_password: repl_password,
-        label: label, doctor_id: lantern_doctor.id, recovery_target_lsn: recovery_target_lsn, version_upgrade: version_upgrade
+        label: label, doctor_id: lantern_doctor.id, recovery_target_lsn: recovery_target_lsn, version_upgrade: version_upgrade,
+        logical_replication: logical_replication
       ) { _1.id = ubid.to_uuid }
       lantern_resource.associate_with_project(project)
 
@@ -155,6 +155,17 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   label def wait_servers
     lantern_resource.set_failed_on_deadline
     nap 5 if servers.any? { _1.strand.label != "wait" }
+
+    if lantern_resource.logical_replication
+      hop_enable_logical_replication
+    end
+
+    hop_wait
+  end
+
+  label def enable_logical_replication
+    lantern_resource.listen_ddl_log
+    lantern_resource.create_and_enable_subscription
     hop_wait
   end
 
@@ -177,7 +188,59 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
       lantern_resource.update(display_state: nil)
     end
 
+    when_swap_leaders_with_parent_set? do
+      if lantern_resource.parent.nil?
+        decr_swap_leaders_with_parent
+      else
+        lantern_resource.update(display_state: "failover")
+        lantern_resource.parent.update(display_state: "failover")
+        register_deadline(:wait, 10 * 60)
+        hop_swap_leaders_with_parent
+      end
+    end
+
     nap 30
+  end
+
+  label def update_hosts
+    current_master = lantern_resource.parent.representative_server
+    current_master_domain = current_master.domain
+    new_master_domain = lantern_resource.representative_server.domain
+
+    lantern_resource.representative_server.update(domain: current_master_domain)
+    current_master.update(domain: new_master_domain)
+
+    # update display_states
+    lantern_resource.update(display_state: nil)
+    lantern_resource.parent.update(display_state: nil)
+
+    # remove fork association so parent can be deleted
+    lantern_resource.update(parent_id: nil)
+    lantern_resource.timeline.update(parent_id: nil)
+    hop_wait
+  end
+
+  label def wait_swap_ip
+    ready = false
+    begin
+      lantern_resource.representative_server.run_query("SELECT 1")
+      ready = true
+    rescue
+    end
+
+    if ready
+      hop_update_hosts
+    else
+      nap 5
+    end
+  end
+
+  label def swap_leaders_with_parent
+    decr_swap_leaders_with_parent
+    lantern_resource.parent.set_to_readonly
+    lantern_resource.disable_logical_subscription
+    lantern_resource.representative_server.vm.swap_ip(lantern_resource.parent.representative_server.vm)
+    hop_wait_swap_ip
   end
 
   label def destroy

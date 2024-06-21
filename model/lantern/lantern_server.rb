@@ -37,13 +37,13 @@ class LanternServer < Sequel::Model
     vm.sshable.host
   end
 
-  def connection_string
+  def connection_string(port: 6432)
     return nil unless (hn = hostname)
     URI::Generic.build2(
       scheme: "postgres",
       userinfo: "postgres:#{URI.encode_uri_component(resource.superuser_password)}",
       host: hn,
-      port: 6432
+      port: port
     ).to_s
   end
 
