@@ -125,6 +125,7 @@ SQL
   def listen_ddl_log
     commands = <<SQL
    DROP EVENT TRIGGER IF EXISTS log_ddl_trigger;
+   TRUNCATE TABLE ddl_log RESTART IDENTITY;
    CREATE OR REPLACE FUNCTION execute_ddl_command()
    RETURNS TRIGGER AS $$
    BEGIN
@@ -138,6 +139,7 @@ SQL
    AFTER INSERT ON ddl_log
    FOR EACH ROW
    EXECUTE FUNCTION execute_ddl_command();
+   ALTER TABLE ddl_log ENABLE REPLICA TRIGGER execute_ddl_after_insert;
 SQL
     representative_server.run_query_all(commands)
   end
@@ -155,6 +157,7 @@ SQL
       WITH (
         copy_data = false,
         create_slot = false,
+        binary = true,
         enabled = true,
         synchronous_commit = false,
         connect = true,
@@ -171,8 +174,8 @@ SQL
 
   def create_logical_replica(lantern_version: nil, extras_version: nil, minor_version: nil)
     ubid = LanternResource.generate_ubid
-    create_publication("pub_#{ubid}")
     create_ddl_log
+    create_publication("pub_#{ubid}")
     slot_lsn = create_replication_slot("slot_#{ubid}")
     Prog::Lantern::LanternResourceNexus.assemble(
       project_id: project_id,
