@@ -150,15 +150,16 @@ SQL
 
   def sync_sequences_with_parent
     representative_server.list_all_databases.each do |db|
-      res = parent.representative_server.run_query("SELECT sequence_schema, sequence_name, last_value
+      res = parent.representative_server.run_query("
+        SELECT sequence_schema, sequence_name, last_value
     FROM information_schema.sequences
     JOIN pg_sequences
     ON (information_schema.sequences.sequence_schema = pg_sequences.schemaname
-    AND information_schema.sequences.sequence_name = pg_sequences.sequencename);", db: db)
+    AND information_schema.sequences.sequence_name = pg_sequences.sequencename)
+    WHERE last_value > 0;", db: db)
 
       statements = res.chomp.strip.split("\n").map do |row|
         values = row.split(",")
-        {schema: values[0], sequence: values[1], last_value: values[2]}
         "SELECT setval('#{values[0]}.#{values[1]}', #{values[2]});"
       end
 
