@@ -21,7 +21,7 @@ class LanternResource < Sequel::Model
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
 
-  semaphore :destroy
+  semaphore :destroy, :swap_leaders_with_parent
 
   plugin :column_encryption do |enc|
     enc.column :superuser_password
@@ -55,8 +55,8 @@ class LanternResource < Sequel::Model
     super || representative_server&.display_state || "unavailable"
   end
 
-  def connection_string
-    representative_server&.connection_string
+  def connection_string(port: 6432)
+    representative_server&.connection_string(port: port)
   end
 
   def required_standby_count
@@ -82,6 +82,116 @@ class LanternResource < Sequel::Model
     timeline.update(gcp_creds_b64: gcp_creds_b64)
     api = Hosting::GcpApis.new
     api.allow_bucket_usage_by_prefix(service_account_name, Config.lantern_backup_bucket, timeline.ubid)
+  end
+
+  def set_to_readonly(status: "on")
+    representative_server.run_query("
+      ALTER SYSTEM SET default_transaction_read_only TO #{status};
+      SELECT pg_reload_conf();
+      SHOW default_transaction_read_only;
+    ")
+  end
+
+  def create_replication_slot(name)
+    representative_server.run_query("SELECT lsn FROM pg_create_logical_replication_slot('#{name}', 'pgoutput');").chomp.strip
+  end
+
+  def create_ddl_log
+    commands = <<SQL
+    BEGIN;
+    CREATE TABLE IF NOT EXISTS ddl_log(
+        id SERIAL PRIMARY KEY,
+        object_tag TEXT,
+        ddl_command TEXT,
+        timestamp TIMESTAMP
+    );
+    CREATE OR REPLACE FUNCTION log_ddl_changes()
+    RETURNS event_trigger AS $$
+    BEGIN
+      INSERT INTO ddl_log (object_tag, ddl_command, timestamp)
+              VALUES (tg_tag, current_query(), current_timestamp);
+    END;
+    $$ LANGUAGE plpgsql;
+
+    DROP EVENT TRIGGER IF EXISTS log_ddl_trigger;
+    CREATE EVENT TRIGGER log_ddl_trigger
+    ON ddl_command_end
+    EXECUTE FUNCTION log_ddl_changes();
+    COMMIT;
+SQL
+    representative_server.run_query_all(commands)
+  end
+
+  def listen_ddl_log
+    commands = <<SQL
+   DROP EVENT TRIGGER IF EXISTS log_ddl_trigger;
+   CREATE OR REPLACE FUNCTION execute_ddl_command()
+   RETURNS TRIGGER AS $$
+   BEGIN
+       SET search_path TO public;
+       EXECUTE NEW.ddl_command;
+       RETURN NEW;
+   END;
+   $$ LANGUAGE plpgsql;
+
+   CREATE TRIGGER execute_ddl_after_insert
+   AFTER INSERT ON ddl_log
+   FOR EACH ROW
+   EXECUTE FUNCTION execute_ddl_command();
+SQL
+    representative_server.run_query_all(commands)
+  end
+
+  def create_publication(name)
+    representative_server.run_query_all("CREATE PUBLICATION #{name} FOR ALL TABLES")
+  end
+
+  def create_and_enable_subscription
+    representative_server.list_all_databases.each do |db|
+      commands = <<SQL
+      CREATE SUBSCRIPTION sub_#{ubid}
+      CONNECTION '#{parent.connection_string(port: 5432)}/#{db}'
+      PUBLICATION pub_#{ubid}
+      WITH (
+        copy_data = false,
+        create_slot = false,
+        enabled = true,
+        synchronous_commit = false,
+        connect = true,
+        slot_name = 'slot_#{ubid}'
+      );
+SQL
+      representative_server.run_query(commands)
+    end
+  end
+
+  def disable_logical_subscription
+    representative_server.run_query_all("ALTER SUBSCRIPTION sub_#{ubid} DISABLE")
+  end
+
+  def create_logical_replica(lantern_version: nil, extras_version: nil, minor_version: nil)
+    ubid = LanternResource.generate_ubid
+    create_publication("pub_#{ubid}")
+    create_ddl_log
+    slot_lsn = create_replication_slot("slot_#{ubid}")
+    Prog::Lantern::LanternResourceNexus.assemble(
+      project_id: project_id,
+      location: location,
+      name: "#{name}-#{Time.now.to_i}",
+      label: "#{label}-logical",
+      ubid: ubid,
+      target_vm_size: representative_server.target_vm_size,
+      target_storage_size_gib: representative_server.target_storage_size_gib,
+      parent_id: id,
+      restore_target: timeline.latest_restore_time.utc.to_s[..-5],
+      recovery_target_lsn: slot_lsn,
+      org_id: org_id,
+      version_upgrade: true,
+      logical_replication: true,
+      lantern_version: lantern_version || representative_server.lantern_version,
+      extras_version: extras_version || representative_server.extras_version,
+      minor_version: minor_version || representative_server.minor_version
+    )
   end
 
   def create_logging_table
