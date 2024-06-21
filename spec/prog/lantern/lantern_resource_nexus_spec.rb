@@ -12,6 +12,7 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       location: "us-central1",
       org_id: 0,
       parent: nil,
+      logical_replication: false,
       servers: [instance_double(
         LanternServer,
         vm: instance_double(
@@ -181,7 +182,13 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect { nx.wait_servers }.to nap(5)
     end
 
-    it "hops if server is ready" do
+    it "hops to enable_logical_replication" do
+      expect(lantern_resource.servers).to all(receive(:strand).and_return(instance_double(Strand, label: "wait")))
+      expect(lantern_resource).to receive(:logical_replication).and_return(true)
+      expect { nx.wait_servers }.to hop("enable_logical_replication")
+    end
+
+    it "hops to if server is ready" do
       expect(lantern_resource.servers).to all(receive(:strand).and_return(instance_double(Strand, label: "wait")))
       expect { nx.wait_servers }.to hop("wait")
     end
@@ -207,6 +214,28 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(lantern_resource).to receive(:display_state).and_return("failed")
       expect(lantern_resource).to receive(:servers).and_return([instance_double(LanternServer, strand: instance_double(Strand, label: "unavailable"))]).at_least(:once)
       expect { nx.wait }.to nap(30)
+    end
+
+    it "naps if no parent on swap_leaders" do
+      expect(lantern_resource).to receive(:required_standby_count).and_return(0)
+      expect(lantern_resource).to receive(:display_state).and_return(nil)
+      expect(lantern_resource).to receive(:servers).and_return([instance_double(LanternServer, strand: instance_double(Strand, label: "wait"))]).at_least(:once)
+      expect(nx).to receive(:when_swap_leaders_with_parent_set?).and_yield
+      expect(lantern_resource).to receive(:parent).and_return(nil)
+      expect(nx).to receive(:decr_swap_leaders_with_parent)
+      expect { nx.wait }.to nap(30)
+    end
+
+    it "hops to swap_leaders" do
+      expect(lantern_resource).to receive(:required_standby_count).and_return(0)
+      expect(lantern_resource).to receive(:display_state).and_return(nil)
+      expect(lantern_resource).to receive(:servers).and_return([instance_double(LanternServer, strand: instance_double(Strand, label: "wait"))]).at_least(:once)
+      expect(nx).to receive(:when_swap_leaders_with_parent_set?).and_yield
+      parent = instance_double(LanternResource)
+      expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)
+      expect(parent).to receive(:update).with(display_state: "failover")
+      expect(lantern_resource).to receive(:update).with(display_state: "failover")
+      expect { nx.wait }.to hop("swap_leaders_with_parent")
     end
   end
 
@@ -240,6 +269,70 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(doctor).to receive(:incr_destroy)
 
       expect { nx.destroy }.to exit({"msg" => "lantern resource is deleted"})
+    end
+  end
+
+  describe "#enable_logical_replication" do
+    it "enables logical replication" do
+      expect(lantern_resource).to receive(:listen_ddl_log)
+      expect(lantern_resource).to receive(:create_and_enable_subscription)
+      expect { nx.enable_logical_replication }.to hop("wait")
+    end
+  end
+
+  describe "#swap_leaders_with_parent" do
+    it "swaps ips with parent leader" do
+      parent = instance_double(LanternResource)
+      representative_server = instance_double(LanternServer)
+      vm = instance_double(GcpVm)
+      expect(parent).to receive(:representative_server).and_return(representative_server)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(lantern_resource).to receive(:disable_logical_subscription)
+      expect(representative_server).to receive(:vm).and_return(vm).at_least(:once)
+      expect(vm).to receive(:swap_ip)
+      expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)
+      expect(parent).to receive(:set_to_readonly)
+      expect { nx.swap_leaders_with_parent }.to hop("wait_swap_ip")
+    end
+  end
+
+  describe "#wait_swap_ip" do
+    it "naps if error" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:run_query).and_raise "test"
+      expect { nx.wait_swap_ip }.to nap(5)
+    end
+
+    it "hops if ready" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:run_query)
+      expect { nx.wait_swap_ip }.to hop("update_hosts")
+    end
+  end
+
+  describe "#update_hosts" do
+    it "updates the domains of the current and new master, updates display states, and removes fork association" do
+      parent = instance_double(LanternResource)
+      current_master = instance_double(LanternServer, domain: "current-master-domain.com")
+      new_master = instance_double(LanternServer, domain: "new-master-domain.com")
+      timeline = instance_double(LanternTimeline)
+
+      expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)
+      expect(parent).to receive(:representative_server).and_return(current_master).at_least(:once)
+      expect(lantern_resource).to receive(:representative_server).and_return(new_master).at_least(:once)
+      expect(new_master).to receive(:update).with(domain: "current-master-domain.com")
+      expect(current_master).to receive(:update).with(domain: "new-master-domain.com")
+
+      expect(lantern_resource).to receive(:update).with(display_state: nil)
+      expect(parent).to receive(:update).with(display_state: nil)
+
+      expect(lantern_resource).to receive(:update).with(parent_id: nil)
+      expect(lantern_resource).to receive(:timeline).and_return(timeline)
+      expect(timeline).to receive(:update).with(parent_id: nil)
+
+      expect { nx.update_hosts }.to hop("wait")
     end
   end
 end
