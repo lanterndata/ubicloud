@@ -288,6 +288,7 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(parent).to receive(:representative_server).and_return(representative_server)
       expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
       expect(lantern_resource).to receive(:disable_logical_subscription)
+      expect(lantern_resource).to receive(:sync_sequences_with_parent)
       expect(representative_server).to receive(:vm).and_return(vm).at_least(:once)
       expect(vm).to receive(:swap_ip)
       expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)

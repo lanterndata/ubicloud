@@ -148,6 +148,24 @@ SQL
     representative_server.run_query_all("CREATE PUBLICATION #{name} FOR ALL TABLES")
   end
 
+  def sync_sequences_with_parent
+    representative_server.list_all_databases.each do |db|
+      res = parent.representative_server.run_query("SELECT sequence_schema, sequence_name, last_value
+    FROM information_schema.sequences
+    JOIN pg_sequences
+    ON (information_schema.sequences.sequence_schema = pg_sequences.schemaname
+    AND information_schema.sequences.sequence_name = pg_sequences.sequencename);", db: db)
+
+      statements = res.chomp.strip.split("\n").map do |row|
+        values = row.split(",")
+        {schema: values[0], sequence: values[1], last_value: values[2]}
+        "SELECT setval('#{values[0]}.#{values[1]}', #{values[2]});"
+      end
+
+      representative_server.run_query(statements, db: db)
+    end
+  end
+
   def create_and_enable_subscription
     representative_server.list_all_databases.each do |db|
       commands = <<SQL
@@ -164,7 +182,7 @@ SQL
         slot_name = 'slot_#{ubid}'
       );
 SQL
-      representative_server.run_query(commands)
+      representative_server.run_query(commands, db: db)
     end
   end
 
