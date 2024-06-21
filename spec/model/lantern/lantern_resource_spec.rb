@@ -191,10 +191,11 @@ RSpec.describe LanternResource do
     it "creates new subscription" do
       representative_server = instance_double(LanternServer)
       expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
-      expect(lantern_resource.representative_server).to receive(:list_all_databases).and_return(["db1"])
-      expect(lantern_resource.representative_server).to receive(:run_query).with(a_string_matching(/CREATE SUBSCRIPTION/))
-      expect(lantern_resource).to receive(:connection_string).and_return("postgres://localhost:5432")
-      expect(lantern_resource).to receive(:parent).and_return(lantern_resource)
+      expect(lantern_resource.representative_server).to receive(:list_all_databases).and_return(["db1", "db2"])
+      expect(lantern_resource.representative_server).to receive(:run_query).with(a_string_matching(/CREATE SUBSCRIPTION/), db: "db1")
+      expect(lantern_resource.representative_server).to receive(:run_query).with(a_string_matching(/CREATE SUBSCRIPTION/), db: "db2")
+      expect(lantern_resource).to receive(:connection_string).and_return("postgres://localhost:5432").at_least(:once)
+      expect(lantern_resource).to receive(:parent).and_return(lantern_resource).at_least(:once)
       expect { lantern_resource.create_and_enable_subscription }.not_to raise_error
     end
   end
@@ -233,27 +234,53 @@ RSpec.describe LanternResource do
       ))
       expect { lantern_resource.create_logical_replica }.not_to raise_error
     end
+
+    it "create logical replica with specified version" do
+      representative_server = instance_double(LanternServer,
+        target_vm_size: "n1-standard-1",
+        target_storage_size_gib: 120)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      timeline = instance_double(LanternTimeline,
+        latest_restore_time: Time.new)
+      expect(lantern_resource).to receive(:timeline).and_return(timeline).at_least(:once)
+      expect(lantern_resource).to receive(:create_replication_slot)
+      expect(lantern_resource).to receive(:create_ddl_log)
+      expect(lantern_resource).to receive(:create_publication)
+      expect(Prog::Lantern::LanternResourceNexus).to receive(:assemble).with(hash_including(
+        parent_id: lantern_resource.id,
+        version_upgrade: true,
+        logical_replication: true,
+        lantern_version: "0.3.0",
+        extras_version: "0.2.6",
+        minor_version: "1"
+      ))
+      expect { lantern_resource.create_logical_replica(lantern_version: "0.3.0", extras_version: "0.2.6", minor_version: "1") }.not_to raise_error
+    end
   end
 
-  it "create logical replica with specified version" do
-    representative_server = instance_double(LanternServer,
-      target_vm_size: "n1-standard-1",
-      target_storage_size_gib: 120)
-    expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
-    timeline = instance_double(LanternTimeline,
-      latest_restore_time: Time.new)
-    expect(lantern_resource).to receive(:timeline).and_return(timeline).at_least(:once)
-    expect(lantern_resource).to receive(:create_replication_slot)
-    expect(lantern_resource).to receive(:create_ddl_log)
-    expect(lantern_resource).to receive(:create_publication)
-    expect(Prog::Lantern::LanternResourceNexus).to receive(:assemble).with(hash_including(
-      parent_id: lantern_resource.id,
-      version_upgrade: true,
-      logical_replication: true,
-      lantern_version: "0.3.0",
-      extras_version: "0.2.6",
-      minor_version: "1"
-    ))
-    expect { lantern_resource.create_logical_replica(lantern_version: "0.3.0", extras_version: "0.2.6", minor_version: "1") }.not_to raise_error
+  describe "#sync_sequences_with_parent" do
+    it "syncs sequences with parent" do
+      representative_server = instance_double(LanternServer)
+      parent_representative_server = instance_double(LanternServer)
+      parent = instance_double(described_class, representative_server: parent_representative_server)
+      databases = ["db1", "db2"]
+      query_result = "public,seq1,100\npublic,seq2,200"
+
+      allow(lantern_resource).to receive_messages(representative_server: representative_server, parent: parent)
+      allow(representative_server).to receive(:list_all_databases).and_return(databases)
+      allow(parent_representative_server).to receive(:run_query).with(anything, db: "db1").and_return(query_result)
+      allow(parent_representative_server).to receive(:run_query).with(anything, db: "db2").and_return(query_result)
+
+      statements_db1 = [
+        "SELECT setval('public.seq1', 100);",
+        "SELECT setval('public.seq2', 200);"
+      ]
+      statements_db2 = statements_db1 # identical statements for the test
+
+      expect(representative_server).to receive(:run_query).with(statements_db1, db: "db1")
+      expect(representative_server).to receive(:run_query).with(statements_db2, db: "db2")
+
+      expect { lantern_resource.sync_sequences_with_parent }.not_to raise_error
+    end
   end
 end
