@@ -4,6 +4,7 @@ Sequel.migration do
   up do
     # percent toward transaction wraparound
     sql = <<SQL
+ WITH max_age AS (
  SELECT 2000000000 as max_old_xid,
         setting AS autovacuum_freeze_max_age
         FROM pg_catalog.pg_settings
@@ -29,5 +30,7 @@ SQL
       response_type: "bool",
       severity: "warning"
     )
+    # Create semaphores for all lantern doctors to sync system queries
+    run "INSERT INTO semaphore (id, strand_id, name) SELECT gen_random_uuid(), id, 'sync_system_queries' FROM strand s WHERE s.prog = 'Lantern::LanternDoctorNexus'"
   end
 end
