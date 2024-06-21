@@ -239,6 +239,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
     decr_swap_leaders_with_parent
     lantern_resource.parent.set_to_readonly
     lantern_resource.disable_logical_subscription
+    lantern_resource.sync_sequences_with_parent
     lantern_resource.representative_server.vm.swap_ip(lantern_resource.parent.representative_server.vm)
     hop_wait_swap_ip
   end
