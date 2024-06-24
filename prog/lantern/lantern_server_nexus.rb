@@ -11,7 +11,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   def_delegators :lantern_server, :vm
 
   semaphore :initial_provisioning, :update_user_password, :update_lantern_extension, :update_extras_extension, :update_image, :add_domain, :update_rhizome, :checkup
-  semaphore :start_server, :stop_server, :restart_server, :take_over, :destroy, :update_storage_size, :update_vm_size, :update_memory_limits, :init_sql, :restart
+  semaphore :start_server, :stop_server, :restart_server, :take_over, :destroy, :update_storage_size, :update_vm_size, :update_memory_limits, :init_sql, :restart, :container_stopped
 
   def self.assemble(
     resource_id: nil, lantern_version: "0.2.2", extras_version: "0.1.4", minor_version: "1", domain: nil,
@@ -446,7 +446,21 @@ SQL
       hop_take_over
     end
 
+    when_container_stopped_set? do
+      hop_container_stopped
+    end
+
     nap 30
+  end
+
+  label def container_stopped
+    decr_container_stopped
+    when_take_over_set? do
+      vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} up -d")
+      hop_take_over
+    end
+
+    nap 15
   end
 
   label def promote_server
@@ -458,9 +472,11 @@ SQL
     current_master.update(domain: new_master_domain)
 
     lantern_server.run_query("SELECT pg_promote(true, 120);")
-    lantern_server.resource.set_to_readonly(status: "off")
-    current_master.change_replication_mode("slave")
-    lantern_server.change_replication_mode("master", lazy: false)
+    # we will mark the old server as slave,
+    # but don't change the docker env, so in case of emergency
+    # we could rollback to that instance
+    current_master.change_replication_mode("slave", update_env: false)
+    lantern_server.change_replication_mode("master")
 
     hop_wait
   end
@@ -468,8 +484,7 @@ SQL
   label def wait_swap_ip
     # wait until ip change will propogate
     begin
-      is_in_recovery = lantern_server.run_query("SELECT pg_is_in_recovery()").chomp == "t"
-      nap 5 if !is_in_recovery
+      lantern_server.run_query("SELECT 1")
     rescue
       nap 5
     end
@@ -483,9 +498,15 @@ SQL
       hop_wait
     end
 
-    lantern_server.resource.set_to_readonly(status: "on")
-    lantern_server.vm.swap_ip(lantern_server.resource.representative_server.vm)
+    lantern_server.resource.representative_server.vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} down -t 60")
+    # put the old server in container_stopped mode, so no healthcheck will be done
+    lantern_server.resource.representative_server.incr_container_stopped
 
+    hop_swap_ip
+  end
+
+  label def swap_ip
+    lantern_server.vm.swap_ip(lantern_server.resource.representative_server.vm)
     register_deadline(:promote_server, 5 * 60)
     hop_wait_swap_ip
   end

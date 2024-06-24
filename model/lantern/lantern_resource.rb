@@ -192,6 +192,10 @@ SQL
   end
 
   def create_logical_replica(lantern_version: nil, extras_version: nil, minor_version: nil)
+    # TODO::
+    # 1. If new database will be created during logical replication it won't be added automatically
+    # 2. New timeline will be generated for lantern resource
+    # 3. We need rollback mechanism (basically that will be ip swap again)
     ubid = LanternResource.generate_ubid
     create_ddl_log
     create_publication("pub_#{ubid}")
