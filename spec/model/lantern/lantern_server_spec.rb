@@ -708,17 +708,17 @@ SQL
     end
   end
 
-  describe "#lazy_change_replication_mode" do
+  describe "#change_replication_mode" do
     it "changes to master" do
       time = Time.new
-      expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo lantern/bin/lazy_update_env", stdin: JSON.generate([
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo lantern/bin/update_env", stdin: JSON.generate([
         ["POSTGRESQL_REPLICATION_MODE", "master"],
         ["INSTANCE_TYPE", "writer"],
         ["POSTGRESQL_RECOVER_FROM_BACKUP", ""]
       ]))
       expect(Time).to receive(:new).and_return(time)
       expect(lantern_server).to receive(:update).with(timeline_access: "push", representative_at: time)
-      lantern_server.lazy_change_replication_mode("master")
+      lantern_server.change_replication_mode("master", lazy: false)
     end
 
     it "changes to slave" do
@@ -728,7 +728,7 @@ SQL
         ["POSTGRESQL_RECOVER_FROM_BACKUP", ""]
       ]))
       expect(lantern_server).to receive(:update).with(timeline_access: "fetch", representative_at: nil)
-      lantern_server.lazy_change_replication_mode("slave")
+      lantern_server.change_replication_mode("slave")
     end
   end
 end

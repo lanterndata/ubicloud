@@ -100,6 +100,51 @@ class CloverWeb
       #   pg.gcp_vm.incr_restart
       #   r.redirect "#{@project.path}#{pg.path}"
       # end
+
+      r.on "replica" do
+        r.post true do
+          Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
+          Authorization.authorize(@current_user.id, "Postgres:view", pg.id)
+
+          Prog::Lantern::LanternServerNexus.assemble(
+            resource_id: pg.id,
+            lantern_version: r.params["replica_lantern_version"],
+            extras_version: r.params["replica_extras_version"],
+            minor_version: r.params["replica_minor_version"],
+            target_vm_size: r.params["replica_vm_size"],
+            target_storage_size_gib: pg.representative_server.target_storage_size_gib,
+            timeline_id: pg.timeline.id,
+            timeline_access: "fetch"
+          )
+
+          flash["notice"] = "A new replica server is being added"
+          r.redirect "#{@project.path}#{pg.path}"
+        end
+
+        r.on String do |server_id|
+          server = pg.servers.find { |s| s.id == server_id }
+
+          r.post "promote" do
+            Authorization.authorize(@current_user.id, "Postgres:edit", @project.id)
+            Authorization.authorize(@current_user.id, "Postgres:view", pg.id)
+
+            server.incr_take_over
+            r.redirect "#{@project.path}#{pg.path}"
+          end
+
+          r.delete true do
+            Authorization.authorize(@current_user.id, "Postgres:delete", @project.id)
+            Authorization.authorize(@current_user.id, "Postgres:view", pg.id)
+
+            if server.primary?
+              return {message: "Cannot delete primary server"}.to_json
+            else
+              server.incr_destroy
+              return {message: "Deleting replica"}.to_json
+            end
+          end
+        end
+      end
     end
   end
 end

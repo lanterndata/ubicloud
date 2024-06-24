@@ -198,5 +198,68 @@ RSpec.describe Clover, "lantern" do
         expect(page.status_code).to eq(200)
       end
     end
+
+    describe "add-replica" do
+      it "can add a replica server" do
+        visit "#{project.path}#{pg.path}"
+        fill_in "replica_lantern_version", with: "0.2.0"
+        fill_in "replica_extras_version", with: "0.1.0"
+        fill_in "replica_minor_version", with: "2"
+        select "n1-standard-2", from: "replica_vm_size"
+        click_button "Add Replica"
+        expect(page).to have_content "A new replica server is being added"
+        expect(page.status_code).to eq(200)
+      end
+    end
+
+    describe "promote-replica" do
+      it "can promote replica server" do
+        query_res = class_double(LanternResource, first: pg)
+        allow(query_res).to receive(:where).and_return(query_res)
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        allow(project).to receive(:lantern_resources_dataset).and_return(query_res)
+        replica = instance_double(LanternServer, primary?: false, display_state: "running", id: "pg2", ubid: "pg2", instance_type: "reader", lantern_version: "0.3.0", extras_version: "0.2.5", minor_version: "1", target_vm_size: "n1-standard-2", target_storage_size_gib: 50, connection_string: "pg://")
+        allow(pg).to receive(:servers).and_return([*pg.servers, replica])
+        expect(replica).to receive(:incr_take_over)
+
+        visit "#{project.path}#{pg.path}"
+        click_button "Promote"
+        expect(page.status_code).to eq(200)
+      end
+    end
+
+    describe "delete-replica" do
+      it "can delete a replica server" do
+        query_res = class_double(LanternResource, first: pg)
+        allow(query_res).to receive(:where).and_return(query_res)
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        allow(project).to receive(:lantern_resources_dataset).and_return(query_res)
+        replica = instance_double(LanternServer, primary?: false, display_state: "running", id: "pg2", ubid: "pg2", instance_type: "reader", lantern_version: "0.3.0", extras_version: "0.2.5", minor_version: "1", target_vm_size: "n1-standard-2", target_storage_size_gib: 50, connection_string: "pg://")
+        allow(pg).to receive(:servers).and_return([*pg.servers, replica])
+        expect(replica).to receive(:incr_destroy)
+
+        visit "#{project.path}#{pg.path}"
+        btn = find "#postgres-delete-replica-pg2 .delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        expect(page.body).to eq({message: "Deleting replica"}.to_json)
+        expect(page.status_code).to eq(200)
+      end
+
+      it "cannot delete primary server" do
+        query_res = class_double(LanternResource, first: pg)
+        allow(query_res).to receive(:where).and_return(query_res)
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        allow(project).to receive(:lantern_resources_dataset).and_return(query_res)
+        serv = instance_double(LanternServer, display_state: "running", id: "pg2", ubid: "pg2", instance_type: "writer", lantern_version: "0.3.0", extras_version: "0.2.5", minor_version: "1", target_vm_size: "n1-standard-2", target_storage_size_gib: 50, connection_string: "pg://")
+        expect(serv).to receive(:primary?).and_return(false, false, true)
+        allow(pg).to receive(:servers).and_return([*pg.servers, serv])
+
+        visit "#{project.path}#{pg.path}"
+        btn = find "#postgres-delete-replica-pg2 .delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        expect(JSON.parse(page.body)["message"]).to eq("Cannot delete primary server")
+        expect(page.status_code).to eq(200)
+      end
+    end
   end
 end
