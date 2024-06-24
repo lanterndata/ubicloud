@@ -320,6 +320,128 @@
           </div>
         </div>
       <% end %>
+      <!-- Reader Servers -->
+      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+        <div class="px-4 py-5 sm:p-6">
+          <h2 class="text-lg font-medium leading-6 text-gray-900">Reader Servers</h2>
+          <ul>
+            <% @pg[:servers].select { !_1[:primary] }.each do |server| %>
+              <li>
+                <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+                  <!-- Detail Card -->
+                  <% data = [
+                    ["ID", server[:ubid]],
+                    ["Lantern Version", server[:lantern_version]],
+                    ["Extras Version", server[:extras_version]],
+                    ["Minor Version", server[:minor_version]],
+                    ["Compute", server[:vm_size]],
+                    ["Storage", "#{server[:storage_size_gib]} GB"]
+                  ]
+                  
+                  if server[:connection_string] == ""
+                    data.push(["Connection String", "Waiting for host to be ready..."])
+                  else
+                    data.push(["Connection String", server[:connection_string], { copieble: true, revealable: true }])
+                  end %>
+
+                  <%== render("components/pg_state_label", locals: { state: server[:state], extra_class: "text-md" }) %>
+                  <%== render("components/kv_data_card", locals: { data: data }) %>
+                  <div class="flex items-center">
+                    <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/replica/#{server[:id]}/promote" %>" role="form" method="POST">
+                      <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/replica/#{server[:id]}/promote") %>
+                      <%== render("components/form/submit_button", locals: { text: "Promote" }) %>
+                    </form>
+                    <div
+                      id="postgres-delete-replica-<%=server[:id]%>"
+                      class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center"
+                    >
+                      <%== render(
+                        "components/delete_button",
+                        locals: {
+                          url: "#{@project_data[:path]}#{@pg[:path]}/replica/#{server[:id]}",
+                          confirmation: "delete",
+                          redirect: "#{@project_data[:path]}#{@pg[:path]}"
+                        }
+                      ) %>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            <% end %>
+          </ul>
+        </div>
+      </div>
+      <!-- Add Replica Server -->
+      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+        <div class="px-4 py-5 sm:p-6">
+          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/replica" %>" role="form" method="POST">
+            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/replica") %>
+            <div class="space-y-4">
+              <div>
+                <h2 class="text-lg font-medium leading-6 text-gray-900">Add Replica Server</h2>
+              </div>
+              <div class="grid grid-cols-12 gap-6">
+                <div class="col-span-12 sm:col-span-5">
+                  <%== render(
+                    "components/form/text",
+                    locals: {
+                      label: "Lantern Version",
+                      name: "replica_lantern_version",
+                      type: "text",
+                      attributes: {
+                        required: true,
+                        value: Config.lantern_default_version
+                      }
+                    }
+                  ) %>
+                </div>
+                <div class="col-span-12 sm:col-span-5">
+                  <%== render(
+                    "components/form/text",
+                    locals: {
+                      label: "Extras Version",
+                      name: "replica_extras_version",
+                      type: "text",
+                      attributes: {
+                        required: true,
+                        value: Config.lantern_extras_default_version
+                      }
+                    }
+                  ) %>
+                </div>
+                <div class="col-span-12 sm:col-span-5">
+                  <%== render(
+                    "components/form/text",
+                    locals: {
+                      label: "Minor Version",
+                      name: "replica_minor_version",
+                      type: "text",
+                      attributes: {
+                        required: true,
+                        value: Config.lantern_minor_default_version
+                      }
+                    }
+                  ) %>
+                </div>
+                <div class="col-span-12 sm:col-span-5">
+                  <%== render(
+                    "components/form/select",
+                    locals: {
+                      name: "replica_vm_size",
+                      label: "VM Size",
+                      options: Option::LanternSizes.map { [_1[:vm_size], _1[:vm_size]] }.to_h,
+                      selected: @pg[:vm_size]
+                    }
+                  ) %>
+                </div>
+                <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                  <%== render("components/form/submit_button", locals: { text: "Add Replica" }) %>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   <% end %>
 </div>

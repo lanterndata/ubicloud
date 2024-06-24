@@ -934,6 +934,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.resource).to receive(:representative_server).and_return(current_master).at_least(:once)
 
       expect(lantern_server.vm).to receive(:swap_ip).with(current_master.vm)
+      expect(lantern_server.resource).to receive(:set_to_readonly).with(status: "on")
 
       expect { nx.take_over }.to hop("wait_swap_ip")
     end
@@ -957,12 +958,13 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       current_master = instance_double(LanternServer, domain: "db1.lantern.dev", vm: instance_double(GcpVm, sshable: instance_double(Sshable, host: "127.0.0.1"), name: "old-master", location: "us-east1", address_name: "old-addr"))
       expect(lantern_server.resource).to receive(:representative_server).and_return(current_master).at_least(:once)
 
+      expect(lantern_server.resource).to receive(:set_to_readonly).with(status: "off")
       expect(current_master).to receive(:update).with(domain: lantern_server.domain).at_least(:once)
       expect(lantern_server).to receive(:update).with(domain: current_master.domain).at_least(:once)
 
       expect(lantern_server).to receive(:run_query).with("SELECT pg_promote(true, 120);")
-      expect(current_master).to receive(:lazy_change_replication_mode).with("slave")
-      expect(lantern_server).to receive(:lazy_change_replication_mode).with("master")
+      expect(current_master).to receive(:change_replication_mode).with("slave")
+      expect(lantern_server).to receive(:change_replication_mode).with("master", lazy: false)
       expect { nx.promote_server }.to hop("wait")
     end
   end
