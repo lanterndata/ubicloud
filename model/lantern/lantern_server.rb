@@ -132,9 +132,10 @@ class LanternServer < Sequel::Model
     })
   end
 
-  def lazy_change_replication_mode(replication_mode)
+  def change_replication_mode(replication_mode, lazy: true)
     update(timeline_access: (replication_mode == "master") ? "push" : "fetch", representative_at: (replication_mode == "master") ? Time.new : nil)
-    vm.sshable.cmd("sudo lantern/bin/lazy_update_env", stdin: JSON.generate([
+    cmd = lazy ? "lazy_update_env" : "update_env"
+    vm.sshable.cmd("sudo lantern/bin/#{cmd}", stdin: JSON.generate([
       ["POSTGRESQL_REPLICATION_MODE", replication_mode],
       ["INSTANCE_TYPE", (replication_mode == "master") ? "writer" : "reader"],
       ["POSTGRESQL_RECOVER_FROM_BACKUP", ""]
