@@ -110,6 +110,12 @@ RSpec.describe LanternServer do
       expect(lantern_server.display_state).to eq("stopped")
     end
 
+    it "shows stopped (container)" do
+      expect(lantern_server.vm).to receive(:display_state).and_return("running").at_least(:once)
+      expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "container_stopped")).at_least(:once)
+      expect(lantern_server.display_state).to eq("stopped")
+    end
+
     it "shows failed" do
       expect(lantern_server.vm).to receive(:display_state).and_return("failed").at_least(:once)
       expect(lantern_server).to receive(:strand).and_return(instance_double(Strand, label: "unknown")).at_least(:once)
@@ -709,6 +715,13 @@ SQL
   end
 
   describe "#change_replication_mode" do
+    it "changes to master without env" do
+      time = Time.new
+      expect(Time).to receive(:new).and_return(time)
+      expect(lantern_server).to receive(:update).with(timeline_access: "push", representative_at: time)
+      lantern_server.change_replication_mode("master", update_env: false)
+    end
+
     it "changes to master" do
       time = Time.new
       expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo lantern/bin/update_env", stdin: JSON.generate([
@@ -718,11 +731,11 @@ SQL
       ]))
       expect(Time).to receive(:new).and_return(time)
       expect(lantern_server).to receive(:update).with(timeline_access: "push", representative_at: time)
-      lantern_server.change_replication_mode("master", lazy: false)
+      lantern_server.change_replication_mode("master", update_env: true)
     end
 
     it "changes to slave" do
-      expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo lantern/bin/lazy_update_env", stdin: JSON.generate([
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo lantern/bin/update_env", stdin: JSON.generate([
         ["POSTGRESQL_REPLICATION_MODE", "slave"],
         ["INSTANCE_TYPE", "reader"],
         ["POSTGRESQL_RECOVER_FROM_BACKUP", ""]

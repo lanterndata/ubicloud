@@ -708,6 +708,11 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect { nx.wait }.to hop("take_over")
     end
 
+    it "hops to container_stopped" do
+      nx.incr_container_stopped
+      expect { nx.wait }.to hop("container_stopped")
+    end
+
     it "decrements checkup" do
       nx.incr_checkup
       expect(nx).to receive(:available?).and_return(true)
@@ -923,34 +928,37 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
   describe "#take_over" do
     it "returns if primary" do
       expect(lantern_server).to receive(:standby?).and_return(false)
-      expect(lantern_server).not_to receive(:run_query)
       expect { nx.take_over }.to hop("wait")
     end
 
-    it "swap ips" do
+    it "stop old master" do
       expect(lantern_server).to receive(:standby?).and_return(true)
 
       current_master = instance_double(LanternServer, domain: "db1.lantern.dev", vm: instance_double(GcpVm, sshable: instance_double(Sshable, host: "127.0.0.1"), name: "old-master", location: "us-east1", address_name: "old-addr"))
       expect(lantern_server.resource).to receive(:representative_server).and_return(current_master).at_least(:once)
 
-      expect(lantern_server.vm).to receive(:swap_ip).with(current_master.vm)
-      expect(lantern_server.resource).to receive(:set_to_readonly).with(status: "on")
+      expect(current_master.vm.sshable).to receive(:cmd)
+      expect(current_master).to receive(:incr_container_stopped)
 
-      expect { nx.take_over }.to hop("wait_swap_ip")
+      expect { nx.take_over }.to hop("swap_ip")
+    end
+
+    it "swap ips" do
+      current_master = instance_double(LanternServer, domain: "db1.lantern.dev", vm: instance_double(GcpVm, sshable: instance_double(Sshable, host: "127.0.0.1"), name: "old-master", location: "us-east1", address_name: "old-addr"))
+      expect(lantern_server.resource).to receive(:representative_server).and_return(current_master).at_least(:once)
+
+      expect(lantern_server.vm).to receive(:swap_ip).with(current_master.vm)
+
+      expect { nx.swap_ip }.to hop("wait_swap_ip")
     end
 
     it "waits until vm available" do
-      expect(lantern_server).to receive(:run_query).with("SELECT pg_is_in_recovery()").and_raise "test"
-      expect { nx.wait_swap_ip }.to nap 5
-    end
-
-    it "waits until ip swap done" do
-      expect(lantern_server).to receive(:run_query).with("SELECT pg_is_in_recovery()").and_return("f")
+      expect(lantern_server).to receive(:run_query).with("SELECT 1").and_raise "test"
       expect { nx.wait_swap_ip }.to nap 5
     end
 
     it "hops to promote" do
-      expect(lantern_server).to receive(:run_query).with("SELECT pg_is_in_recovery()").and_return("t")
+      expect(lantern_server).to receive(:run_query).with("SELECT 1")
       expect { nx.wait_swap_ip }.to hop("promote_server")
     end
 
@@ -958,14 +966,25 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       current_master = instance_double(LanternServer, domain: "db1.lantern.dev", vm: instance_double(GcpVm, sshable: instance_double(Sshable, host: "127.0.0.1"), name: "old-master", location: "us-east1", address_name: "old-addr"))
       expect(lantern_server.resource).to receive(:representative_server).and_return(current_master).at_least(:once)
 
-      expect(lantern_server.resource).to receive(:set_to_readonly).with(status: "off")
       expect(current_master).to receive(:update).with(domain: lantern_server.domain).at_least(:once)
       expect(lantern_server).to receive(:update).with(domain: current_master.domain).at_least(:once)
 
       expect(lantern_server).to receive(:run_query).with("SELECT pg_promote(true, 120);")
-      expect(current_master).to receive(:change_replication_mode).with("slave")
-      expect(lantern_server).to receive(:change_replication_mode).with("master", lazy: false)
+      expect(current_master).to receive(:change_replication_mode).with("slave", update_env: false)
+      expect(lantern_server).to receive(:change_replication_mode).with("master")
       expect { nx.promote_server }.to hop("wait")
+    end
+  end
+
+  describe "#container_stopped" do
+    it "hops to take_over" do
+      nx.incr_take_over
+      expect(lantern_server.vm.sshable).to receive(:cmd)
+      expect { nx.container_stopped }.to hop("take_over")
+    end
+
+    it "naps 15" do
+      expect { nx.container_stopped }.to nap(15)
     end
   end
 end
