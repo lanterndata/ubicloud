@@ -17,7 +17,7 @@ class LanternServer < Sequel::Model
   include SemaphoreMethods
 
   semaphore :initial_provisioning, :update_user_password, :update_lantern_extension, :update_extras_extension, :update_image, :setup_ssl, :add_domain, :update_rhizome, :checkup
-  semaphore :start_server, :stop_server, :restart_server, :take_over, :destroy, :update_storage_size, :update_vm_size, :update_memory_limits, :init_sql, :restart
+  semaphore :start_server, :stop_server, :restart_server, :take_over, :destroy, :update_storage_size, :update_vm_size, :update_memory_limits, :init_sql, :restart, :container_stopped
 
   def self.ubid_to_name(id)
     id.to_s[0..7]
@@ -48,7 +48,7 @@ class LanternServer < Sequel::Model
   end
 
   def run_query(query, db: "postgres", user: "postgres")
-    vm.sshable.cmd("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U #{user} -t --csv #{db}", stdin: query).chomp
+    vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} exec -T postgresql psql -q -U #{user} -t --csv #{db}", stdin: query).chomp
   end
 
   def run_query_all(query)
@@ -57,7 +57,7 @@ class LanternServer < Sequel::Model
 
   def display_state
     return "deleting" if destroy_set? || strand.label == "destroy"
-    return "stopped" if vm.display_state == "stopped"
+    return "stopped" if vm.display_state == "stopped" || strand.label == "container_stopped"
     return "stopping" if vm.display_state == "stopping"
     return "starting" if vm.display_state == "starting"
     return "failed" if vm.display_state == "failed"
@@ -132,14 +132,15 @@ class LanternServer < Sequel::Model
     })
   end
 
-  def change_replication_mode(replication_mode, lazy: true)
+  def change_replication_mode(replication_mode, update_env: true)
     update(timeline_access: (replication_mode == "master") ? "push" : "fetch", representative_at: (replication_mode == "master") ? Time.new : nil)
-    cmd = lazy ? "lazy_update_env" : "update_env"
-    vm.sshable.cmd("sudo lantern/bin/#{cmd}", stdin: JSON.generate([
-      ["POSTGRESQL_REPLICATION_MODE", replication_mode],
-      ["INSTANCE_TYPE", (replication_mode == "master") ? "writer" : "reader"],
-      ["POSTGRESQL_RECOVER_FROM_BACKUP", ""]
-    ]))
+    if update_env
+      vm.sshable.cmd("sudo lantern/bin/update_env", stdin: JSON.generate([
+        ["POSTGRESQL_REPLICATION_MODE", replication_mode],
+        ["INSTANCE_TYPE", (replication_mode == "master") ? "writer" : "reader"],
+        ["POSTGRESQL_RECOVER_FROM_BACKUP", ""]
+      ]))
+    end
   end
 
   def update_walg_creds
@@ -219,7 +220,7 @@ SQL
   end
 
   def list_all_databases
-    vm.sshable.cmd("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec postgresql psql -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'")
+    vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} exec postgresql psql -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'")
       .chomp
       .strip
       .split("\n")
