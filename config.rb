@@ -154,6 +154,7 @@ module Config
   override :e2e_test, "0"
   override :backup_retention_days, 7, int
   override :lantern_log_dataset, "lantern_logs", string
+  override :compose_file, "/var/lib/lantern/docker-compose.yaml", string
 
   # Cloudflare
   optional :cf_token, string
