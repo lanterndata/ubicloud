@@ -458,8 +458,9 @@ SQL
     current_master.update(domain: new_master_domain)
 
     lantern_server.run_query("SELECT pg_promote(true, 120);")
-    current_master.lazy_change_replication_mode("slave")
-    lantern_server.lazy_change_replication_mode("master")
+    lantern_server.resource.set_to_readonly(status: "off")
+    current_master.change_replication_mode("slave")
+    lantern_server.change_replication_mode("master", lazy: false)
 
     hop_wait
   end
@@ -482,6 +483,7 @@ SQL
       hop_wait
     end
 
+    lantern_server.resource.set_to_readonly(status: "on")
     lantern_server.vm.swap_ip(lantern_server.resource.representative_server.vm)
 
     register_deadline(:promote_server, 5 * 60)
