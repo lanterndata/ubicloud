@@ -101,13 +101,6 @@ RSpec.describe Hosting::GcpApis do
     end
 
     describe "#delete_ephermal_ipv4" do
-      it "does nothing on 404" do
-        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}))
-        stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm/deleteAccessConfig?accessConfig=External%20NAT&networkInterface=nic0").to_return(status: 404, body: JSON.dump({"errors" => [{"error" => "test"}]}), headers: {"Content-Type" => "application/json"})
-        api = described_class.new
-        expect { api.delete_ephermal_ipv4("dummy-vm", "us-central1-a") }.not_to raise_error
-      end
-
       it "deletes ephermal address from vm" do
         stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
         stub_request(:post, "https://compute.googleapis.com/compute/v1/projects/test-project/zones/us-central1-a/instances/dummy-vm/deleteAccessConfig?accessConfig=External%20NAT&networkInterface=nic0").to_return(status: 200, body: JSON.dump({"id" => "test-op"}), headers: {"Content-Type" => "application/json"})

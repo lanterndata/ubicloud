@@ -72,17 +72,25 @@ class GcpVm < Sequel::Model
     gcp_client = Hosting::GcpApis.new
     zone1 = "#{location}-a"
     zone2 = "#{vm.location}-a"
-    gcp_client.delete_ephermal_ipv4(name, zone1)
-    gcp_client.delete_ephermal_ipv4(vm.name, zone2)
-    vm_info = gcp_client.get_vm(name, zone1)
+    vm_info1 = gcp_client.get_vm(name, zone1)
+    vm_info2 = gcp_client.get_vm(vm.name, zone2)
+
+    if vm_info1["networkInterfaces"][0]["accessConfigs"].find { _1["name"] == "External NAT" }
+      gcp_client.delete_ephermal_ipv4(name, zone1)
+    end
+
+    if vm_info2["networkInterfaces"][0]["accessConfigs"].find { _1["name"] == "External NAT" }
+      gcp_client.delete_ephermal_ipv4(vm.name, zone2)
+    end
+
     # we are explicitly checking if ip is already assigned
     # because the operation can be terminated while running
     # and on next retry we will have error that the external ip is already assigned
-    if !vm_info["networkInterfaces"][0]["accessConfigs"].find { _1["natIP"] == vm.sshable.host }
+    if !vm_info1["networkInterfaces"][0]["accessConfigs"].find { _1["natIP"] == vm.sshable.host }
       gcp_client.assign_static_ipv4(name, vm.sshable.host, zone1)
     end
-    vm_info = gcp_client.get_vm(vm.name, zone2)
-    if !vm_info["networkInterfaces"][0]["accessConfigs"].find { _1["natIP"] == sshable.host }
+
+    if !vm_info2["networkInterfaces"][0]["accessConfigs"].find { _1["natIP"] == sshable.host }
       gcp_client.assign_static_ipv4(vm.name, sshable.host, zone2)
     end
 
