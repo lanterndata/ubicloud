@@ -170,6 +170,9 @@ class Hosting::GcpApis
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
     query = {accessConfig: "External NAT", networkInterface: "nic0"}
     response = connection.post(path: "/compute/v1/projects/#{@project}/zones/#{zone}/instances/#{vm_name}/deleteAccessConfig", query: query, expects: [200, 400, 404])
+    if response.status == 404
+      return
+    end
     Hosting::GcpApis.check_errors(response)
     data = JSON.parse(response.body)
     wait_for_operation(zone, data["id"])
@@ -276,7 +279,7 @@ class Hosting::GcpApis
       }
     }
 
-    response = connection.post(path: "/v1/projects/#{@project}/serviceAccounts", body: JSON.dump(body), expects: [200, 400, 403])
+    response = connection.post(path: "/v1/projects/#{@project}/serviceAccounts", body: JSON.dump(body), expects: [200, 400, 403, 409])
 
     Hosting::GcpApis.check_errors(response)
 
