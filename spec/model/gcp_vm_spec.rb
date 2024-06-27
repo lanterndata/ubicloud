@@ -73,12 +73,31 @@ RSpec.describe GcpVm do
   end
 
   describe "#swap_ip" do
+    it "does not assign ip if already assigned" do
+      api = instance_double(Hosting::GcpApis)
+      expect(api).to receive(:delete_ephermal_ipv4).with("vm1", "us-central1-a")
+      expect(api).to receive(:delete_ephermal_ipv4).with("vm2", "us-central1-a")
+      expect(api).to receive(:get_vm).and_return({"networkInterfaces" => [{"accessConfigs" => [{"natIP" => "ip2"}]}]}, {"networkInterfaces" => [{"accessConfigs" => [{"natIP" => "ip1"}]}]})
+      expect(Hosting::GcpApis).to receive(:new).and_return(api)
+      vm2 = instance_double(described_class, name: "vm2", address_name: "vm2-addr", location: "us-central1", sshable: instance_double(Sshable, host: "ip2"))
+      expect(gcp_vm).to receive(:sshable).and_return(instance_double(Sshable, host: "ip1")).at_least(:once)
+      expect(gcp_vm.sshable).to receive(:invalidate_cache_entry)
+      expect(vm2.sshable).to receive(:invalidate_cache_entry)
+      expect(gcp_vm.sshable).to receive(:update).with(host: "temp_vm1")
+      expect(gcp_vm.sshable).to receive(:update).with(host: "ip2")
+      expect(vm2.sshable).to receive(:update).with(host: "ip1")
+      expect(gcp_vm).to receive(:update).with(address_name: "vm2-addr")
+      expect(vm2).to receive(:update).with(address_name: "vm1-addr")
+      expect { gcp_vm.swap_ip(vm2) }.not_to raise_error
+    end
+
     it "swap server ips" do
       api = instance_double(Hosting::GcpApis)
       expect(api).to receive(:delete_ephermal_ipv4).with("vm1", "us-central1-a")
       expect(api).to receive(:delete_ephermal_ipv4).with("vm2", "us-central1-a")
       expect(api).to receive(:assign_static_ipv4).with("vm1", "ip2", "us-central1-a")
       expect(api).to receive(:assign_static_ipv4).with("vm2", "ip1", "us-central1-a")
+      expect(api).to receive(:get_vm).and_return({"networkInterfaces" => [{"accessConfigs" => []}]}).at_least(:once)
       expect(Hosting::GcpApis).to receive(:new).and_return(api)
       vm2 = instance_double(described_class, name: "vm2", address_name: "vm2-addr", location: "us-central1", sshable: instance_double(Sshable, host: "ip2"))
       expect(gcp_vm).to receive(:sshable).and_return(instance_double(Sshable, host: "ip1")).at_least(:once)
