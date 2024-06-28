@@ -170,11 +170,27 @@ RSpec.describe LanternResource do
   end
 
   describe "#create_replication_slot" do
-    it "creates new replication slot" do
+    it "creates new logical replication slot" do
       representative_server = instance_double(LanternServer)
       expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
       expect(lantern_resource.representative_server).to receive(:run_query).with("SELECT lsn FROM pg_create_logical_replication_slot('test', 'pgoutput');").and_return("0/6002748 \n")
-      expect(lantern_resource.create_replication_slot("test")).to eq("0/6002748")
+      expect(lantern_resource.create_logical_replication_slot("test")).to eq("0/6002748")
+    end
+
+    it "creates new physical replication slot" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(lantern_resource.representative_server).to receive(:run_query).with("SELECT lsn FROM pg_create_physical_replication_slot('test');").and_return("0/6002748 \n")
+      expect(lantern_resource.create_physical_replication_slot("test")).to eq("0/6002748")
+    end
+  end
+
+  describe "#drop_replication_slot" do
+    it "drops replication slot" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(lantern_resource.representative_server).to receive(:run_query).with("SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_name='test';")
+      expect { lantern_resource.delete_replication_slot("test") }.not_to raise_error
     end
   end
 
@@ -221,7 +237,7 @@ RSpec.describe LanternResource do
       timeline = instance_double(LanternTimeline,
         latest_restore_time: Time.new)
       expect(lantern_resource).to receive(:timeline).and_return(timeline).at_least(:once)
-      expect(lantern_resource).to receive(:create_replication_slot)
+      expect(lantern_resource).to receive(:create_logical_replication_slot)
       expect(lantern_resource).to receive(:create_ddl_log)
       expect(lantern_resource).to receive(:create_publication)
       expect(Prog::Lantern::LanternResourceNexus).to receive(:assemble).with(hash_including(
@@ -243,7 +259,7 @@ RSpec.describe LanternResource do
       timeline = instance_double(LanternTimeline,
         latest_restore_time: Time.new)
       expect(lantern_resource).to receive(:timeline).and_return(timeline).at_least(:once)
-      expect(lantern_resource).to receive(:create_replication_slot)
+      expect(lantern_resource).to receive(:create_logical_replication_slot)
       expect(lantern_resource).to receive(:create_ddl_log)
       expect(lantern_resource).to receive(:create_publication)
       expect(Prog::Lantern::LanternResourceNexus).to receive(:assemble).with(hash_including(
