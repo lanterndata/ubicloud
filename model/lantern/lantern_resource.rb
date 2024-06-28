@@ -97,7 +97,7 @@ class LanternResource < Sequel::Model
   end
 
   def create_physical_replication_slot(name)
-    representative_server.run_query("SELECT lsn FROM pg_create_physical_replication_slot('#{name}');").chomp.strip
+    representative_server.run_query("SELECT lsn FROM pg_create_physical_replication_slot('#{name}', true);").chomp.strip
   end
 
   def delete_replication_slot(name)
