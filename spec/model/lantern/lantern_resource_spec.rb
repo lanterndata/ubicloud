@@ -180,7 +180,7 @@ RSpec.describe LanternResource do
     it "creates new physical replication slot" do
       representative_server = instance_double(LanternServer)
       expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
-      expect(lantern_resource.representative_server).to receive(:run_query).with("SELECT lsn FROM pg_create_physical_replication_slot('test');").and_return("0/6002748 \n")
+      expect(lantern_resource.representative_server).to receive(:run_query).with("SELECT lsn FROM pg_create_physical_replication_slot('test', true);").and_return("0/6002748 \n")
       expect(lantern_resource.create_physical_replication_slot("test")).to eq("0/6002748")
     end
   end
