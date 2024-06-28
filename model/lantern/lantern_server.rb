@@ -99,6 +99,14 @@ class LanternServer < Sequel::Model
       end
     end
 
+    postgresql_recovery_target_time = resource.recovery_target_lsn ? "" : resource.restore_target || ""
+    postgresql_recovery_target_lsn = resource.recovery_target_lsn || ""
+
+    if standby?
+      postgresql_recovery_target_time = ""
+      postgresql_recovery_target_lsn = resource.create_physical_replication_slot(ubid)
+    end
+
     JSON.generate({
       enable_coredumps: true,
       skip_deps: vm.boot_image != Config.gcp_default_image,
@@ -123,8 +131,8 @@ class LanternServer < Sequel::Model
       gcp_creds_logging_b64: Config.gcp_creds_logging_b64,
       container_image: "#{Config.gcr_image}:lantern-#{lantern_version}-extras-#{extras_version}-minor-#{minor_version}",
       postgresql_recover_from_backup: backup_label,
-      postgresql_recovery_target_time: resource.recovery_target_lsn ? "" : resource.restore_target || "",
-      postgresql_recovery_target_lsn: resource.recovery_target_lsn || "",
+      postgresql_recovery_target_time: postgresql_recovery_target_time,
+      postgresql_recovery_target_lsn: postgresql_recovery_target_lsn,
       gcp_creds_walg_b64: walg_config[:gcp_creds_b64],
       walg_gs_prefix: walg_config[:walg_gs_prefix],
       gcp_creds_big_query_b64: resource.gcp_creds_b64,
