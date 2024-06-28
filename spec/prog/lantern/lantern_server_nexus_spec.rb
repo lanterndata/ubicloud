@@ -972,7 +972,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server).to receive(:run_query).with("SELECT pg_promote(true, 120);")
       expect(current_master).to receive(:change_replication_mode).with("slave", update_env: false)
       expect(lantern_server).to receive(:change_replication_mode).with("master")
-      expect { nx.promote_server }.to hop("wait")
+      expect { nx.promote_server }.to hop("init_sql")
     end
   end
 
