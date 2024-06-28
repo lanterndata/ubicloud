@@ -170,6 +170,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     nap 30 if lag.empty? || lag.to_i > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
 
     lantern_server.update(synchronization_status: "ready")
+    lantern_server.resource.delete_replication_slot(lantern_server.ubid)
     hop_wait_synchronization if lantern_server.resource.ha_type == LanternResource::HaType::SYNC
     hop_wait
   end
@@ -559,6 +560,8 @@ SQL
 
       if lantern_server.primary?
         lantern_server.timeline.incr_destroy
+      else
+        lantern_server.resource.delete_replication_slot(lantern_server.ubid)
       end
       lantern_server.destroy
 

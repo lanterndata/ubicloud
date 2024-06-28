@@ -92,8 +92,16 @@ class LanternResource < Sequel::Model
     ")
   end
 
-  def create_replication_slot(name)
+  def create_logical_replication_slot(name)
     representative_server.run_query("SELECT lsn FROM pg_create_logical_replication_slot('#{name}', 'pgoutput');").chomp.strip
+  end
+
+  def create_physical_replication_slot(name)
+    representative_server.run_query("SELECT lsn FROM pg_create_physical_replication_slot('#{name}');").chomp.strip
+  end
+
+  def delete_replication_slot(name)
+    representative_server.run_query("SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_name='#{name}';")
   end
 
   def create_ddl_log
@@ -199,7 +207,7 @@ SQL
     ubid = LanternResource.generate_ubid
     create_ddl_log
     create_publication("pub_#{ubid}")
-    slot_lsn = create_replication_slot("slot_#{ubid}")
+    slot_lsn = create_logical_replication_slot("slot_#{ubid}")
     Prog::Lantern::LanternResourceNexus.assemble(
       project_id: project_id,
       location: location,
