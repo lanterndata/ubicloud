@@ -488,7 +488,6 @@ RSpec.describe LanternServer do
       expect(lantern_server).to receive(:lantern_version).and_return("0.2.2").at_least(:once)
       expect(lantern_server).to receive(:extras_version).and_return("0.1.4").at_least(:once)
       expect(lantern_server).to receive(:minor_version).and_return("1").at_least(:once)
-      expect(lantern_server.resource).to receive(:create_physical_replication_slot).and_return("0/6002748")
       expect(vm).to receive(:boot_image).and_return("custom-image").at_least(:once)
 
       walg_conf = timeline.generate_walg_config
@@ -518,7 +517,7 @@ RSpec.describe LanternServer do
         container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}",
         postgresql_recover_from_backup: "LATEST",
         postgresql_recovery_target_time: "",
-        postgresql_recovery_target_lsn: "0/6002748",
+        postgresql_recovery_target_lsn: "",
         gcp_creds_walg_b64: walg_conf[:gcp_creds_b64],
         walg_gs_prefix: walg_conf[:walg_gs_prefix],
         gcp_creds_big_query_b64: resource.gcp_creds_b64,

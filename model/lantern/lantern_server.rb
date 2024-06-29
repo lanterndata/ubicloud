@@ -103,8 +103,9 @@ class LanternServer < Sequel::Model
     postgresql_recovery_target_lsn = resource.recovery_target_lsn || ""
 
     if standby?
+      backup_label = "LATEST"
       postgresql_recovery_target_time = ""
-      postgresql_recovery_target_lsn = resource.create_physical_replication_slot(ubid)
+      postgresql_recovery_target_lsn = ""
     end
 
     JSON.generate({
