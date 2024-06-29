@@ -479,7 +479,8 @@ SQL
     current_master.change_replication_mode("slave", update_env: false)
     lantern_server.change_replication_mode("master")
 
-    hop_init_sql
+    incr_initial_provisioning
+    hop_wait_db_available
   end
 
   label def wait_swap_ip
