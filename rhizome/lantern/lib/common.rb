@@ -106,8 +106,9 @@ end
 
 def calculate_memory_sizes
   total_ram = (r "free -tk | awk 'NR == 2 {print $2}'")
-  # Calculate 95% of the total RAM in kilobytes
-  shared_buf_mb = (total_ram.to_i * 0.95 / 1024).round
+  # Calculate 95% of the total RAM in kilobytes, but reserve at least 500mb
+  # If the subtraction will underflow we will set the limit to 500mb
+  shared_buf_mb = [500, [(total_ram.to_i * 0.95 / 1024).round, total_ram.to_i / 1024 - 500].min].max
   # Calculate 50% of the total RAM in kilobytes
   shm_size_mb = (total_ram.to_i * 0.5 / 1024).round
   mem_limit_buf = "#{shared_buf_mb}MB"

@@ -33,6 +33,7 @@ RSpec.describe Serializers::Web::Lantern do
       instance_type: "writer",
       hostname: "db.lantern.dev",
       primary?: true,
+      vm: instance_double(GcpVm, name: "test"),
       connection_string: "postgres://postgres:test123@db.lantern.dev:6432")
     expect(lantern).to receive(:representative_server).and_return(leader).at_least(:once)
     data = described_class.new(:default).serialize(lantern)
@@ -54,6 +55,7 @@ RSpec.describe Serializers::Web::Lantern do
       instance_type: "writer",
       hostname: "db.lantern.dev",
       primary?: true,
+      vm: instance_double(GcpVm, name: "test"),
       connection_string: "postgres://postgres:test123@db.lantern.dev:6432")
     expect(lantern).to receive(:representative_server).and_return(nil).at_least(:once)
     data = described_class.new(:default).serialize(lantern)
@@ -78,6 +80,7 @@ RSpec.describe Serializers::Web::Lantern do
       hostname: "db.lantern.dev",
       primary?: true,
       strand: instance_double(Strand, label: "wait"),
+      vm: instance_double(GcpVm, name: "test"),
       connection_string: "postgres://postgres:test123@db.lantern.dev:6432")
     expect(lantern).to receive(:representative_server).and_return(leader).at_least(:once)
     expect(lantern).to receive(:servers).and_return([leader]).at_least(:once)
@@ -101,11 +104,13 @@ RSpec.describe Serializers::Web::Lantern do
       instance_type: "writer",
       hostname: "db.lantern.dev",
       primary?: true,
+      vm: instance_double(GcpVm, name: "test"),
       connection_string: "postgres://postgres:test123@db.lantern.dev:6432")
     expect(lantern).to receive(:representative_server).and_return(leader).at_least(:once)
     data = described_class.new(:default).serialize([lantern, lantern])
 
     expect(data[0][:state]).to eq("running")
+    expect(data[0][:vm_name]).to eq("test")
     expect(data[1][:state]).to eq("running")
     expect(data[0][:connection_string]).to be_nil
     expect(data[1][:connection_string]).to be_nil
