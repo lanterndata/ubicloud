@@ -218,7 +218,7 @@ RSpec.describe Clover, "lantern" do
         allow(query_res).to receive(:where).and_return(query_res)
         expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
         allow(project).to receive(:lantern_resources_dataset).and_return(query_res)
-        replica = instance_double(LanternServer, primary?: false, display_state: "running", id: "pg2", ubid: "pg2", instance_type: "reader", lantern_version: "0.3.0", extras_version: "0.2.5", minor_version: "1", target_vm_size: "n1-standard-2", target_storage_size_gib: 50, connection_string: "pg://")
+        replica = instance_double(LanternServer, primary?: false, display_state: "running", id: "pg2", ubid: "pg2", instance_type: "reader", lantern_version: "0.3.0", extras_version: "0.2.5", minor_version: "1", target_vm_size: "n1-standard-2", target_storage_size_gib: 50, connection_string: "pg://", vm: instance_double(GcpVm, name: "test"))
         allow(pg).to receive(:servers).and_return([*pg.servers, replica])
         expect(replica).to receive(:incr_take_over)
 
@@ -234,7 +234,7 @@ RSpec.describe Clover, "lantern" do
         allow(query_res).to receive(:where).and_return(query_res)
         expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
         allow(project).to receive(:lantern_resources_dataset).and_return(query_res)
-        replica = instance_double(LanternServer, primary?: false, display_state: "running", id: "pg2", ubid: "pg2", instance_type: "reader", lantern_version: "0.3.0", extras_version: "0.2.5", minor_version: "1", target_vm_size: "n1-standard-2", target_storage_size_gib: 50, connection_string: "pg://")
+        replica = instance_double(LanternServer, primary?: false, display_state: "running", id: "pg2", ubid: "pg2", instance_type: "reader", lantern_version: "0.3.0", extras_version: "0.2.5", minor_version: "1", target_vm_size: "n1-standard-2", target_storage_size_gib: 50, connection_string: "pg://", vm: instance_double(GcpVm, name: "test"))
         allow(pg).to receive(:servers).and_return([*pg.servers, replica])
         expect(replica).to receive(:incr_destroy)
 
@@ -250,7 +250,7 @@ RSpec.describe Clover, "lantern" do
         allow(query_res).to receive(:where).and_return(query_res)
         expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
         allow(project).to receive(:lantern_resources_dataset).and_return(query_res)
-        serv = instance_double(LanternServer, display_state: "running", id: "pg2", ubid: "pg2", instance_type: "writer", lantern_version: "0.3.0", extras_version: "0.2.5", minor_version: "1", target_vm_size: "n1-standard-2", target_storage_size_gib: 50, connection_string: "pg://")
+        serv = instance_double(LanternServer, display_state: "running", id: "pg2", ubid: "pg2", instance_type: "writer", lantern_version: "0.3.0", extras_version: "0.2.5", minor_version: "1", target_vm_size: "n1-standard-2", target_storage_size_gib: 50, connection_string: "pg://", vm: instance_double(GcpVm, name: "test"))
         expect(serv).to receive(:primary?).and_return(false, false, true)
         allow(pg).to receive(:servers).and_return([*pg.servers, serv])
 

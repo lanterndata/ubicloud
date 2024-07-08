@@ -26,6 +26,7 @@
   <% data = [
     ["ID", @pg[:ubid]],
     ["Name", @pg[:name]],
+    ["VM", @pg[:vm_name]],
     ["Label", @pg[:label]],
     ["Org Id", @pg[:org_id]],
     ["Instance Type", @pg[:instance_type]],
@@ -36,7 +37,7 @@
     ["Compute", @pg[:vm_size]],
     ["Storage", "#{@pg[:storage_size_gib]} GB"]
   ]
-  
+
   if @pg[:connection_string] == ""
     data.push(["Connection String", "Waiting for host to be ready..."])
   else
@@ -331,13 +332,14 @@
                   <!-- Detail Card -->
                   <% data = [
                     ["ID", server[:ubid]],
+                    ["VM", server[:vm_name]],
                     ["Lantern Version", server[:lantern_version]],
                     ["Extras Version", server[:extras_version]],
                     ["Minor Version", server[:minor_version]],
                     ["Compute", server[:vm_size]],
                     ["Storage", "#{server[:storage_size_gib]} GB"]
                   ]
-                  
+
                   if server[:connection_string] == ""
                     data.push(["Connection String", "Waiting for host to be ready..."])
                   else
