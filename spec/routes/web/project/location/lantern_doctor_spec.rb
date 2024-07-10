@@ -46,7 +46,7 @@ RSpec.describe Clover, "lantern-doctor" do
         pg.doctor.queries
         first_query = LanternDoctorQuery[doctor_id: pg.doctor.id]
         first_query.update(condition: "failed")
-        doctor_page = LanternDoctorPage.create_incident(first_query, "postgres", err: "test-err", output: "test-out")
+        doctor_page = LanternDoctorPage.create_incident(first_query, "postgres", "test", err: "test-err", output: "test-out")
         expect(doctor_page.status).to eq("new")
 
         visit "/project/#{project.ubid}/lantern-doctor"
@@ -69,7 +69,7 @@ RSpec.describe Clover, "lantern-doctor" do
         pg.doctor.queries
         first_query = LanternDoctorQuery[doctor_id: pg.doctor.id]
         first_query.update(condition: "failed")
-        doctor_page = LanternDoctorPage.create_incident(first_query, "postgres", err: "test-err", output: "test-out")
+        doctor_page = LanternDoctorPage.create_incident(first_query, "postgres", "test", err: "test-err", output: "test-out")
         expect(doctor_page.status).to eq("new")
 
         visit "/project/#{project.ubid}/lantern-doctor"
@@ -92,7 +92,7 @@ RSpec.describe Clover, "lantern-doctor" do
         pg.doctor.queries
         first_query = LanternDoctorQuery[doctor_id: pg.doctor.id]
         first_query.update(condition: "failed")
-        doctor_page = LanternDoctorPage.create_incident(first_query, "postgres", err: "test-err", output: "test-out")
+        doctor_page = LanternDoctorPage.create_incident(first_query, "postgres", "test", err: "test-err", output: "test-out")
         expect(doctor_page.status).to eq("new")
 
         visit "/project/#{project.ubid}/lantern-doctor"
@@ -115,7 +115,7 @@ RSpec.describe Clover, "lantern-doctor" do
         pg.doctor.queries
         first_query = LanternDoctorQuery[doctor_id: pg.doctor.id]
         first_query.update(condition: "failed")
-        doctor_page = LanternDoctorPage.create_incident(first_query, "postgres", err: "test-err", output: "test-out")
+        doctor_page = LanternDoctorPage.create_incident(first_query, "postgres", "test", err: "test-err", output: "test-out")
         expect(doctor_page.status).to eq("new")
 
         visit "/project/#{project.ubid}/lantern-doctor"

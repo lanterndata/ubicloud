@@ -32,6 +32,9 @@ class LanternDoctor < Sequel::Model
     doctor_query_list = queries
     system_query_list = system_queries
 
+    # update rhizome in case new method will be added
+    resource.servers.each { _1.incr_update_rhizome }
+
     system_query_list.each {
       if !has_system_query?(doctor_query_list, _1)
         LanternDoctorQuery.create_with_id(parent_id: _1.id, doctor_id: id, condition: "unknown", type: "user", response_type: _1.response_type)

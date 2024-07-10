@@ -46,6 +46,9 @@ RSpec.describe LanternDoctor do
       expect(lantern_doctor).to receive(:queries).and_return(query_list)
       expect(lantern_doctor).to receive(:system_queries).and_return(system_queries)
       new_query = instance_double(LanternDoctorQuery, parent_id: "test-parent-id")
+      serv = instance_double(LanternServer)
+      expect(lantern_doctor).to receive(:resource).and_return(instance_double(LanternResource, servers: [serv])).at_least(:once)
+      expect(serv).to receive(:incr_update_rhizome)
       expect(LanternDoctorQuery).to receive(:create_with_id).with(parent_id: "test-parent-id", doctor_id: lantern_doctor.id, type: "user", response_type: "rows", condition: "unknown").and_return(new_query)
       expect { lantern_doctor.sync_system_queries }.not_to raise_error
     end
