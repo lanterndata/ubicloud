@@ -80,7 +80,7 @@ RSpec.describe Clover, "lantern-doctor" do
         pg.doctor.queries
         first_query = LanternDoctorQuery[doctor_id: pg.doctor.id]
         first_query.update(condition: "failed")
-        page = LanternDoctorPage.create_incident(first_query, "postgres", err: "test-err", output: "test-out")
+        page = LanternDoctorPage.create_incident(first_query, "postgres", "test", err: "test-err", output: "test-out")
         expect(page.status).to eq("new")
 
         post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/#{pg.name}/doctor/incidents/#{page.id}/trigger"
@@ -108,7 +108,7 @@ RSpec.describe Clover, "lantern-doctor" do
         pg.doctor.queries
         first_query = LanternDoctorQuery[doctor_id: pg.doctor.id]
         first_query.update(condition: "failed")
-        page = LanternDoctorPage.create_incident(first_query, "postgres", err: "test-err", output: "test-out")
+        page = LanternDoctorPage.create_incident(first_query, "postgres", "test", err: "test-err", output: "test-out")
         expect(page.status).to eq("new")
 
         post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/#{pg.name}/doctor/incidents/#{page.id}/ack"
@@ -131,7 +131,7 @@ RSpec.describe Clover, "lantern-doctor" do
         pg.doctor.queries
         first_query = LanternDoctorQuery[doctor_id: pg.doctor.id]
         first_query.update(condition: "failed")
-        page = LanternDoctorPage.create_incident(first_query, "postgres", err: "test-err", output: "test-out")
+        page = LanternDoctorPage.create_incident(first_query, "postgres", "test", err: "test-err", output: "test-out")
         expect(page.status).to eq("new")
 
         post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/#{pg.name}/doctor/incidents/#{page.id}/resolve"
@@ -154,7 +154,7 @@ RSpec.describe Clover, "lantern-doctor" do
         pg.doctor.queries
         first_query = LanternDoctorQuery[doctor_id: pg.doctor.id]
         first_query.update(condition: "failed")
-        page = LanternDoctorPage.create_incident(first_query, "postgres", err: "test-err", output: "test-out")
+        page = LanternDoctorPage.create_incident(first_query, "postgres", "test", err: "test-err", output: "test-out")
         page.trigger
 
         get "/api/project/#{project.ubid}/location/#{pg.location}/lantern/#{pg.name}/doctor/incidents"
@@ -166,7 +166,7 @@ RSpec.describe Clover, "lantern-doctor" do
         incidents = first_item["incidents"]
         expect(incidents.size).to eq(1)
 
-        expect(incidents[0]["summary"]).to eq("Healthcheck: test system query failed on instance-1 - no-label (postgres)")
+        expect(incidents[0]["summary"]).to eq("Healthcheck: test system query failed on instance-1 - no-label (postgres - test)")
         expect(incidents[0]["error"]).to eq("test-err")
         expect(incidents[0]["output"]).to eq("test-out")
       end

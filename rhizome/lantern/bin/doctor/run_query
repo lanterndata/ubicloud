@@ -1,0 +1,117 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "yaml"
+require_relative "../../../common/lib/util"
+require_relative "../../lib/common"
+
+$configure_hash = JSON.parse($stdin.read)
+dbs = $configure_hash["dbs"]
+
+def exec_sql(sql, user: "postgres", db: "postgres")
+  r("docker compose -f #{$compose_file} exec -T postgresql psql -q -U #{user} -t --csv #{db}", stdin: sql).chomp.strip
+end
+
+def run_for_db(db)
+  query = $configure_hash["query"]
+  err = ""
+  output = ""
+  response_type = query["response_type"]
+  name = query["name"]
+  is_system = query["is_system"]
+  fn_label = query["fn_label"]
+  query_user = query["query_user"]
+  sql = query["sql"]
+
+  success = true
+  begin
+    if is_system && fn_label && SystemQueries.respond_to?(fn_label)
+      res = SystemQueries.send(fn_label, db, query_user)
+    elsif sql
+      res = exec_sql(sql, db: db, user: query_user)
+    else
+      fail "BUG: non-system query without sql"
+    end
+
+    case response_type
+    when "bool"
+      if res != "f"
+        success = false
+      end
+    when "rows"
+      if res != ""
+        success = false
+      end
+      output = res
+    else
+      fail "BUG: invalid response type (#{response_type}) on query #{name}"
+    end
+  rescue => e
+    success = false
+    err = e.message
+  end
+
+  [success, {db: db, result: output, err: err}]
+end
+
+class SystemQueries
+  def self.check_daemon_embedding_jobs(db, query_user)
+    jobs_table_exists = exec_sql(<<SQL)
+      SELECT EXISTS (
+       SELECT FROM pg_catalog.pg_class c
+       JOIN   pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+       WHERE  n.nspname = '_lantern_internal'
+       AND    c.relname = 'embedding_generation_jobs'
+       AND    c.relkind = 'r'
+     );
+SQL
+
+    if jobs_table_exists == "f"
+      return "f"
+    end
+
+    jobs = exec_sql("SELECT \"schema\", \"table\", src_column, dst_column FROM _lantern_internal.embedding_generation_jobs WHERE init_finished_at IS NOT NULL AND canceled_at IS NULL;")
+
+    jobs = jobs.split("\n").map do |row|
+      values = row.split(",")
+      {schema: values[0], table: values[1], src_column: values[2], dst_column: values[3]}
+    end
+
+    if jobs.empty?
+      return "f"
+    end
+
+    failed = jobs.any? do |job|
+      res = exec_sql("SELECT (SELECT COUNT(*) FROM \"#{job[:schema]}\".\"#{job[:table]}\" WHERE \"#{job[:src_column]}\" IS NOT NULL AND \"#{job[:src_column]}\" != '' AND \"#{job[:src_column]}\" != 'Error: Summary failed (llm)' AND \"#{job[:dst_column]}\" IS NULL) > 2000", db: db, user: query_user)
+      res == "t"
+    end
+
+    failed ? "t" : "f"
+  end
+
+  def self.check_disk_space_usage(_db, _query_user)
+    server_type = $configure_hash["server_type"]
+    output = ""
+    usage_percent = r("df | awk '$1 == \"/dev/root\" {print $5}' | sed 's/%//'").chomp.strip.to_i
+    if usage_percent > 90
+      output += "#{server_type} server - usage #{usage_percent}%\n"
+    end
+    output.chomp
+  end
+end
+
+exit_code = 0
+
+response = []
+dbs.each do |db|
+  success, res = run_for_db(db)
+  if !success
+    exit_code = 1
+  end
+  response.push(res)
+end
+
+puts JSON.generate(response)
+
+exit(exit_code)

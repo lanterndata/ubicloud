@@ -37,7 +37,7 @@
     ["Compute", @pg[:vm_size]],
     ["Storage", "#{@pg[:storage_size_gib]} GB"]
   ]
-
+  
   if @pg[:connection_string] == ""
     data.push(["Connection String", "Waiting for host to be ready..."])
   else
@@ -339,7 +339,7 @@
                     ["Compute", server[:vm_size]],
                     ["Storage", "#{server[:storage_size_gib]} GB"]
                   ]
-
+                  
                   if server[:connection_string] == ""
                     data.push(["Connection String", "Waiting for host to be ready..."])
                   else
