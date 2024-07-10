@@ -49,7 +49,7 @@ RSpec.describe Clover, "lantern" do
         pg.doctor.sync_system_queries
         query = LanternDoctorQuery[type: "user"]
         query.update(condition: "failed")
-        LanternDoctorPage.create_incident(query, "postgres", err: "test-err", output: "test-out")
+        LanternDoctorPage.create_incident(query, "postgres", "test", err: "test-err", output: "test-out")
 
         visit "#{project.path}/lantern-doctor"
 

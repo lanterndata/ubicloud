@@ -45,10 +45,67 @@ class Prog::Lantern::LanternDoctorNexus < Prog::Base
     end
 
     if lantern_doctor.should_run?
-      lantern_doctor.queries.each { _1.run }
+      hop_run_queries
     end
 
     nap 60
+  end
+
+  label def run_queries
+    lantern_doctor.queries.each do |query|
+      next if !query.should_run?
+
+      dbs = (query.db_name == "*") ? lantern_doctor.resource.representative_server.list_all_databases : [query.db_name]
+
+      query.servers.each do |server|
+        server.vm.sshable.cmd("common/bin/daemonizer 'lantern/bin/doctor/run_query' #{query.task_name}", stdin: JSON.generate({query: {is_system: query.is_system?, response_type: query.response_type, name: query.name, sql: query.sql&.tr("\n", " "), fn_label: query.fn_label, query_user: query.user}, server_type: server.primary? ? "primary" : "standby", dbs: dbs}))
+      end
+    end
+
+    hop_wait_queries
+  end
+
+  label def wait_queries
+    lantern_doctor.queries.each do |query|
+      query.servers.each do |server|
+        vm = server.vm
+        status = "Unknown"
+        begin
+          status = vm.sshable.cmd("common/bin/daemonizer --check #{query.task_name}")
+        rescue
+        end
+
+        case status
+        when "Failed", "Succeeded"
+          logs = JSON.parse(vm.sshable.cmd("common/bin/daemonizer --logs #{query.task_name}"))
+          all_output = []
+
+          if !logs["stdout"].empty?
+            # stdout will be [{ "db": string, "result": string }]
+            begin
+              all_output = JSON.parse(logs["stdout"])
+            rescue
+              all_output = [{"db" => "*", "result" => logs["stdout"], "err" => logs["stderr"]}]
+            end
+
+            # resolve errored page if exists
+            query.update_page_status("*", vm.name, true, nil, nil)
+          else
+            # this is the case when command errored for some reason
+            all_output = [{"db" => "*", "result" => "", "err" => logs["stderr"]}]
+          end
+
+          all_output.each do |output|
+            query.update_page_status(output["db"], vm.name, status == "Succeeded", output["result"], output["err"])
+          end
+
+          query.update(condition: (status == "Failed") ? "failed" : "healthy", last_checked: Time.new)
+          vm.sshable.cmd("common/bin/daemonizer --clean #{query.task_name}")
+        end
+      end
+    end
+
+    hop_wait
   end
 
   label def sync_system_queries
