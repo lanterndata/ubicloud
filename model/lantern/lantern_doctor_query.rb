@@ -27,6 +27,10 @@ class LanternDoctorQuery < Sequel::Model
     parent&.name || super
   end
 
+  def task_name
+    "healthcheck_#{ubid}"
+  end
+
   def db_name
     parent&.db_name || super
   end
@@ -47,8 +51,17 @@ class LanternDoctorQuery < Sequel::Model
     parent&.response_type || super
   end
 
+  def server_type
+    parent&.server_type || super
+  end
+
+  def servers
+    doctor.resource.servers.select { (server_type == "*") || (server_type == "primary" && _1.primary?) || (server_type == "standby" && _1.standby?) }
+  end
+
   def should_run?
-    CronParser.new(schedule).next(last_checked || Time.new - 365 * 24 * 60 * 60) <= Time.new
+    is_scheduled_time = CronParser.new(schedule).next(last_checked || Time.new - 365 * 24 * 60 * 60) <= Time.new
+    is_scheduled_time && doctor.resource.representative_server.vm.sshable.cmd("common/bin/daemonizer --check #{task_name}") == "NotStarted"
   end
 
   def is_system?
@@ -68,109 +81,12 @@ class LanternDoctorQuery < Sequel::Model
     LanternDoctorPage.where(query_id: id, status: ["new", "triggered", "acknowledged"]).all
   end
 
-  def run
-    if !should_run?
-      return nil
+  def update_page_status(db, vm_name, success, output, err_msg)
+    pg = LanternDoctorPage.where(query_id: id, db: db, vm_name: vm_name).where(Sequel.lit("status != 'resolved' ")).first
+    if !success && !pg
+      LanternDoctorPage.create_incident(self, db, vm_name, err: err_msg, output: output)
+    elsif success && pg
+      pg.resolve
     end
-
-    lantern_server = doctor.resource.representative_server
-    dbs = (db_name == "*") ? lantern_server.list_all_databases : [db_name]
-    query_user = user
-
-    any_failed = false
-    dbs.each do |db|
-      err_msg = ""
-      output = ""
-
-      failed = false
-      begin
-        if is_system? && fn_label && LanternDoctorQuery.method_defined?(fn_label)
-          res = send(fn_label, db, query_user)
-        elsif sql
-          res = lantern_server.run_query(sql, db: db, user: query_user).strip
-        else
-          fail "BUG: non-system query without sql"
-        end
-
-        case response_type
-        when "bool"
-          if res != "f"
-            failed = true
-            any_failed = true
-          end
-        when "rows"
-          if res != ""
-            failed = true
-            any_failed = true
-          end
-          output = res
-        else
-          fail "BUG: invalid response type (#{response_type}) on query #{name}"
-        end
-      rescue => e
-        failed = true
-        any_failed = true
-        Clog.emit("LanternDoctorQuery failed") { {error: e, query_name: name, db: db, resource_name: doctor.resource.name} }
-        err_msg = e.message
-      end
-
-      pg = LanternDoctorPage.where(query_id: id, db: db).where(Sequel.lit("status != 'resolved' ")).first
-
-      if failed && !pg
-        LanternDoctorPage.create_incident(self, db, err: err_msg, output: output)
-      elsif !failed && pg
-        pg.resolve
-      end
-    end
-
-    update(condition: any_failed ? "failed" : "healthy", last_checked: Time.new)
-  end
-
-  def check_daemon_embedding_jobs(db, query_user)
-    lantern_server = doctor.resource.representative_server
-    jobs_table_exists = lantern_server.run_query(<<SQL).chomp.strip
-      SELECT EXISTS (
-       SELECT FROM pg_catalog.pg_class c
-       JOIN   pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-       WHERE  n.nspname = '_lantern_internal'
-       AND    c.relname = 'embedding_generation_jobs'
-       AND    c.relkind = 'r'
-     );
-SQL
-
-    if jobs_table_exists == "f"
-      return "f"
-    end
-
-    jobs = lantern_server.run_query("SELECT \"schema\", \"table\", src_column, dst_column FROM _lantern_internal.embedding_generation_jobs WHERE init_finished_at IS NOT NULL AND canceled_at IS NULL;")
-
-    jobs = jobs.chomp.strip.split("\n").map do |row|
-      values = row.split(",")
-      {schema: values[0], table: values[1], src_column: values[2], dst_column: values[3]}
-    end
-
-    if jobs.empty?
-      return "f"
-    end
-
-    failed = jobs.any? do |job|
-      res = lantern_server.run_query("SELECT (SELECT COUNT(*) FROM \"#{job[:schema]}\".\"#{job[:table]}\" WHERE \"#{job[:src_column]}\" IS NOT NULL AND \"#{job[:src_column]}\" != '' AND \"#{job[:src_column]}\" != 'Error: Summary failed (llm)' AND \"#{job[:dst_column]}\" IS NULL) > 2000", db: db, user: query_user).strip
-      res == "t"
-    end
-
-    failed ? "t" : "f"
-  end
-
-  def check_disk_space_usage(_db, _query_user)
-    output = ""
-    doctor.resource.servers.each do |serv|
-      usage_percent = serv.vm.sshable.cmd("df | awk '$1 == \"/dev/root\" {print $5}' | sed 's/%//'").strip.to_i
-      if usage_percent > 90
-        server_type = serv.primary? ? "primary" : "standby"
-        output += "#{server_type} server - usage #{usage_percent}%\n"
-      end
-    rescue
-    end
-    output.chomp
   end
 end
