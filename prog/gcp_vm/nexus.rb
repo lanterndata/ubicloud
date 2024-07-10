@@ -235,6 +235,7 @@ class Prog::GcpVm::Nexus < Prog::Base
       end
       strand.children.each { _1.destroy }
       gcp_vm.projects.map { gcp_vm.dissociate_with_project(_1) }
+      LanternDoctorPage.where(vm_name: gcp_vm.name).each { _1.resolve }
       gcp_vm.destroy
     end
     pop "gcp vm deleted"

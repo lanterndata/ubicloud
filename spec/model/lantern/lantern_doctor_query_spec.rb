@@ -12,6 +12,7 @@ RSpec.describe LanternDoctorQuery do
       r.schedule = "*/1 * * * *"
       r.id = "6181ddb3-0002-8ad0-9aeb-084832c9273b"
       r.response_type = "bool"
+      r.server_type = "primary"
     end
   }
 
@@ -84,6 +85,59 @@ RSpec.describe LanternDoctorQuery do
       expect(parent).to receive(:response_type).and_return("rows")
       expect(lantern_doctor_query.response_type).to be("rows")
     end
+
+    it "returns parent server_type if parent_id is defined else self server_type" do
+      expect(lantern_doctor_query).to receive(:parent).and_return(nil)
+      expect(lantern_doctor_query.server_type).to eq("primary")
+
+      expect(lantern_doctor_query).to receive(:parent).and_return(parent)
+      expect(parent).to receive(:server_type).and_return("standby")
+      expect(lantern_doctor_query.server_type).to be("standby")
+    end
+
+    it "returns task_name" do
+      expect(lantern_doctor_query.task_name).to eq("healthcheck_#{lantern_doctor_query.ubid}")
+    end
+  end
+
+  describe "#servers" do
+    it "returns primary servers based on server_type" do
+      serv1 = instance_double(LanternServer)
+      serv2 = instance_double(LanternServer)
+      allow(serv1).to receive_messages(primary?: true, standby?: false)
+      allow(serv2).to receive_messages(primary?: false, standby?: true)
+
+      resource = instance_double(LanternResource, servers: [serv1, serv2])
+      doctor = instance_double(LanternDoctor, resource: resource)
+      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor)
+      expect(lantern_doctor_query.servers).to eq([serv1])
+    end
+
+    it "returns standby servers based on server_type" do
+      serv1 = instance_double(LanternServer)
+      serv2 = instance_double(LanternServer)
+      allow(serv1).to receive_messages(primary?: true, standby?: false)
+      allow(serv2).to receive_messages(primary?: false, standby?: true)
+
+      resource = instance_double(LanternResource, servers: [serv1, serv2])
+      doctor = instance_double(LanternDoctor, resource: resource)
+      allow(lantern_doctor_query).to receive(:server_type).and_return("standby")
+      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor)
+      expect(lantern_doctor_query.servers).to eq([serv2])
+    end
+
+    it "returns all servers based on server_type" do
+      serv1 = instance_double(LanternServer)
+      serv2 = instance_double(LanternServer)
+      allow(serv1).to receive_messages(primary?: true, standby?: false)
+      allow(serv2).to receive_messages(primary?: false, standby?: true)
+
+      resource = instance_double(LanternResource, servers: [serv1, serv2])
+      doctor = instance_double(LanternDoctor, resource: resource)
+      allow(lantern_doctor_query).to receive(:server_type).and_return("*")
+      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor)
+      expect(lantern_doctor_query.servers).to eq([serv1, serv2])
+    end
   end
 
   describe "#should_run?" do
@@ -96,7 +150,21 @@ RSpec.describe LanternDoctorQuery do
       expect(lantern_doctor_query.should_run?).to be(false)
     end
 
+    it "return false if in progress" do
+      serv = instance_double(LanternServer, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      resource = instance_double(LanternResource, representative_server: serv)
+      doctor = instance_double(LanternDoctor, resource: resource)
+      expect(serv.vm.sshable).to receive(:cmd).and_return("InProgress")
+      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor)
+      expect(lantern_doctor_query.should_run?).to be(false)
+    end
+
     it "return true if it is the same time for run" do
+      serv = instance_double(LanternServer, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      resource = instance_double(LanternResource, representative_server: serv)
+      doctor = instance_double(LanternDoctor, resource: resource)
+      expect(serv.vm.sshable).to receive(:cmd).and_return("NotStarted")
+      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor)
       ts = Time.new
       min = ts.min
       expect(Time).to receive(:new).and_return(ts).at_least(:once)
@@ -106,6 +174,11 @@ RSpec.describe LanternDoctorQuery do
     end
 
     it "return true if the running time was passed but didn't run yet" do
+      serv = instance_double(LanternServer, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
+      resource = instance_double(LanternResource, representative_server: serv)
+      doctor = instance_double(LanternDoctor, resource: resource)
+      expect(serv.vm.sshable).to receive(:cmd).and_return("NotStarted")
+      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor)
       min = Time.new.min
       modified_min = (min == 0) ? 59 : min - 1
 
@@ -140,284 +213,6 @@ RSpec.describe LanternDoctorQuery do
     end
   end
 
-  describe "#run" do
-    it "returns if should not run yet" do
-      expect(lantern_doctor_query).to receive(:should_run?).and_return(false)
-      expect(lantern_doctor_query.run).to be_nil
-    end
-
-    it "runs query on specified database" do
-      serv = instance_double(LanternServer)
-      resource = instance_double(LanternResource, representative_server: serv, db_user: "test")
-      doctor = instance_double(LanternDoctor, resource: resource)
-      expect(serv).to receive(:run_query).with(lantern_doctor_query.sql, db: lantern_doctor_query.db_name, user: resource.db_user).and_return("f")
-      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-      expect(lantern_doctor_query).to receive(:should_run?).and_return(true)
-      expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "healthy"))
-      expect { lantern_doctor_query.run }.not_to raise_error
-    end
-
-    it "throws error if no sql defined" do
-      serv = instance_double(LanternServer, ubid: "test-ubid")
-      resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b", label: "test-label")
-      doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
-
-      expect(lantern_doctor_query).to receive(:sql).and_return(nil).at_least(:once)
-      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-      expect(lantern_doctor_query).to receive(:should_run?).and_return(true)
-      expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "failed"))
-      expect(LanternDoctorPage).to receive(:create_incident).with(lantern_doctor_query, "postgres", err: "BUG: non-system query without sql", output: "")
-
-      expect { lantern_doctor_query.run }.not_to raise_error
-    end
-
-    it "throws error if wrong response_type" do
-      serv = instance_double(LanternServer, ubid: "test-ubid")
-      resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b", label: "test-label")
-      doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
-
-      expect(serv).to receive(:run_query).with(lantern_doctor_query.sql, db: "postgres", user: resource.db_user).and_return("f")
-      expect(lantern_doctor_query).to receive(:response_type).and_return("test").at_least(:once)
-      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-      expect(lantern_doctor_query).to receive(:should_run?).and_return(true)
-      expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "failed"))
-      expect(LanternDoctorPage).to receive(:create_incident).with(lantern_doctor_query, "postgres", err: "BUG: invalid response type (test) on query test", output: "")
-
-      expect { lantern_doctor_query.run }.not_to raise_error
-    end
-
-    it "runs function for specified database" do
-      serv = instance_double(LanternServer)
-      resource = instance_double(LanternResource, representative_server: serv, db_user: "test")
-      doctor = instance_double(LanternDoctor, resource: resource)
-
-      expect(parent).to receive(:db_name).and_return("postgres")
-      expect(lantern_doctor_query).to receive(:fn_label).and_return("check_daemon_embedding_jobs").at_least(:once)
-      expect(lantern_doctor_query).to receive(:parent).and_return(parent).at_least(:once)
-
-      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-      expect(lantern_doctor_query).to receive(:is_system?).and_return(true).at_least(:once)
-      expect(lantern_doctor_query).to receive(:should_run?).and_return(true).at_least(:once)
-      expect(lantern_doctor_query).to receive(:check_daemon_embedding_jobs).and_return("f")
-      expect(lantern_doctor_query).to receive(:response_type).and_return("bool").at_least(:once)
-      expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "healthy"))
-
-      expect { lantern_doctor_query.run }.not_to raise_error
-    end
-
-    it "runs query on all databases" do
-      serv = instance_double(LanternServer)
-      resource = instance_double(LanternResource, representative_server: serv, db_user: "test")
-      doctor = instance_double(LanternDoctor, resource: resource)
-      dbs = ["db1", "db2"]
-
-      expect(serv).to receive(:list_all_databases).and_return(dbs)
-
-      expect(serv).to receive(:run_query).with(lantern_doctor_query.sql, db: "db1", user: resource.db_user).and_return("f")
-      expect(serv).to receive(:run_query).with(lantern_doctor_query.sql, db: "db2", user: resource.db_user).and_return("f")
-
-      expect(lantern_doctor_query).to receive(:db_name).and_return("*")
-      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-      expect(lantern_doctor_query).to receive(:should_run?).and_return(true)
-      expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "healthy"))
-
-      expect { lantern_doctor_query.run }.not_to raise_error
-    end
-
-    it "runs query on all databases and errors" do
-      serv = instance_double(LanternServer, ubid: "test-ubid")
-      resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b", label: "test-label")
-      doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
-      dbs = ["db1", "db2"]
-
-      expect(serv).to receive(:list_all_databases).and_return(dbs)
-
-      expect(serv).to receive(:run_query).with(lantern_doctor_query.sql, db: "db1", user: resource.db_user).and_raise("test-err")
-      expect(serv).to receive(:run_query).with(lantern_doctor_query.sql, db: "db2", user: resource.db_user).and_return("f")
-
-      expect(lantern_doctor_query).to receive(:db_name).and_return("*")
-      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-      expect(lantern_doctor_query).to receive(:should_run?).and_return(true)
-      expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "failed"))
-      expect(LanternDoctorPage).to receive(:create_incident).with(lantern_doctor_query, "db1", err: "test-err", output: "")
-
-      expect { lantern_doctor_query.run }.not_to raise_error
-    end
-
-    it "runs query on all databases and fails" do
-      serv = instance_double(LanternServer, ubid: "test-ubid")
-      resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b", label: "test-label")
-      doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
-      dbs = ["db1", "db2"]
-
-      expect(serv).to receive(:list_all_databases).and_return(dbs)
-
-      expect(serv).to receive(:run_query).with(lantern_doctor_query.sql, db: "db1", user: resource.db_user).and_return("t")
-      expect(serv).to receive(:run_query).with(lantern_doctor_query.sql, db: "db2", user: resource.db_user).and_return("f")
-
-      expect(lantern_doctor_query).to receive(:db_name).and_return("*")
-      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-      expect(lantern_doctor_query).to receive(:should_run?).and_return(true)
-      expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "failed"))
-      expect(LanternDoctorPage).to receive(:create_incident).with(lantern_doctor_query, "db1", err: "", output: "")
-
-      expect { lantern_doctor_query.run }.not_to raise_error
-    end
-
-    it "runs query on all databases and fails with rows" do
-      serv = instance_double(LanternServer, ubid: "test-ubid")
-      resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b", label: "test-label")
-      doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
-      dbs = ["db1", "db2"]
-
-      expect(serv).to receive(:list_all_databases).and_return(dbs)
-
-      expect(serv).to receive(:run_query).with(lantern_doctor_query.sql, db: "db1", user: resource.db_user).and_return("r1\nr2")
-      expect(serv).to receive(:run_query).with(lantern_doctor_query.sql, db: "db2", user: resource.db_user).and_return("")
-
-      expect(lantern_doctor_query).to receive(:response_type).and_return("rows").at_least(:once)
-      expect(lantern_doctor_query).to receive(:db_name).and_return("*")
-      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-      expect(lantern_doctor_query).to receive(:should_run?).and_return(true)
-      expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "failed"))
-      expect(LanternDoctorPage).to receive(:create_incident).with(lantern_doctor_query, "db1", err: "", output: "r1\nr2")
-
-      expect { lantern_doctor_query.run }.not_to raise_error
-    end
-
-    it "does not create duplicate page" do
-      serv = instance_double(LanternServer, ubid: "test-ubid")
-      resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b")
-      doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
-      dbs = ["db1", "db2"]
-
-      expect(serv).to receive(:list_all_databases).and_return(dbs)
-
-      expect(serv).to receive(:run_query).with(lantern_doctor_query.sql, db: "db1", user: resource.db_user).and_return("t")
-      expect(serv).to receive(:run_query).with(lantern_doctor_query.sql, db: "db2", user: resource.db_user).and_return("f")
-
-      expect(lantern_doctor_query).to receive(:db_name).and_return("*")
-      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-      expect(lantern_doctor_query).to receive(:should_run?).and_return(true)
-      expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "failed"))
-      first_dataset = instance_double(Sequel::Dataset, first: instance_double(LanternDoctorPage))
-      second_dataset = instance_double(Sequel::Dataset, first: nil)
-      expect(first_dataset).to receive(:where).with(Sequel.lit("status != 'resolved' ")).and_return(first_dataset)
-      expect(second_dataset).to receive(:where).with(Sequel.lit("status != 'resolved' ")).and_return(second_dataset)
-      expect(LanternDoctorPage).to receive(:where).with(query_id: lantern_doctor_query.id, db: "db1").and_return(first_dataset)
-      expect(LanternDoctorPage).to receive(:where).with(query_id: lantern_doctor_query.id, db: "db2").and_return(second_dataset)
-
-      expect { lantern_doctor_query.run }.not_to raise_error
-    end
-
-    it "runs query on all databases and resolves previous error" do
-      serv = instance_double(LanternServer, ubid: "test-ubid")
-      resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b")
-      doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
-      dbs = ["db1", "db2"]
-
-      expect(serv).to receive(:list_all_databases).and_return(dbs)
-
-      expect(serv).to receive(:run_query).with(lantern_doctor_query.sql, db: "db1", user: resource.db_user).and_return("f")
-      expect(serv).to receive(:run_query).with(lantern_doctor_query.sql, db: "db2", user: resource.db_user).and_return("f")
-
-      expect(lantern_doctor_query).to receive(:db_name).and_return("*")
-      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-      expect(lantern_doctor_query).to receive(:should_run?).and_return(true)
-      expect(lantern_doctor_query).to receive(:update).with(hash_including(condition: "healthy"))
-      page1 = instance_double(LanternDoctorPage)
-      page2 = instance_double(LanternDoctorPage)
-
-      first_dataset = instance_double(Sequel::Dataset, first: page1)
-      second_dataset = instance_double(Sequel::Dataset, first: page2)
-      expect(first_dataset).to receive(:where).with(Sequel.lit("status != 'resolved' ")).and_return(first_dataset)
-      expect(second_dataset).to receive(:where).with(Sequel.lit("status != 'resolved' ")).and_return(second_dataset)
-      expect(LanternDoctorPage).to receive(:where).with(query_id: lantern_doctor_query.id, db: "db1").and_return(first_dataset)
-      expect(LanternDoctorPage).to receive(:where).with(query_id: lantern_doctor_query.id, db: "db2").and_return(second_dataset)
-      expect(page1).to receive(:resolve)
-      expect(page2).to receive(:resolve)
-
-      expect { lantern_doctor_query.run }.not_to raise_error
-    end
-  end
-
-  describe "#check_disk_space_usage" do
-    it "fails if primary disk server usage is above 90%" do
-      serv1 = instance_double(LanternServer, primary?: true, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
-      serv2 = instance_double(LanternServer, primary?: false, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
-      expect(serv1.vm.sshable).to receive(:cmd).and_return("91")
-      expect(serv2.vm.sshable).to receive(:cmd).and_return("80")
-      doctor = instance_double(LanternDoctor, resource: instance_double(LanternResource, servers: [serv1, serv2]), ubid: "test-ubid")
-      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-      expect(lantern_doctor_query.check_disk_space_usage("postgres", "postgres")).to eq("primary server - usage 91%")
-    end
-
-    it "fails if standby disk usage is above 90%" do
-      serv1 = instance_double(LanternServer, primary?: true, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
-      serv2 = instance_double(LanternServer, primary?: false, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
-      expect(serv1.vm.sshable).to receive(:cmd).and_return("11")
-      expect(serv2.vm.sshable).to receive(:cmd).and_return("92")
-      doctor = instance_double(LanternDoctor, resource: instance_double(LanternResource, servers: [serv1, serv2]), ubid: "test-ubid")
-      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-      expect(lantern_doctor_query.check_disk_space_usage("postgres", "postgres")).to eq("standby server - usage 92%")
-    end
-
-    it "succceds if all servers disk usage is under 90%" do
-      serv1 = instance_double(LanternServer, primary?: true, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
-      serv2 = instance_double(LanternServer, primary?: false, vm: instance_double(GcpVm, sshable: instance_double(Sshable)))
-      expect(serv1.vm.sshable).to receive(:cmd).and_return("11")
-      expect(serv2.vm.sshable).to receive(:cmd).and_return("22")
-      doctor = instance_double(LanternDoctor, resource: instance_double(LanternResource, servers: [serv1, serv2]), ubid: "test-ubid")
-      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-      expect(lantern_doctor_query.check_disk_space_usage("postgres", "postgres")).to eq("")
-    end
-  end
-
-  describe "#check_daemon_embedding_jobs" do
-    it "get jobs and fails" do
-      serv = instance_double(LanternServer, ubid: "test-ubid")
-      resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b")
-      doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
-      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-      expect(serv).to receive(:run_query).and_return("t")
-      expect(serv).to receive(:run_query).and_return("public,test2,test-src,test-dst\npublic,test3,test-src,test-dst")
-      expect(serv).to receive(:run_query).and_return("f")
-      expect(serv).to receive(:run_query).and_return("t")
-      expect(lantern_doctor_query.check_daemon_embedding_jobs("postgres", "postgres")).to eq("t")
-    end
-
-    it "get jobs as empty" do
-      serv = instance_double(LanternServer, ubid: "test-ubid")
-      resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b")
-      doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
-      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-      expect(serv).to receive(:run_query).and_return("t")
-      expect(serv).to receive(:run_query).and_return(" \n")
-      expect(lantern_doctor_query.check_daemon_embedding_jobs("postgres", "postgres")).to eq("f")
-    end
-
-    it "get jobs and succceds" do
-      serv = instance_double(LanternServer, ubid: "test-ubid")
-      resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b")
-      doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
-      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-      expect(serv).to receive(:run_query).and_return("t")
-      expect(serv).to receive(:run_query).and_return("public,test2,test-src,test-dst\npublic,test3,test-src,test-dst")
-      expect(serv).to receive(:run_query).and_return("f")
-      expect(serv).to receive(:run_query).and_return("f")
-      expect(lantern_doctor_query.check_daemon_embedding_jobs("postgres", "postgres")).to eq("f")
-    end
-
-    it "job table does not exist" do
-      serv = instance_double(LanternServer, ubid: "test-ubid")
-      resource = instance_double(LanternResource, representative_server: serv, db_user: "test", name: "test-res", id: "6181ddb3-0002-8ad0-9aeb-084832c9273b")
-      doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
-      expect(lantern_doctor_query).to receive(:doctor).and_return(doctor).at_least(:once)
-      expect(serv).to receive(:run_query).and_return("f")
-      expect(lantern_doctor_query.check_daemon_embedding_jobs("postgres", "postgres")).to eq("f")
-    end
-  end
-
   describe "#page" do
     it "lists active pages" do
       serv = instance_double(LanternServer, ubid: "test-ubid")
@@ -425,10 +220,10 @@ RSpec.describe LanternDoctorQuery do
       doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
       query = described_class.create_with_id(type: "user")
       expect(query).to receive(:doctor).and_return(doctor).at_least(:once)
-      p1 = LanternDoctorPage.create_incident(query, "pg1", err: "", output: "")
-      p2 = LanternDoctorPage.create_incident(query, "pg2", err: "", output: "")
-      p3 = LanternDoctorPage.create_incident(query, "pg3", err: "", output: "")
-      LanternDoctorPage.create_incident(query, "pg4", err: "", output: "")
+      p1 = LanternDoctorPage.create_incident(query, "pg1", "test", err: "", output: "")
+      p2 = LanternDoctorPage.create_incident(query, "pg2", "test", err: "", output: "")
+      p3 = LanternDoctorPage.create_incident(query, "pg3", "test", err: "", output: "")
+      LanternDoctorPage.create_incident(query, "pg4", "test", err: "", output: "")
 
       p1.trigger
       p2.resolve
@@ -445,10 +240,10 @@ RSpec.describe LanternDoctorQuery do
       doctor = instance_double(LanternDoctor, resource: resource, ubid: "test-ubid")
       query = described_class.create_with_id(type: "user")
       expect(query).to receive(:doctor).and_return(doctor).at_least(:once)
-      p1 = LanternDoctorPage.create_incident(query, "pg1", err: "", output: "")
-      p2 = LanternDoctorPage.create_incident(query, "pg2", err: "", output: "")
-      p3 = LanternDoctorPage.create_incident(query, "pg3", err: "", output: "")
-      LanternDoctorPage.create_incident(query, "pg4", err: "", output: "")
+      p1 = LanternDoctorPage.create_incident(query, "pg1", "test", err: "", output: "")
+      p2 = LanternDoctorPage.create_incident(query, "pg2", "test", err: "", output: "")
+      p3 = LanternDoctorPage.create_incident(query, "pg3", "test", err: "", output: "")
+      LanternDoctorPage.create_incident(query, "pg4", "test", err: "", output: "")
 
       p1.trigger
       p2.resolve
@@ -456,6 +251,34 @@ RSpec.describe LanternDoctorQuery do
 
       pages = query.new_and_active_pages
       expect(pages.size).to be(3)
+    end
+  end
+
+  describe "#update_page_status" do
+    it "creates incident" do
+      query_res = class_double(LanternDoctorPage)
+      expect(query_res).to receive(:where).and_return(class_double(LanternDoctorPage, first: nil))
+      expect(LanternDoctorPage).to receive(:where).and_return(query_res)
+      expect(LanternDoctorPage).to receive(:create_incident)
+      expect { lantern_doctor_query.update_page_status("postgres", "test", false, "", "test") }.not_to raise_error
+    end
+
+    it "resolves" do
+      p1 = instance_double(LanternDoctorPage)
+      expect(p1).to receive(:resolve)
+      query_res = class_double(LanternDoctorPage)
+      expect(query_res).to receive(:where).and_return(class_double(LanternDoctorPage, first: p1))
+      expect(LanternDoctorPage).to receive(:where).and_return(query_res)
+      expect { lantern_doctor_query.update_page_status("postgres", "test", true, "", "test") }.not_to raise_error
+    end
+
+    it "do nothing" do
+      p1 = instance_double(LanternDoctorPage)
+      expect(p1).not_to receive(:resolve)
+      query_res = class_double(LanternDoctorPage)
+      expect(query_res).to receive(:where).and_return(class_double(LanternDoctorPage, first: p1))
+      expect(LanternDoctorPage).to receive(:where).and_return(query_res)
+      expect { lantern_doctor_query.update_page_status("postgres", "test", false, "", "test") }.not_to raise_error
     end
   end
 end

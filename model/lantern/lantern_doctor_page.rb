@@ -8,12 +8,14 @@ class LanternDoctorPage < Sequel::Model
 
   include ResourceMethods
 
-  def self.create_incident(query, db_name, err: "", output: "")
-    pg = Prog::PageNexus.assemble_with_logs("Healthcheck: #{query.name} failed on #{query.doctor.resource.name} - #{query.doctor.resource.label} (#{db_name})", [query.ubid, query.doctor.ubid], {"stderr" => err, "stdout" => output}, query.severity, "LanternDoctorQueryFailed", query.id, db_name)
+  def self.create_incident(query, db_name, vm_name, err: "", output: "")
+    pg = Prog::PageNexus.assemble_with_logs("Healthcheck: #{query.name} failed on #{query.doctor.resource.name} - #{query.doctor.resource.label} (#{db_name} - #{vm_name})", [query.ubid, query.doctor.ubid], {"stderr" => err, "stdout" => output}, query.severity, "LanternDoctorQueryFailed", query.id, db_name, vm_name)
     LanternDoctorPage.create_with_id(
       query_id: query.id,
       page_id: pg.id,
-      status: "new"
+      status: "new",
+      db: db_name,
+      vm_name: vm_name
     )
   end
 

@@ -168,6 +168,7 @@ RSpec.describe Prog::GcpVm::Nexus do
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
       expect(gcp_api).to receive(:delete_vm).with("dummy-vm", "us-central1-a")
+      expect(LanternDoctorPage).to receive(:where).and_return([])
       expect { nx.destroy }.to exit({"msg" => "gcp vm deleted"})
     end
 
@@ -179,6 +180,9 @@ RSpec.describe Prog::GcpVm::Nexus do
       expect(gcp_api).to receive(:delete_vm).with("dummy-vm", "us-central1-a")
       expect(gcp_vm).to receive(:address_name).and_return("dummy-vm-addr")
       expect(gcp_api).to receive(:release_ipv4).with("dummy-vm-addr", "us-central1")
+      page = instance_double(LanternDoctorPage)
+      expect(page).to receive(:resolve)
+      expect(LanternDoctorPage).to receive(:where).and_return([page])
       expect { nx.destroy }.to exit({"msg" => "gcp vm deleted"})
     end
   end
