@@ -56,7 +56,7 @@ def run_for_db(db)
 end
 
 class SystemQueries
-  def self.check_daemon_embedding_jobs(db, query_user)
+  def self.get_jobs(db, query_user)
     jobs_table_exists = exec_sql(<<SQL)
       SELECT EXISTS (
        SELECT FROM pg_catalog.pg_class c
@@ -68,15 +68,19 @@ class SystemQueries
 SQL
 
     if jobs_table_exists == "f"
-      return "f"
+      return []
     end
 
-    jobs = exec_sql("SELECT \"schema\", \"table\", src_column, dst_column FROM _lantern_internal.embedding_generation_jobs WHERE init_finished_at IS NOT NULL AND canceled_at IS NULL;")
+    jobs = exec_sql("SELECT \"schema\", \"table\", src_column, dst_column, pk FROM _lantern_internal.embedding_generation_jobs WHERE init_finished_at IS NOT NULL AND canceled_at IS NULL;")
 
-    jobs = jobs.split("\n").map do |row|
+    jobs.split("\n").map do |row|
       values = row.split(",")
-      {schema: values[0], table: values[1], src_column: values[2], dst_column: values[3]}
+      {schema: values[0], table: values[1], src_column: values[2], dst_column: values[3], pk: values[4]}
     end
+  end
+
+  def self.check_daemon_embedding_jobs(db, query_user)
+    jobs = SystemQueries.get_jobs(db, query_user)
 
     if jobs.empty?
       return "f"
@@ -98,6 +102,44 @@ SQL
       output += "#{server_type} server - usage #{usage_percent}%\n"
     end
     output.chomp
+  end
+
+  def self.check_embedding_source_whitespaces(db, query_user)
+    jobs = SystemQueries.get_jobs(db, query_user)
+    output = ""
+
+    if jobs.empty?
+      return output
+    end
+
+    jobs.each do |job|
+      query = <<SQL
+WITH whitespaces AS (
+    SELECT
+        id,
+        unnest(regexp_matches("#{job[:src_column]}", '\s\s+', 'g')) AS whitespace_sequence
+    FROM
+        "#{job[:schema]}"."#{job[:table]}"
+    WHERE
+        "#{job[:src_column]}" IS NOT NULL
+        AND "#{job[:src_column]}" != ''
+        AND "#{job[:src_column]}" != 'Error: Summary failed (llm)'
+    ORDER BY
+        "#{job[:pk]}" DESC
+    LIMIT 100000000
+) SELECT
+    SUM(LENGTH(whitespace_sequence) - 1) AS repeat_count
+FROM
+    whitespaces;
+SQL
+      whitespace_count = exec_sql(query, user: query_user, db: db).to_i
+
+      if whitespace_count > 100000
+        output += "#{job[:table]}.#{job[:src_column]} has #{whitespace_count} whitespace tokens which can be sanitized\n"
+      end
+    end
+
+    output
   end
 end
 
