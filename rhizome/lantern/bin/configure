@@ -21,6 +21,12 @@ def install_dependencies
   r "sudo service docker restart"
 end
 
+def setup_memory_limits
+  r "sudo sh -c 'echo vm.overcommit_ratio=100 >> /etc/sysctl.d/99-lantern.conf'"
+  r "sudo sh -c 'echo vm.overcommit_memory=2 >> /etc/sysctl.d/99-lantern.conf'"
+  r "sudo sysctl -p /etc/sysctl.d/99-lantern.conf"
+end
+
 def setup_fs
   # Setup FS
   r "sudo mkdir -p #{$datadir}"
@@ -133,6 +139,7 @@ if $configure_hash[:skip_deps].nil?
   puts "GCR repo ready"
 end
 
+setup_memory_limits
 setup_fs
 puts "filesystem ready"
 setup_env
