@@ -52,7 +52,7 @@ def run_for_db(db)
     err = e.message
   end
 
-  [success, {db: db, result: output, err: err}]
+  [success, {db: db, result: output, err: err, success: success}]
 end
 
 class SystemQueries
@@ -61,7 +61,7 @@ class SystemQueries
       SELECT EXISTS (
        SELECT FROM pg_catalog.pg_class c
        JOIN   pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-       WHERE  n.nspname = '_lantern_internal'
+       WHERE  n.nspname = '_lantern_extras_internal'
        AND    c.relname = 'embedding_generation_jobs'
        AND    c.relkind = 'r'
      );
@@ -71,7 +71,7 @@ SQL
       return []
     end
 
-    jobs = exec_sql("SELECT \"schema\", \"table\", src_column, dst_column, pk FROM _lantern_internal.embedding_generation_jobs WHERE init_finished_at IS NOT NULL AND canceled_at IS NULL;")
+    jobs = exec_sql("SELECT \"schema\", \"table\", src_column, dst_column, pk FROM _lantern_extras_internal.embedding_generation_jobs WHERE init_finished_at IS NOT NULL AND canceled_at IS NULL;")
 
     jobs.split("\n").map do |row|
       values = row.split(",")

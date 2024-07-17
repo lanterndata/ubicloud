@@ -81,25 +81,30 @@ class Prog::Lantern::LanternDoctorNexus < Prog::Base
           all_output = []
 
           if !logs["stdout"].empty?
-            # stdout will be [{ "db": string, "result": string }]
+            # stdout will be [{ "db": string, "result": string, "success": bool }]
             begin
               all_output = JSON.parse(logs["stdout"])
             rescue
-              all_output = [{"db" => "*", "result" => logs["stdout"], "err" => logs["stderr"]}]
             end
+          end
 
+          if status == "Failed"
+            all_output = [{"db" => "*", "result" => logs["stdout"][..200], "err" => logs["stderr"], "success" => false}] + all_output.select { _1["success"] }
+          else
             # resolve errored page if exists
             query.update_page_status("*", vm.name, true, nil, nil)
-          else
-            # this is the case when command errored for some reason
-            all_output = [{"db" => "*", "result" => "", "err" => logs["stderr"]}]
           end
 
+          condition = "healthy"
           all_output.each do |output|
-            query.update_page_status(output["db"], vm.name, status == "Succeeded", output["result"], output["err"])
+            if !output["success"]
+              condition = "failed"
+            end
+
+            query.update_page_status(output["db"], vm.name, output["success"], output["result"], output["err"])
           end
 
-          query.update(condition: (status == "Failed") ? "failed" : "healthy", last_checked: Time.new)
+          query.update(condition: condition, last_checked: Time.new)
           vm.sshable.cmd("common/bin/daemonizer --clean #{query.task_name}")
         end
       end

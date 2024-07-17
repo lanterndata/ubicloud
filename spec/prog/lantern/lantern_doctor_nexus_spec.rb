@@ -177,7 +177,7 @@ RSpec.describe Prog::Lantern::LanternDoctorNexus do
     describe "#wait_queries" do
       before do
         allow(sshable).to receive(:cmd).with("common/bin/daemonizer --check test_query").and_return("Succeeded")
-        allow(sshable).to receive(:cmd).with("common/bin/daemonizer --logs test_query").and_return(JSON.generate({"stdout" => '[{"db": "test_db", "result": "success"}]', "stderr" => ""}))
+        allow(sshable).to receive(:cmd).with("common/bin/daemonizer --logs test_query").and_return(JSON.generate({"stdout" => '[{"db": "test_db", "result": "success", "success": true }]', "stderr" => ""}))
         allow(sshable).to receive(:cmd).with("common/bin/daemonizer --clean test_query").and_return("cleaned")
       end
 
@@ -200,7 +200,6 @@ RSpec.describe Prog::Lantern::LanternDoctorNexus do
         allow(sshable).to receive(:cmd).with("common/bin/daemonizer --check test_query").and_return("Failed")
         allow(sshable).to receive(:cmd).with("common/bin/daemonizer --logs test_query").and_return(JSON.generate({"stdout" => "error parse", "stderr" => "error"}))
 
-        expect(query).to receive(:update_page_status).with("*", vm.name, true, nil, nil)
         expect(query).to receive(:update_page_status).with("*", vm.name, false, "error parse", "error")
         expect(query).to receive(:update).with(condition: "failed", last_checked: instance_of(Time))
 
