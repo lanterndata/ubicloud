@@ -167,6 +167,7 @@ class MiscOperations
     name = "ubuntu-lantern-#{lantern_version.tr(".", "-")}-extras-#{extras_version.tr(".", "-")}-minor-#{minor_version}"
     description = "Time: #{Time.new}, Lantern - #{lantern_version}, Extras - #{extras_version}, Minor - #{minor_version}"
     container_image = "#{Config.gcr_image}:lantern-#{lantern_version}-extras-#{extras_version}-minor-#{minor_version}"
+    description = "Lantern Image with cached: Lantern #{lantern_version}, extras: #{extras_version}, minor: #{minor_version} - Created At #{Time.new}"
 
     if vm.nil?
       vm = Prog::GcpVm::Nexus.assemble_with_sshable("lantern", Project.first.id, name: "imagecreation-machine", storage_size_gib: 10)
