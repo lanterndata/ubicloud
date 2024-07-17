@@ -150,14 +150,14 @@ RSpec.describe Clover, "lantern" do
       end
 
       it "updates extras extension" do
-        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-extension", {extras_version: "0.2.3", lantern_version: Config.lantern_default_version}
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-extension", {extras_version: "0.2.33", lantern_version: Config.lantern_default_version}
         expect(last_response.status).to eq(200)
       end
     end
 
     describe "#update-image" do
       it "updates image" do
-        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-image", {lantern_version: "0.2.3", extras_version: "0.2.3", minor_version: "1"}
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/update-image", {lantern_version: "0.2.3", extras_version: "0.2.33", minor_version: "1"}
         expect(last_response.status).to eq(200)
       end
     end
