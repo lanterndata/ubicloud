@@ -91,6 +91,37 @@ class MiscOperations
     vm.sshable.cmd("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -U postgres -t --csv #{db_name}", stdin: query)
   end
 
+  def self.run_script_daemonized(resource_name, filename, task_name)
+    serv = LanternResource[name: resource_name].representative_server
+    serv.vm.sshable.cmd("common/bin/daemonizer 'sudo #{filename}' #{task_name}")
+
+    task_logs resource_name, "#{task_name}"
+  end
+
+  def self.create_all_indexes_concurrently_script(resource_name, filename)
+    serv = LanternResource[name: resource_name].representative_server
+    all_dbs = serv.vm.sshable.cmd("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec postgresql psql -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'").strip.split("\n")
+    command_list = []
+    all_dbs.each do |db|
+      db_name = db.strip
+      indexes = MiscOperations.query_on_db(serv.vm, db_name, "SELECT indexdef FROM pg_indexes WHERE indexdef ILIKE '%lantern_hnsw%';").strip.split("\n")
+
+      if !indexes.empty?
+        queries = []
+        indexes.each {
+          queries.push(_1.gsub(/create\s+index/i, 'CREATE INDEX CONCURRENTLY')[1..-2])
+        }
+
+        queries.map do |query|
+          command_list.push("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -U postgres #{db_name} -c \"#{query}\"")
+        end
+      end
+    end
+    command = command_list.join("\n")
+
+    serv.vm.sshable.cmd("cp /dev/stdin #{filename} && chmod +x #{filename}", stdin: command)
+  end
+
   def self.reindex_all_concurrently(resource_name, disable_indexes: false)
     serv = LanternResource[name: resource_name].representative_server
     all_dbs = serv.vm.sshable.cmd("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec postgresql psql -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'").strip.split("\n")
