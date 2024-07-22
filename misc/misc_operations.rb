@@ -95,7 +95,7 @@ class MiscOperations
     serv = LanternResource[name: resource_name].representative_server
     serv.vm.sshable.cmd("common/bin/daemonizer 'sudo #{filename}' #{task_name}")
 
-    task_logs resource_name, "#{task_name}"
+    task_logs resource_name, task_name.to_s
   end
 
   def self.create_all_indexes_concurrently_script(resource_name, filename)
@@ -109,7 +109,7 @@ class MiscOperations
       if !indexes.empty?
         queries = []
         indexes.each {
-          queries.push(_1.gsub(/create\s+index/i, 'CREATE INDEX CONCURRENTLY')[1..-2])
+          queries.push(_1.gsub(/create\s+index/i, "CREATE INDEX CONCURRENTLY")[1..-2])
         }
 
         queries.map do |query|
