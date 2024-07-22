@@ -610,11 +610,11 @@ SQL
   end
 
   def available?
-    vm.sshable.invalidate_cache_entry
-
+    status = false
     begin
-      lantern_server.run_query("SELECT 1")
-      return true
+      session = Sequel.connect(lantern_server.connection_string)
+      session["SELECT 1"]
+      status = true
     rescue
     end
 
@@ -624,7 +624,7 @@ SQL
     rescue
     end
 
-    false
+    status
   end
 
   label def prewarm_indexes
