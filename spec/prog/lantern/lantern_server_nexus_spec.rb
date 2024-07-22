@@ -752,7 +752,9 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     it "marks as available" do
       expect(lantern_server).to receive(:connection_string)
       session = instance_double(Hash)
-      expect(session).to receive(:[]).with("SELECT 1")
+      res = instance_double(Sequel::Dataset)
+      expect(res).to receive(:first)
+      expect(session).to receive(:[]).with("SELECT 1").and_return(res)
       expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo lantern/bin/logs --tail 5").and_return("logs")
       expect(Sequel).to receive(:connect).and_return(session)
       expect(nx.available?).to be(true)
