@@ -748,40 +748,30 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
   end
 
-  describe "#update_memory_limits" do
-    it "updates memory limits" do
-      expect(nx).to receive(:when_update_memory_limits_set?).and_yield
-      expect(lantern_server).to receive(:run_query)
-      expect(lantern_server.vm.sshable).to receive(:invalidate_cache_entry)
-      expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo lantern/bin/update_memory_limits")
-      expect { nx.wait_db_available }.to hop("wait")
-    end
-  end
-
   describe "#available" do
     it "marks as available" do
-      expect(lantern_server).to receive(:run_query)
-      expect(lantern_server.vm.sshable).to receive(:invalidate_cache_entry)
+      expect(lantern_server).to receive(:connection_string)
+      session = instance_double(Hash)
+      expect(session).to receive(:[]).with("SELECT 1")
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo lantern/bin/logs --tail 5").and_return("logs")
+      expect(Sequel).to receive(:connect).and_return(session)
       expect(nx.available?).to be(true)
     end
 
     it "does not mark as unavailable if redo in progress" do
-      expect(lantern_server).to receive(:run_query).and_raise "err"
-      expect(lantern_server.vm.sshable).to receive(:invalidate_cache_entry)
+      expect(lantern_server).to receive(:connection_string)
+      session = instance_double(Hash)
+      expect(session).to receive(:[]).with("SELECT 1").and_raise "err"
+      expect(Sequel).to receive(:connect).and_return(session)
       expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo lantern/bin/logs --tail 5").and_return("redo in progress")
       expect(nx.available?).to be(true)
     end
 
-    it "marks unavailable if cmd fails" do
-      expect(lantern_server).to receive(:run_query).and_raise "err"
-      expect(lantern_server.vm.sshable).to receive(:invalidate_cache_entry)
-      expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo lantern/bin/logs --tail 5").and_raise
-      expect(nx.available?).to be(false)
-    end
-
     it "marks unavailable if cmd returns other logs" do
-      expect(lantern_server).to receive(:run_query).and_raise "err"
-      expect(lantern_server.vm.sshable).to receive(:invalidate_cache_entry)
+      expect(lantern_server).to receive(:connection_string)
+      session = instance_double(Hash)
+      expect(session).to receive(:[]).with("SELECT 1").and_raise "err"
+      expect(Sequel).to receive(:connect).and_return(session)
       expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo lantern/bin/logs --tail 5").and_return("logs")
       expect(nx.available?).to be(false)
     end
