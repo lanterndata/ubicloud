@@ -613,7 +613,7 @@ SQL
     status = false
     begin
       session = Sequel.connect(lantern_server.connection_string)
-      session["SELECT 1"]
+      session["SELECT 1"].first
       status = true
     rescue
     end
