@@ -48,11 +48,11 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
         timeline_access: timeline_access,
         timeline_id: timeline_id,
         representative_at: representative_at,
-        synchronization_status: representative_at ? "ready" : "catching_up",
-        domain: domain
+        synchronization_status: representative_at ? "ready" : "catching_up"
       )
 
-      Strand.create(prog: "Lantern::LanternServerNexus", label: "start") { _1.id = lantern_server.id }
+      stack_frame = domain.nil? ? {} : {domain: domain}
+      Strand.create(prog: "Lantern::LanternServerNexus", label: "start", stack: [stack_frame]) { _1.id = lantern_server.id }
     end
   end
 
@@ -127,7 +127,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     case vm.sshable.cmd("common/bin/daemonizer --check configure_lantern")
     when "Succeeded"
       vm.sshable.cmd("common/bin/daemonizer --clean configure_lantern")
-      if !lantern_server.domain.nil?
+      if !frame["domain"].nil?
         lantern_server.incr_add_domain
       end
 
@@ -314,15 +314,25 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   end
 
   label def add_domain
+    if frame["domain"].nil?
+      raise "no domain in stack"
+    end
+
     cf_client = Dns::Cloudflare.new
     begin
-      cf_client.upsert_dns_record(lantern_server.domain, lantern_server.vm.sshable.host)
+      cf_client.upsert_dns_record(frame["domain"], lantern_server.vm.sshable.host)
     rescue => e
       Clog.emit("Error while adding domain") { {error: e} }
-      lantern_server.update(domain: nil)
       decr_add_domain
       hop_wait
     end
+
+    lantern_server.update(domain: frame["domain"])
+
+    current_frame = strand.stack.first
+    current_frame.delete("domain")
+    strand.modified!(:stack)
+    strand.save_changes
 
     decr_add_domain
     register_deadline(:wait, 5 * 60)

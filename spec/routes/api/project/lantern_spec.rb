@@ -67,6 +67,7 @@ RSpec.describe Clover, "lantern" do
         body = JSON.parse(last_response.body)
         expect(last_response.status).to eq(200)
 
+        serv = LanternResource[name: "instance-2"].representative_server
         expect(body["name"]).to eq("instance-2")
         expect(body["label"]).to eq("test-label")
         expect(body["state"]).to eq("creating")
@@ -77,7 +78,7 @@ RSpec.describe Clover, "lantern" do
         expect(body["minor_version"]).to eq("1")
         expect(body["org_id"]).to eq(0)
         expect(body["storage_size_gib"]).to eq(100)
-        expect(body["domain"]).to eq("test.db.lantern.dev")
+        expect(serv.strand.stack.first["domain"]).to eq("test.db.lantern.dev")
         expect(body["app_env"]).to eq("test")
         expect(body["debug"]).to be(false)
         expect(body["enable_telemetry"]).to be(true)
@@ -99,6 +100,7 @@ RSpec.describe Clover, "lantern" do
 
         expect(last_response.status).to eq(200)
 
+        serv = LanternResource[name: "instance-from-backup"].representative_server
         expect(body["name"]).to eq("instance-from-backup")
         expect(body["state"]).to eq("creating")
         expect(body["instance_type"]).to eq("writer")
@@ -108,7 +110,7 @@ RSpec.describe Clover, "lantern" do
         expect(body["minor_version"]).to eq(pg.representative_server.minor_version)
         expect(body["org_id"]).to eq(0)
         expect(body["storage_size_gib"]).to eq(pg.representative_server.target_storage_size_gib)
-        expect(body["domain"]).to eq("test.db.lantern.dev")
+        expect(serv.strand.stack.first["domain"]).to eq("test.db.lantern.dev")
         expect(body["app_env"]).to eq("test")
         expect(body["debug"]).to be(false)
         expect(body["enable_telemetry"]).to be(true)
@@ -130,7 +132,7 @@ RSpec.describe Clover, "lantern" do
         expect(pg.timeline).to receive(:refresh_earliest_backup_completion_time).at_least(:once)
         expect(pg.timeline).to receive(:earliest_restore_time).and_return(Time.new - 1000000).at_least(:once)
         expect(pg.timeline).to receive(:latest_restore_time).and_return(Time.new).at_least(:once)
-        post "/api/project/#{project.ubid}/lantern", {size: "n1-standard-2", name: "instance-from-backup", org_id: 0, location: "us-central1", domain: "test.db.lantern.dev", parent_id: pg.id, restore_target: Time.now - 1000}
+        post "/api/project/#{project.ubid}/lantern", {size: "n1-standard-2", name: "instance-from-backup", org_id: 0, location: "us-central1", parent_id: pg.id, restore_target: Time.now - 1000}
 
         body = JSON.parse(last_response.body)
 
@@ -145,7 +147,6 @@ RSpec.describe Clover, "lantern" do
         expect(body["minor_version"]).to eq(pg.representative_server.minor_version)
         expect(body["org_id"]).to eq(0)
         expect(body["storage_size_gib"]).to eq(pg.representative_server.target_storage_size_gib)
-        expect(body["domain"]).to eq("test.db.lantern.dev")
         expect(body["app_env"]).to eq("test")
         expect(body["debug"]).to be(false)
         expect(body["enable_telemetry"]).to be(true)
@@ -158,10 +159,11 @@ RSpec.describe Clover, "lantern" do
         expect(Config).to receive(:lantern_top_domain).and_return("db.lantern.dev")
         post "/api/project/#{project.ubid}/lantern", {size: "n1-standard-2", name: "instance-2", org_id: 0, location: "us-central1", storage_size_gib: 100, lantern_version: "0.2.2", extras_version: "0.1.4", minor_version: "1", subdomain: "test", app_env: "test", repl_password: "test-repl-pass", enable_telemetry: true, postgres_password: "test-pg-pass"}
 
-        body = JSON.parse(last_response.body)
+        JSON.parse(last_response.body)
         expect(last_response.status).to eq(200)
 
-        expect(body["domain"]).to eq("test.db.lantern.dev")
+        serv = LanternResource[name: "instance-2"].representative_server
+        expect(serv.strand.stack.first["domain"]).to eq("test.db.lantern.dev")
       end
     end
   end
