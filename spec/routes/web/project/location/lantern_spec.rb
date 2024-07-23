@@ -171,7 +171,7 @@ RSpec.describe Clover, "lantern" do
         fill_in "domain", with: "example.com"
         click_button "Add domain"
         pg = LanternResource.first
-        expect(pg.representative_server.domain).to eq("example.com")
+        expect(pg.representative_server.strand.stack.first["domain"]).to eq("example.com")
       end
     end
 

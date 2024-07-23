@@ -101,6 +101,11 @@ class CloverApi
       r.post "add-domain" do
         Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
         DB.transaction do
+          strand = pg.representative_server.strand
+          strand.stack.first["domain"] = r.params["domain"]
+          strand.modified!(:stack)
+          strand.save_changes
+
           pg.representative_server.update(domain: r.params["domain"])
           pg.representative_server.incr_add_domain
         end

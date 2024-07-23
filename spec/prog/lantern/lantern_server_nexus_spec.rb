@@ -235,7 +235,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_lantern").and_return("Succeeded")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_lantern")
-      expect(lantern_server).to receive(:domain).and_return("db.lantern.dev")
+      expect(nx).to receive(:frame).and_return({"domain" => "db.lantern.dev"})
       expect(lantern_server).to receive(:incr_add_domain)
       expect(lantern_server).to receive(:primary?).and_return(true)
       expect(nx).to receive(:register_deadline).with(:wait, 40 * 60)
@@ -246,7 +246,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_lantern").and_return("Succeeded")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_lantern")
-      expect(lantern_server).to receive(:domain).and_return(nil)
+      expect(nx).to receive(:frame).and_return({})
       expect(lantern_server).to receive(:primary?).and_return(false)
       expect(nx).to receive(:register_deadline).with(:wait, 120 * 60)
       expect { nx.setup_docker_stack }.to hop("wait_db_available")
@@ -557,12 +557,17 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
   end
 
   describe "#add_domain" do
+    it "raises error" do
+      expect(nx).to receive(:frame).and_return({})
+      expect { nx.add_domain }.to raise_error "no domain in stack"
+    end
+
     it "fails to add domain" do
+      expect(nx).to receive(:frame).and_return({"domain" => "db.lantern.dev"}).at_least(:once)
       expect(lantern_server.vm.sshable).to receive(:host).and_return("1.1.1.1")
       cf_client = instance_double(Dns::Cloudflare)
       expect(Dns::Cloudflare).to receive(:new).and_return(cf_client)
       expect(cf_client).to receive(:upsert_dns_record).and_raise
-      allow(lantern_server).to receive(:update).with(domain: nil)
       expect { nx.add_domain }.to hop("wait")
     end
 
@@ -570,7 +575,9 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.vm.sshable).to receive(:host).and_return("1.1.1.1")
       cf_client = instance_double(Dns::Cloudflare)
       expect(Dns::Cloudflare).to receive(:new).and_return(cf_client)
-      expect(lantern_server).to receive(:domain).and_return("test.lantern.dev")
+
+      expect(nx).to receive(:frame).and_return({"domain" => "test.lantern.dev"}).at_least(:once)
+      expect(lantern_server).to receive(:update).with({domain: "test.lantern.dev"})
       expect(cf_client).to receive(:upsert_dns_record).with("test.lantern.dev", "1.1.1.1")
       expect { nx.add_domain }.to hop("setup_ssl")
     end
