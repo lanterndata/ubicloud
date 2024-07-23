@@ -64,7 +64,7 @@ class LanternServer < Sequel::Model
     return "domain setup" if strand.label.include?("domain")
     return "ssl setup" if strand.label == "setup_ssl"
     return "updating" if vm.display_state == "updating" || strand.label.include?("update") || strand.label == "init_sql"
-    return "unavailable" if strand.label == "wait_db_available"
+    return "unavailable" if ["wait_db_available", "unavailable"].include?(strand.label)
     return "running" if strand.label == "wait"
     return "failover" if ["take_over", "wait_swap_ip", "promote_server"].include?(strand.label)
     "creating"
