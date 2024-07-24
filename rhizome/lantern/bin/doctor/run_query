@@ -141,6 +141,15 @@ SQL
 
     output
   end
+
+  def self.remove_dangling_images(_db, _query_user)
+    r("sudo docker image prune -af")
+    ""
+  end
+
+  def self.remove_dangling_index_files(_db, _query_user)
+    r("sudo find /var/lib/lantern-data/data/ -name 'ldb-index*' -type f -mmin +240 -delete >/tmp/ldb-index-cleanup-logs 2>&1 && echo "" || cat /tmp/ldb-index-cleanup-logs").chomp.strip
+  end
 end
 
 exit_code = 0
