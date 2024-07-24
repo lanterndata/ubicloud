@@ -146,6 +146,15 @@ end
 exit_code = 0
 
 response = []
+fn_label = $configure_hash["query"]["fn_label"]
+is_system = $configure_hash["query"]["is_system"]
+
+if is_system && fn_label && !SystemQueries.respond_to?(fn_label)
+  # rhyzome is not synced yet
+  warn "update_needed"
+  exit(1)
+end
+
 dbs.each do |db|
   success, res = run_for_db(db)
   if !success
