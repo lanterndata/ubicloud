@@ -94,12 +94,13 @@ SQL
     failed ? "t" : "f"
   end
 
-  def self.check_disk_space_usage(_db, _query_user)
+  def self.check_disk_space_usage(db, query_user)
     server_type = $configure_hash["server_type"]
     output = ""
     usage_percent = r("df | awk '$1 == \"/dev/root\" {print $5}' | sed 's/%//'").chomp.strip.to_i
     if usage_percent > 90
       output += "#{server_type} server - usage #{usage_percent}%\n"
+      remove_dangling_images(db, query_user)
     end
     output.chomp
   end
@@ -148,7 +149,7 @@ SQL
   end
 
   def self.remove_dangling_index_files(_db, _query_user)
-    r("sudo find /var/lib/lantern-data/data/ -name 'ldb-index*' -type f -mmin +240 -delete >/tmp/ldb-index-cleanup-logs 2>&1 && echo "" || cat /tmp/ldb-index-cleanup-logs").chomp.strip
+    r("sudo find /var/lib/lantern-data/data/ -name 'ldb-index*' -type f -mmin +240 -delete >/tmp/ldb-index-cleanup-logs 2>&1 && echo '' || cat /tmp/ldb-index-cleanup-logs").chomp.strip
   end
 end
 
