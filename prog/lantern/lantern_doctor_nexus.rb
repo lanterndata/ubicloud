@@ -80,6 +80,17 @@ class Prog::Lantern::LanternDoctorNexus < Prog::Base
           logs = JSON.parse(vm.sshable.cmd("common/bin/daemonizer --logs #{query.task_name}"))
           all_output = []
 
+          if status == "Failed" && logs["stderr"].chomp == "update_needed"
+            is_updating = server.strand.label == "wait_update_rhizome"
+            will_update = !Semaphore.where(strand_id: server.strand.id, name: "update_rhizome").first.nil?
+            if !is_updating && !will_update
+              server.incr_update_rhizome
+            end
+
+            vm.sshable.cmd("common/bin/daemonizer --clean #{query.task_name}")
+            next
+          end
+
           if !logs["stdout"].empty?
             # stdout will be [{ "db": string, "result": string, "success": bool }]
             begin

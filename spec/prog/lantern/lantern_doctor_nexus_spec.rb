@@ -194,6 +194,51 @@ RSpec.describe Prog::Lantern::LanternDoctorNexus do
         expect { nx.wait_queries }.to hop("wait")
       end
 
+      it "handles update_needed" do
+        query = instance_double(LanternDoctorQuery, servers: [server], db_name: "postgres", task_name: "test_query")
+        expect(lantern_doctor).to receive(:queries).and_return([query])
+        allow(sshable).to receive(:cmd).with("common/bin/daemonizer --check test_query").and_return("Failed")
+        allow(sshable).to receive(:cmd).with("common/bin/daemonizer --logs test_query").and_return(JSON.generate({"stdout" => "error parse", "stderr" => "update_needed"}))
+        expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean test_query")
+
+        expect(server).to receive(:strand).and_return(instance_double(Strand, id: "test", label: "wait")).at_least(:once)
+        expect(Semaphore).to receive(:where).with(name: "update_rhizome", strand_id: "test").and_return(instance_double(Sequel::Dataset, first: nil))
+        expect(query).not_to receive(:update).with(condition: "failed", last_checked: instance_of(Time))
+        expect(server).to receive(:incr_update_rhizome)
+
+        expect { nx.wait_queries }.to hop("wait")
+      end
+
+      it "skips update_needed if already updating" do
+        query = instance_double(LanternDoctorQuery, servers: [server], db_name: "postgres", task_name: "test_query")
+        expect(lantern_doctor).to receive(:queries).and_return([query])
+        allow(sshable).to receive(:cmd).with("common/bin/daemonizer --check test_query").and_return("Failed")
+        allow(sshable).to receive(:cmd).with("common/bin/daemonizer --logs test_query").and_return(JSON.generate({"stdout" => "error parse", "stderr" => "update_needed"}))
+        expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean test_query")
+
+        expect(server).to receive(:strand).and_return(instance_double(Strand, id: "test", label: "wait_update_rhizome")).at_least(:once)
+        expect(Semaphore).to receive(:where).with(name: "update_rhizome", strand_id: "test").and_return(instance_double(Sequel::Dataset, first: nil))
+        expect(query).not_to receive(:update).with(condition: "failed", last_checked: instance_of(Time))
+        expect(server).not_to receive(:incr_update_rhizome)
+
+        expect { nx.wait_queries }.to hop("wait")
+      end
+
+      it "skips update_needed if will update" do
+        query = instance_double(LanternDoctorQuery, servers: [server], db_name: "postgres", task_name: "test_query")
+        expect(lantern_doctor).to receive(:queries).and_return([query])
+        allow(sshable).to receive(:cmd).with("common/bin/daemonizer --check test_query").and_return("Failed")
+        allow(sshable).to receive(:cmd).with("common/bin/daemonizer --logs test_query").and_return(JSON.generate({"stdout" => "error parse", "stderr" => "update_needed"}))
+        expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean test_query")
+
+        expect(server).to receive(:strand).and_return(instance_double(Strand, id: "test", label: "wait")).at_least(:once)
+        expect(Semaphore).to receive(:where).with(name: "update_rhizome", strand_id: "test").and_return(instance_double(Sequel::Dataset, first: instance_double(Semaphore)))
+        expect(query).not_to receive(:update).with(condition: "failed", last_checked: instance_of(Time))
+        expect(server).not_to receive(:incr_update_rhizome)
+
+        expect { nx.wait_queries }.to hop("wait")
+      end
+
       it "handles error" do
         query = instance_double(LanternDoctorQuery, servers: [server], db_name: "postgres", task_name: "test_query")
         expect(lantern_doctor).to receive(:queries).and_return([query])
