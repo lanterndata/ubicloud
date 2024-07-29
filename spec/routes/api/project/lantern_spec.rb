@@ -85,6 +85,7 @@ RSpec.describe Clover, "lantern" do
         expect(body["repl_user"]).to eq("repl_user")
         expect(body["repl_password"]).to eq("test-repl-pass")
         expect(body["postgres_password"]).to eq("test-pg-pass")
+        expect(body["servers"][0]["max_storage_autoresize_gib"]).to eq(0)
       end
 
       it "creates new lantern database from backup" do
@@ -94,7 +95,7 @@ RSpec.describe Clover, "lantern" do
         expect(pg.timeline).to receive(:refresh_earliest_backup_completion_time).at_least(:once)
         expect(pg.timeline).to receive(:earliest_restore_time).and_return(Time.new - 1000000).at_least(:once)
         expect(pg.timeline).to receive(:latest_restore_time).and_return(Time.new).at_least(:once)
-        post "/api/project/#{project.ubid}/lantern", {size: "n1-standard-2", name: "instance-from-backup", org_id: 0, location: "us-central1", domain: "test.db.lantern.dev", parent_id: pg.id}
+        post "/api/project/#{project.ubid}/lantern", {size: "n1-standard-2", name: "instance-from-backup", org_id: 0, location: "us-central1", domain: "test.db.lantern.dev", parent_id: pg.id, max_storage_autoresize_gib: 100}
 
         body = JSON.parse(last_response.body)
 
@@ -117,6 +118,7 @@ RSpec.describe Clover, "lantern" do
         expect(body["repl_user"]).to eq("repl_user")
         expect(body["repl_password"]).to eq(pg.repl_password)
         expect(body["postgres_password"]).to eq(pg.superuser_password)
+        expect(body["servers"][0]["max_storage_autoresize_gib"]).to eq(100)
       end
 
       it "creates new lantern database from backup with wrong restore time" do

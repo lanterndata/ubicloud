@@ -26,6 +26,7 @@ RSpec.describe Serializers::Web::Lantern do
       domain: "db.lanern.dev",
       target_vm_size: "standard-2",
       target_storage_size_gib: 10,
+      max_storage_autoresize_gib: 0,
       lantern_version: "0.2.2",
       extras_version: "0.1.2",
       minor_version: "1",
@@ -55,6 +56,7 @@ RSpec.describe Serializers::Web::Lantern do
       instance_type: "writer",
       hostname: "db.lantern.dev",
       primary?: true,
+      max_storage_autoresize_gib: 200,
       vm: instance_double(GcpVm, name: "test"),
       connection_string: "postgres://postgres:test123@db.lantern.dev:6432")
     expect(lantern).to receive(:representative_server).and_return(nil).at_least(:once)
@@ -81,6 +83,7 @@ RSpec.describe Serializers::Web::Lantern do
       primary?: true,
       strand: instance_double(Strand, label: "wait"),
       vm: instance_double(GcpVm, name: "test"),
+      max_storage_autoresize_gib: 0,
       connection_string: "postgres://postgres:test123@db.lantern.dev:6432")
     expect(lantern).to receive(:representative_server).and_return(leader).at_least(:once)
     expect(lantern).to receive(:servers).and_return([leader]).at_least(:once)
@@ -104,6 +107,7 @@ RSpec.describe Serializers::Web::Lantern do
       instance_type: "writer",
       hostname: "db.lantern.dev",
       primary?: true,
+      max_storage_autoresize_gib: 0,
       vm: instance_double(GcpVm, name: "test"),
       connection_string: "postgres://postgres:test123@db.lantern.dev:6432")
     expect(lantern).to receive(:representative_server).and_return(leader).at_least(:once)

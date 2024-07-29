@@ -14,7 +14,7 @@ class GcpVm < Sequel::Model
   include ResourceMethods
   include SemaphoreMethods
   include DisplayStatusMethods
-  semaphore :destroy, :start_vm, :stop_vm, :update_storage, :update_size
+  semaphore :destroy, :start_vm, :stop_vm, :update_storage, :update_size, :resize_data_disk
 
   include Authorization::HyperTagMethods
 

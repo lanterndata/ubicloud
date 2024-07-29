@@ -10,13 +10,26 @@ class LanternDoctorPage < Sequel::Model
 
   def self.create_incident(query, db_name, vm_name, err: "", output: "")
     pg = Prog::PageNexus.assemble_with_logs("Healthcheck: #{query.name} failed on #{query.doctor.resource.name} - #{query.doctor.resource.label} (#{db_name} - #{vm_name})", [query.ubid, query.doctor.ubid], {"stderr" => err, "stdout" => output}, query.severity, "LanternDoctorQueryFailed", query.id, db_name, vm_name)
-    LanternDoctorPage.create_with_id(
+    doctor_page = LanternDoctorPage.create_with_id(
       query_id: query.id,
       page_id: pg.id,
       status: "new",
       db: db_name,
       vm_name: vm_name
     )
+    doctor_page.post_incident_action
+    doctor_page
+  end
+
+  def post_incident_action
+    case query.name
+    when "Lantern Server Disk Usage"
+      query.doctor.resource.servers.each do |server|
+        if server.max_storage_autoresize_gib > server.target_storage_size_gib && page.details["logs"]&.[]("stdout") =~ /\/dev\/.*usage.*%/
+          server.autoresize_disk
+        end
+      end
+    end
   end
 
   def path
