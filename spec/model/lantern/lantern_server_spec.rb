@@ -744,4 +744,31 @@ SQL
       lantern_server.change_replication_mode("slave")
     end
   end
+
+  describe "#autoresize_disk" do
+    it "resizes data disk by 50%" do
+      expect(lantern_server).to receive(:target_storage_size_gib).and_return(50).at_least(:once)
+      expect(lantern_server).to receive(:max_storage_autoresize_gib).and_return(100).at_least(:once)
+      expect(lantern_server).to receive(:update).with(target_storage_size_gib: 75)
+      expect(lantern_server.vm).to receive(:update).with(storage_size_gib: 75)
+      expect(lantern_server).to receive(:incr_update_storage_size)
+      expect { lantern_server.autoresize_disk }.not_to raise_error
+    end
+
+    it "resizes data disk by max" do
+      expect(lantern_server).to receive(:target_storage_size_gib).and_return(50).at_least(:once)
+      expect(lantern_server).to receive(:max_storage_autoresize_gib).and_return(70).at_least(:once)
+      expect(lantern_server).to receive(:update).with(target_storage_size_gib: 70)
+      expect(lantern_server.vm).to receive(:update).with(storage_size_gib: 70)
+      expect(lantern_server).to receive(:incr_update_storage_size)
+      expect { lantern_server.autoresize_disk }.not_to raise_error
+    end
+
+    it "does nothing" do
+      expect(lantern_server).to receive(:target_storage_size_gib).and_return(80).at_least(:once)
+      expect(lantern_server).to receive(:max_storage_autoresize_gib).and_return(70).at_least(:once)
+      expect(lantern_server).not_to receive(:incr_update_storage_size)
+      expect { lantern_server.autoresize_disk }.not_to raise_error
+    end
+  end
 end

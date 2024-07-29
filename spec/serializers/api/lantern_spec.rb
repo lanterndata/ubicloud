@@ -26,6 +26,7 @@ RSpec.describe Serializers::Api::Lantern do
       domain: "db.lanern.dev",
       target_vm_size: "standard-2",
       target_storage_size_gib: 10,
+      max_storage_autoresize_gib: 0,
       lantern_version: "0.2.2",
       extras_version: "0.1.2",
       minor_version: "1",
@@ -52,6 +53,7 @@ RSpec.describe Serializers::Api::Lantern do
       minor_version: "1",
       display_state: "running",
       instance_type: "writer",
+      max_storage_autoresize_gib: 0,
       hostname: "db.lantern.dev",
       connection_string: "postgres://postgres:test123@db.lantern.dev:6432")
     expect(lantern).to receive(:representative_server).and_return(nil).at_least(:once)
@@ -75,6 +77,7 @@ RSpec.describe Serializers::Api::Lantern do
       display_state: "running",
       instance_type: "writer",
       hostname: "db.lantern.dev",
+      max_storage_autoresize_gib: 0,
       connection_string: "postgres://postgres:test123@db.lantern.dev:6432",
       strand: instance_double(Strand, label: "wait"))
     expect(lantern).to receive(:representative_server).and_return(leader).at_least(:once)
@@ -99,6 +102,7 @@ RSpec.describe Serializers::Api::Lantern do
       display_state: "running",
       instance_type: "writer",
       hostname: "db.lantern.dev",
+      max_storage_autoresize_gib: 0,
       connection_string: "postgres://postgres:test123@db.lantern.dev:6432")
     expect(lantern).to receive(:representative_server).and_return(leader).at_least(:once)
     data = described_class.new(:default).serialize([lantern, lantern])

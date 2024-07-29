@@ -50,6 +50,7 @@ class Serializers::Api::Lantern < Serializers::Base
                    minor_version: _1.minor_version,
                    vm_size: _1.target_vm_size,
                    storage_size_gib: _1.target_storage_size_gib,
+                   max_storage_autoresize_gib: _1.max_storage_autoresize_gib,
                    connection_string: _1.connection_string
                  }
                }

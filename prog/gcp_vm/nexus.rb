@@ -15,7 +15,7 @@ class Prog::GcpVm::Nexus < Prog::Base
   extend Forwardable
   def_delegators :gcp_vm
 
-  semaphore :destroy, :start_vm, :stop_vm, :update_storage, :update_size
+  semaphore :destroy, :start_vm, :stop_vm, :update_storage, :update_size, :resize_data_disk
 
   def self.assemble(public_key, project_id, name: nil, size: "n1-standard-2",
     unix_user: "lantern", location: "us-central1", boot_image: Config.gcp_default_image,
@@ -163,6 +163,10 @@ class Prog::GcpVm::Nexus < Prog::Base
       hop_update_storage
     end
 
+    when_resize_data_disk_set? do
+      hop_resize_data_disk
+    end
+
     nap 30
   end
 
@@ -192,22 +196,42 @@ class Prog::GcpVm::Nexus < Prog::Base
     hop_wait_sshable
   end
 
+  label def resize_data_disk
+    decr_resize_data_disk
+    gcp_vm.sshable.cmd("sudo resize2fs /dev/sdb")
+    hop_wait
+  end
+
   label def update_storage
-    if !gcp_vm.is_stopped?
-      hop_stop_vm
-    end
-    decr_update_storage
     gcp_client = Hosting::GcpApis.new
     zone = "#{gcp_vm.location}-a"
     vm = gcp_client.get_vm(gcp_vm.name, zone)
-    disk_source = vm["disks"][0]["source"]
-    gcp_client.resize_vm_disk(zone, disk_source, gcp_vm.storage_size_gib)
+    boot_disk = vm["disks"][0]
+    data_disk = vm["disks"].find { !_1["boot"] }
+
+    if data_disk.nil? && !gcp_vm.is_stopped?
+      hop_stop_vm
+    end
+
+    decr_update_storage
+
+    disk = data_disk || boot_disk
+    gcp_client.resize_vm_disk(zone, disk["source"], gcp_vm.storage_size_gib)
+
+    if data_disk
+      incr_resize_data_disk
+    end
 
     when_update_size_set? do
       hop_update_size
     end
 
-    hop_start_vm
+    if gcp_vm.is_stopped?
+      hop_start_vm
+    end
+
+    gcp_vm.update(display_state: "running")
+    hop_wait
   end
 
   label def update_size

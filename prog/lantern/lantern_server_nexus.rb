@@ -15,7 +15,8 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
 
   def self.assemble(
     resource_id: nil, lantern_version: "0.2.2", extras_version: "0.1.4", minor_version: "1", domain: nil,
-    timeline_access: "push", representative_at: nil, target_vm_size: nil, target_storage_size_gib: 50, timeline_id: nil
+    timeline_access: "push", representative_at: nil, target_vm_size: nil, target_storage_size_gib: 50, timeline_id: nil,
+    max_storage_autoresize_gib: 0
   )
 
     DB.transaction do
@@ -48,7 +49,8 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
         timeline_access: timeline_access,
         timeline_id: timeline_id,
         representative_at: representative_at,
-        synchronization_status: representative_at ? "ready" : "catching_up"
+        synchronization_status: representative_at ? "ready" : "catching_up",
+        max_storage_autoresize_gib: max_storage_autoresize_gib
       )
 
       stack_frame = domain.nil? ? {} : {domain: domain}

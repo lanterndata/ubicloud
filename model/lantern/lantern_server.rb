@@ -236,6 +236,14 @@ SQL
       .map { _1.strip }
   end
 
+  def autoresize_disk
+    new_storage_size = (target_storage_size_gib * 1.5).clamp(..max_storage_autoresize_gib)
+    return if new_storage_size < target_storage_size_gib
+    update(target_storage_size_gib: new_storage_size)
+    vm.update(storage_size_gib: new_storage_size)
+    incr_update_storage_size
+  end
+
   # def failover_target
   #   nil
   # end
