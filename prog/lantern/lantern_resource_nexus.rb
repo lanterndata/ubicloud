@@ -15,7 +15,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, ubid: LanternResource.generate_ubid, ha_type: LanternResource::HaType::NONE, parent_id: nil, restore_target: nil, recovery_target_lsn: nil,
     org_id: nil, db_name: "postgres", db_user: "postgres", db_user_password: nil, superuser_password: nil, repl_password: nil, app_env: Config.rack_env,
     lantern_version: Config.lantern_default_version, extras_version: Config.lantern_extras_default_version, minor_version: Config.lantern_minor_default_version, domain: nil, enable_debug: false,
-    label: "", version_upgrade: false, logical_replication: false)
+    label: "", version_upgrade: false, logical_replication: false, max_storage_autoresize_gib: 0)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -98,6 +98,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
         target_storage_size_gib: target_storage_size_gib,
         timeline_id: timeline_id,
         timeline_access: timeline_access,
+        max_storage_autoresize_gib: max_storage_autoresize_gib,
         representative_at: Time.now
       )
 

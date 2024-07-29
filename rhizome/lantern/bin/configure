@@ -24,13 +24,13 @@ end
 def setup_memory_limits
   r "sudo sh -c 'echo vm.overcommit_ratio=100 >> /etc/sysctl.d/99-lantern.conf'"
   r "sudo sh -c 'echo vm.overcommit_memory=2 >> /etc/sysctl.d/99-lantern.conf'"
+  r "sudo sh -c 'echo vm.swappiness=10 >> /etc/sysctl.d/99-lantern.conf'"
   r "sudo sysctl -p /etc/sysctl.d/99-lantern.conf"
 end
 
 def setup_fs
   # Setup FS
   r "sudo mkdir -p #{$datadir}"
-  r "sudo chown -R 1001:1001 #{$datadir}"
   # Directory for configuration
   r "sudo mkdir -p #{$workdir}"
 
@@ -38,6 +38,19 @@ def setup_fs
   if $configure_hash["enable_coredumps"]
     r "sudo su -c 'echo \"/bitnami/postgresql/data/core.%e.%p.%t\" > /proc/sys/kernel/core_pattern'"
   end
+
+  # Add swap
+  r "sudo fallocate -l 1G /swapfile"
+  r "sudo chmod 600 /swapfile"
+  r "sudo mkswap /swapfile"
+  r "sudo swapon /swapfile"
+
+  # Mount data volume
+  r "sudo mkfs.ext4 /dev/sdb"
+  r "sudo mount /dev/sdb #{$datadir}"
+  r "sudo su -c \"echo '/dev/sdb #{$datadir} ext4 defaults 0 0' >> /etc/fstab\""
+
+  r "sudo chown -R 1001:1001 #{$datadir}"
 end
 
 def setup_env

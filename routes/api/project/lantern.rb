@@ -47,6 +47,7 @@ class CloverApi
         org_id: r.params["org_id"].to_i,
         target_vm_size: parsed_size.vm_size,
         target_storage_size_gib: r.params["storage_size_gib"] || parsed_size.storage_size_gib,
+        max_storage_autoresize_gib: r.params["max_storage_autoresize_gib"].to_i,
         lantern_version: r.params["lantern_version"],
         extras_version: r.params["extras_version"],
         minor_version: r.params["minor_version"],

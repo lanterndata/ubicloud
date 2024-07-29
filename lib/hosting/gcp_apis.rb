@@ -71,9 +71,19 @@ class Hosting::GcpApis
           boot: true,
           deviceName: "#{name}-boot",
           initializeParams: {
-            diskSizeGb: disk_size_gb,
+            diskSizeGb: 25,
             diskType: "projects/#{@project}/zones/#{zone}/diskTypes/pd-ssd",
             sourceImage: image
+          },
+          mode: "READ_WRITE",
+          type: "PERSISTENT"
+        },
+        {
+          autoDelete: true,
+          deviceName: "#{name}-data",
+          initializeParams: {
+            diskSizeGb: disk_size_gb,
+            diskType: "projects/#{@project}/zones/#{zone}/diskTypes/pd-ssd"
           },
           mode: "READ_WRITE",
           type: "PERSISTENT"

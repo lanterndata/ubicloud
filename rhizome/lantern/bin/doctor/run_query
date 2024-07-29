@@ -94,14 +94,41 @@ SQL
     failed ? "t" : "f"
   end
 
+  # return usage percent or 0 if device does not exist
+  def self.usage_percent(device_name, subtract_tmp)
+    total = (r "df | awk '$1 == \"#{device_name}\" {print $2}'").chomp.strip.to_i
+
+    return 0 if total == 0 # the device does not exist
+
+    fs_reserved_space = (total * 0.05).clamp(..5 * 1024 * 1024)
+    effective_total_space = total - fs_reserved_space
+    used = (r "df | awk '$1 == \"#{device_name}\" {print $3}'").chomp.strip.to_i
+    pg_tmp = if subtract_tmp
+      (r "(du -s #{$datadir}/data/base/pgsql_tmp/ 2>/dev/null || echo \"0\" )| awk '{print $1}'").chomp.strip.to_i
+    else
+      0
+    end
+
+    available = effective_total_space - (used - pg_tmp)
+
+    100 - (available.to_f / effective_total_space * 100).to_i
+  end
+
   def self.check_disk_space_usage(db, query_user)
     server_type = $configure_hash["server_type"]
     output = ""
-    usage_percent = r("df | awk '$1 == \"/dev/root\" {print $5}' | sed 's/%//'").chomp.strip.to_i
-    if usage_percent > 90
-      output += "#{server_type} server - usage #{usage_percent}%\n"
-      remove_dangling_images(db, query_user)
-    end
+
+    ["/dev/root", "/dev/sdb"].each {
+      usage_percent = self.usage_percent _1, _1 == "/dev/sdb"
+      if usage_percent > 90
+        output += "#{server_type} server (#{_1}) - usage #{usage_percent}%\n"
+
+        if _1 == "/dev/root"
+          remove_dangling_images(db, query_user)
+        end
+      end
+    }
+
     output.chomp
   end
 

@@ -222,34 +222,73 @@ RSpec.describe Prog::GcpVm::Nexus do
       expect { nx.wait }.to hop("update_size")
     end
 
+    it "hops to resize_data_disk" do
+      expect(nx).to receive(:when_resize_data_disk_set?).and_yield
+      expect { nx.wait }.to hop("resize_data_disk")
+    end
+
     it "naps 30s" do
       expect { nx.wait }.to nap(30)
     end
   end
 
+  describe "#resize_data_disk" do
+    it "resizes data disk" do
+      expect(nx).to receive(:decr_resize_data_disk)
+      sshable = instance_double(Sshable, host: "1.1.1.1")
+      expect(gcp_vm).to receive(:sshable).and_return(sshable).at_least(:once)
+      expect(gcp_vm.sshable).to receive(:cmd).with("sudo resize2fs /dev/sdb")
+      expect { nx.resize_data_disk }.to hop("wait")
+    end
+  end
+
   describe "#update_storage" do
     it "stops vm before updating" do
+      gcp_api = instance_double(Hosting::GcpApis)
+      expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
+      expect(gcp_api).to receive(:get_vm).with("dummy-vm", "us-central1-a").and_return({"disks" => [{"source" => "https://compute.googleapis.com/compute/v1/projects/test/zones/us-central1-a/disks/test-disk", "boot" => true}]})
       expect(gcp_vm).to receive(:is_stopped?).and_return(false)
       expect { nx.update_storage }.to hop("stop_vm")
     end
 
     it "resizes vm disk" do
-      expect(gcp_vm).to receive(:is_stopped?).and_return(true)
+      expect(gcp_vm).to receive(:is_stopped?).and_return(true).at_least(:once)
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
-      expect(gcp_api).to receive(:get_vm).with("dummy-vm", "us-central1-a").and_return({"disks" => [{"source" => "https://compute.googleapis.com/compute/v1/projects/test/zones/us-central1-a/disks/test-disk"}]})
+      expect(gcp_api).to receive(:get_vm).with("dummy-vm", "us-central1-a").and_return({"disks" => [{"source" => "https://compute.googleapis.com/compute/v1/projects/test/zones/us-central1-a/disks/test-disk", "boot" => true}]})
       expect(gcp_api).to receive(:resize_vm_disk).with("us-central1-a", "https://compute.googleapis.com/compute/v1/projects/test/zones/us-central1-a/disks/test-disk", 50)
       expect { nx.update_storage }.to hop("start_vm")
     end
 
     it "resizes vm disk and hop to vm size update" do
-      expect(gcp_vm).to receive(:is_stopped?).and_return(true)
       expect(nx).to receive(:when_update_size_set?).and_yield
       gcp_api = instance_double(Hosting::GcpApis)
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
-      expect(gcp_api).to receive(:get_vm).with("dummy-vm", "us-central1-a").and_return({"disks" => [{"source" => "https://compute.googleapis.com/compute/v1/projects/test/zones/us-central1-a/disks/test-disk"}]})
+      expect(gcp_api).to receive(:get_vm).with("dummy-vm", "us-central1-a").and_return({"disks" => [{"source" => "https://compute.googleapis.com/compute/v1/projects/test/zones/us-central1-a/disks/test-disk", "boot" => true}]})
       expect(gcp_api).to receive(:resize_vm_disk).with("us-central1-a", "https://compute.googleapis.com/compute/v1/projects/test/zones/us-central1-a/disks/test-disk", 50)
+      expect(gcp_vm).to receive(:is_stopped?).and_return(true)
       expect { nx.update_storage }.to hop("update_size")
+    end
+
+    it "resizes vm data disk" do
+      gcp_api = instance_double(Hosting::GcpApis)
+      expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
+      expect(gcp_api).to receive(:get_vm).with("dummy-vm", "us-central1-a").and_return({"disks" => [{"source" => "https://compute.googleapis.com/compute/v1/projects/test/zones/us-central1-a/disks/test-disk", "boot" => false}]})
+      expect(gcp_api).to receive(:resize_vm_disk).with("us-central1-a", "https://compute.googleapis.com/compute/v1/projects/test/zones/us-central1-a/disks/test-disk", 50)
+      expect(gcp_vm).to receive(:is_stopped?).and_return(false)
+      expect(gcp_vm).to receive(:update).with(display_state: "running")
+      expect(nx).to receive(:incr_resize_data_disk)
+      expect { nx.update_storage }.to hop("wait")
+    end
+
+    it "resizes vm data disk when stopped" do
+      gcp_api = instance_double(Hosting::GcpApis)
+      expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
+      expect(gcp_api).to receive(:get_vm).with("dummy-vm", "us-central1-a").and_return({"disks" => [{"source" => "https://compute.googleapis.com/compute/v1/projects/test/zones/us-central1-a/disks/test-disk", "boot" => false}]})
+      expect(gcp_api).to receive(:resize_vm_disk).with("us-central1-a", "https://compute.googleapis.com/compute/v1/projects/test/zones/us-central1-a/disks/test-disk", 50)
+      expect(gcp_vm).to receive(:is_stopped?).and_return(true)
+      expect(nx).to receive(:incr_resize_data_disk)
+      expect { nx.update_storage }.to hop("start_vm")
     end
   end
 
