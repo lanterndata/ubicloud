@@ -2,8 +2,6 @@
 
 require "forwardable"
 
-require_relative "../../lib/util"
-
 class Prog::Lantern::LanternResourceNexus < Prog::Base
   subject_is :lantern_resource
 
