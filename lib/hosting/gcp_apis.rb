@@ -2,7 +2,6 @@
 
 require "googleauth"
 require "excon"
-require_relative "../../config"
 
 class Hosting::GcpApis
   def initialize

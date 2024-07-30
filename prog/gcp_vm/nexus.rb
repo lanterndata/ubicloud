@@ -7,8 +7,6 @@ require "shellwords"
 require "openssl"
 require "base64"
 
-require_relative "../../lib/hosting/gcp_apis"
-
 class Prog::GcpVm::Nexus < Prog::Base
   subject_is :gcp_vm
 
