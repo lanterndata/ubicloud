@@ -579,7 +579,10 @@ SQL
       if lantern_server.primary?
         lantern_server.timeline.incr_destroy
       else
-        lantern_server.resource.delete_replication_slot(lantern_server.ubid)
+        begin
+          lantern_server.resource.delete_replication_slot(lantern_server.ubid)
+        rescue
+        end
       end
       lantern_server.destroy
 
