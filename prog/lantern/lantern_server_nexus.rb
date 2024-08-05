@@ -11,7 +11,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   def_delegators :lantern_server, :vm
 
   semaphore :initial_provisioning, :update_user_password, :update_lantern_extension, :update_extras_extension, :update_image, :add_domain, :update_rhizome, :checkup
-  semaphore :start_server, :stop_server, :restart_server, :take_over, :destroy, :update_storage_size, :update_vm_size, :update_memory_limits, :init_sql, :restart, :container_stopped
+  semaphore :start_server, :stop_server, :restart_server, :take_over, :destroy, :update_storage_size, :update_vm_size, :update_memory_limits, :init_sql, :restart, :container_stopped, :setup_ssl
 
   def self.assemble(
     resource_id: nil, lantern_version: "0.2.2", extras_version: "0.1.4", minor_version: "1", domain: nil,
@@ -350,8 +350,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     case vm.sshable.cmd("common/bin/daemonizer --check setup_ssl")
     when "Succeeded"
       vm.sshable.cmd("common/bin/daemonizer --clean setup_ssl")
-      decr_update_image
-      # Update lantern to build extension with march_native on the machine
+      decr_setup_ssl
       hop_wait_db_available
     when "NotStarted"
       vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/setup_ssl' setup_ssl", stdin: JSON.generate({
@@ -365,6 +364,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       Clog.emit("Lantern SSL Setup Failed for #{lantern_server.resource.name}") { {logs: logs, name: lantern_server.resource.name, lantern_server: lantern_server.id} }
       Prog::PageNexus.assemble_with_logs("Lantern SSL Setup Failed for #{lantern_server.resource.name}", [lantern_server.resource.ubid, lantern_server.ubid], logs, "error", "LanternSSLSetupFailed", lantern_server.ubid)
       vm.sshable.cmd("common/bin/daemonizer --clean setup_ssl")
+      decr_setup_ssl
       hop_wait
     end
     nap 10
@@ -427,6 +427,10 @@ SQL
 
     when_add_domain_set? do
       hop_add_domain
+    end
+
+    when_setup_ssl_set? do
+      hop_setup_ssl
     end
 
     # We will always update rhizome before updating extensions
@@ -492,6 +496,7 @@ SQL
     lantern_server.change_replication_mode("master")
 
     incr_initial_provisioning
+    incr_setup_ssl
     hop_wait_db_available
   end
 
