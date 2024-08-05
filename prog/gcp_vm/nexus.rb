@@ -70,18 +70,9 @@ class Prog::GcpVm::Nexus < Prog::Base
       gcp_client.assign_static_ipv4(gcp_vm.name, addr_info["address"], "#{gcp_vm.location}-a")
       gcp_vm.update(has_static_ipv4: true)
       gcp_vm.sshable.update(host: addr_info["address"])
-      hop_add_to_external_index_fw
+      hop_wait_sshable
     end
     nap 10
-  end
-
-  label def add_to_external_index_fw
-    gcp_client = Hosting::GcpApis.new
-    if Config.lantern_external_index_fw_name
-      gcp_client.add_ip_to_firewall(Config.lantern_external_index_fw_name, gcp_vm.sshable.host)
-    end
-
-    hop_wait_sshable
   end
 
   label def wait_create_vm
@@ -263,10 +254,6 @@ class Prog::GcpVm::Nexus < Prog::Base
       gcp_client.delete_vm(gcp_vm.name, "#{gcp_vm.location}-a")
       if gcp_vm.has_static_ipv4
         gcp_client.release_ipv4(gcp_vm.address_name, gcp_vm.location)
-      end
-
-      if Config.lantern_external_index_fw_name
-        gcp_client.remove_ip_from_firewall(Config.lantern_external_index_fw_name, gcp_vm.sshable.host)
       end
 
       strand.children.each { _1.destroy }

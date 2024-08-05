@@ -150,7 +150,6 @@ module Config
   override :lantern_default_version, "0.3.1", string
   override :lantern_extras_default_version, "0.2.3", string
   override :lantern_minor_default_version, "2", string
-  optional :lantern_external_index_fw_name, string
   override :lantern_backup_bucket, "walg-dev-backups"
   override :e2e_test, "0"
   override :backup_retention_days, 7, int
