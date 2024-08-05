@@ -722,6 +722,11 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect { nx.wait }.to hop("container_stopped")
     end
 
+    it "hops to setup_ssl" do
+      nx.incr_setup_ssl
+      expect { nx.wait }.to hop("setup_ssl")
+    end
+
     it "decrements checkup" do
       nx.incr_checkup
       expect(nx).to receive(:available?).and_return(true)
@@ -975,6 +980,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(current_master).to receive(:change_replication_mode).with("slave", update_env: false)
       expect(lantern_server).to receive(:change_replication_mode).with("master")
       expect(nx).to receive(:incr_initial_provisioning)
+      expect(nx).to receive(:incr_setup_ssl)
       expect { nx.promote_server }.to hop("wait_db_available")
     end
   end
