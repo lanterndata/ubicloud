@@ -454,5 +454,81 @@ RSpec.describe Hosting::GcpApis do
         expect { api.allow_access_to_big_query_dataset(service_account_email, dataset_id) }.not_to raise_error
       end
     end
+
+    describe "#add_ip_to_firewall" do
+      it "adds an IP to the firewall allow list" do
+        stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/test-project/global/firewalls/my-firewall-rule")
+          .to_return(status: 200, body: JSON.dump({
+            "name" => "my-firewall-rule",
+            "sourceRanges" => ["192.168.1.0/24"]
+          }), headers: {"Content-Type" => "application/json"})
+
+        stub_request(:put, "https://compute.googleapis.com/compute/v1/projects/test-project/global/firewalls/my-firewall-rule")
+          .with(body: JSON.dump({
+            "name" => "my-firewall-rule",
+            "sourceRanges" => ["192.168.1.0/24", "203.0.113.0/24"]
+          }))
+          .to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+
+        api = described_class.new
+        expect { api.add_ip_to_firewall("my-firewall-rule", "203.0.113.0/24") }.not_to raise_error
+      end
+
+      it "does not add IP to the firewall allow list if already exists" do
+        stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/test-project/global/firewalls/my-firewall-rule")
+          .to_return(status: 200, body: JSON.dump({
+            "name" => "my-firewall-rule",
+            "sourceRanges" => ["192.168.1.0/24", "203.0.113.0/24"]
+          }), headers: {"Content-Type" => "application/json"})
+
+        stub_request(:put, "https://compute.googleapis.com/compute/v1/projects/test-project/global/firewalls/my-firewall-rule")
+          .with(body: JSON.dump({
+            "name" => "my-firewall-rule",
+            "sourceRanges" => ["192.168.1.0/24", "203.0.113.0/24"]
+          }))
+          .to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+
+        api = described_class.new
+        expect { api.add_ip_to_firewall("my-firewall-rule", "203.0.113.0/24") }.not_to raise_error
+      end
+    end
+
+    describe "#remove_ip_from_firewall" do
+      it "remove an IP from the firewall allow list" do
+        stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/test-project/global/firewalls/my-firewall-rule")
+          .to_return(status: 200, body: JSON.dump({
+            "name" => "my-firewall-rule",
+            "sourceRanges" => ["192.168.1.0/24", "203.0.113.0/24"]
+          }), headers: {"Content-Type" => "application/json"})
+
+        stub_request(:put, "https://compute.googleapis.com/compute/v1/projects/test-project/global/firewalls/my-firewall-rule")
+          .with(body: JSON.dump({
+            "name" => "my-firewall-rule",
+            "sourceRanges" => ["192.168.1.0/24"]
+          }))
+          .to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+
+        api = described_class.new
+        expect { api.remove_ip_from_firewall("my-firewall-rule", "203.0.113.0/24") }.not_to raise_error
+      end
+
+      it "does not remove IP to the firewall allow list if already exists" do
+        stub_request(:get, "https://compute.googleapis.com/compute/v1/projects/test-project/global/firewalls/my-firewall-rule")
+          .to_return(status: 200, body: JSON.dump({
+            "name" => "my-firewall-rule",
+            "sourceRanges" => ["192.168.1.0/24"]
+          }), headers: {"Content-Type" => "application/json"})
+
+        stub_request(:put, "https://compute.googleapis.com/compute/v1/projects/test-project/global/firewalls/my-firewall-rule")
+          .with(body: JSON.dump({
+            "name" => "my-firewall-rule",
+            "sourceRanges" => ["192.168.1.0/24"]
+          }))
+          .to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+
+        api = described_class.new
+        expect { api.remove_ip_from_firewall("my-firewall-rule", "203.0.113.0/24") }.not_to raise_error
+      end
+    end
   end
 end

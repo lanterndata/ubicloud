@@ -453,4 +453,34 @@ class Hosting::GcpApis
     Hosting::GcpApis.check_errors(response)
     JSON.parse(response.body).merge({"resource_name" => "projects/#{@project}/global/images/#{name}"})
   end
+
+  def add_ip_to_firewall(firewall_name, ip_address)
+    connection = Excon.new(@host[:connection_string], headers: @host[:headers])
+
+    # Get the existing firewall rule
+    response = connection.get(path: "/compute/v1/projects/#{@project}/global/firewalls/#{firewall_name}", expects: [200, 404])
+    Hosting::GcpApis.check_errors(response)
+
+    firewall_rule = JSON.parse(response.body)
+    if !firewall_rule["sourceRanges"].include?(ip_address)
+      firewall_rule["sourceRanges"].push ip_address
+    end
+
+    response = connection.put(path: "/compute/v1/projects/#{@project}/global/firewalls/#{firewall_name}", body: JSON.dump(firewall_rule), expects: [200, 400])
+    Hosting::GcpApis.check_errors(response)
+  end
+
+  def remove_ip_from_firewall(firewall_name, ip_address)
+    connection = Excon.new(@host[:connection_string], headers: @host[:headers])
+
+    # Get the existing firewall rule
+    response = connection.get(path: "/compute/v1/projects/#{@project}/global/firewalls/#{firewall_name}", expects: [200, 404])
+    Hosting::GcpApis.check_errors(response)
+
+    firewall_rule = JSON.parse(response.body)
+    firewall_rule["sourceRanges"].delete ip_address
+
+    response = connection.put(path: "/compute/v1/projects/#{@project}/global/firewalls/#{firewall_name}", body: JSON.dump(firewall_rule), expects: [200, 400])
+    Hosting::GcpApis.check_errors(response)
+  end
 end
