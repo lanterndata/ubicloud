@@ -2,6 +2,7 @@
 
 require_relative "../../model/spec_helper"
 require "netaddr"
+require "googleauth"
 
 RSpec.describe Prog::GcpVm::Nexus do
   subject(:nx) {
@@ -106,7 +107,7 @@ RSpec.describe Prog::GcpVm::Nexus do
       expect { nx.wait_ipv4 }.to nap(10)
     end
 
-    it "hops to wait_sshable after assigning ipv4" do
+    it "hops to add_to_external_index_fw after assigning ipv4" do
       sshable = instance_double(Sshable)
       expect(gcp_vm).to receive(:sshable).and_return(sshable)
       gcp_api = instance_double(Hosting::GcpApis)
@@ -117,7 +118,24 @@ RSpec.describe Prog::GcpVm::Nexus do
       expect(gcp_api).to receive(:assign_static_ipv4).with("dummy-vm", "1.1.1.1", "us-central1-a")
       expect(gcp_vm).to receive(:update).with({has_static_ipv4: true})
       expect(sshable).to receive(:update).with({host: "1.1.1.1"})
-      expect { nx.wait_ipv4 }.to hop("wait_sshable")
+      expect { nx.wait_ipv4 }.to hop("add_to_external_index_fw")
+    end
+
+    it "hops to wait_sshable if external index fw is not set" do
+      expect(Config).to receive(:lantern_external_index_fw_name).and_return(nil)
+      gcp_api = instance_double(Hosting::GcpApis)
+      expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
+      expect { nx.add_to_external_index_fw }.to hop("wait_sshable")
+    end
+
+    it "adds ip to external inedx fw" do
+      expect(Config).to receive(:lantern_external_index_fw_name).and_return("test-fw").at_least(:once)
+      sshable = instance_double(Sshable, host: "1.1.1.1")
+      expect(gcp_vm).to receive(:sshable).and_return(sshable)
+      gcp_api = instance_double(Hosting::GcpApis)
+      expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
+      expect(gcp_api).to receive(:add_ip_to_firewall).with("test-fw", "1.1.1.1")
+      expect { nx.add_to_external_index_fw }.to hop("wait_sshable")
     end
   end
 
@@ -179,10 +197,14 @@ RSpec.describe Prog::GcpVm::Nexus do
       expect(Hosting::GcpApis).to receive(:new).and_return(gcp_api)
       expect(gcp_api).to receive(:delete_vm).with("dummy-vm", "us-central1-a")
       expect(gcp_vm).to receive(:address_name).and_return("dummy-vm-addr")
+      sshable = instance_double(Sshable, host: "1.1.1.1")
+      expect(gcp_vm).to receive(:sshable).and_return(sshable).at_least(:once)
       expect(gcp_api).to receive(:release_ipv4).with("dummy-vm-addr", "us-central1")
       page = instance_double(LanternDoctorPage)
       expect(page).to receive(:resolve)
       expect(LanternDoctorPage).to receive(:where).and_return([page])
+      expect(Config).to receive(:lantern_external_index_fw_name).and_return("test-fw").at_least(:once)
+      expect(gcp_api).to receive(:remove_ip_from_firewall).with("test-fw", "1.1.1.1")
       expect { nx.destroy }.to exit({"msg" => "gcp vm deleted"})
     end
   end
