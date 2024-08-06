@@ -771,4 +771,16 @@ SQL
       expect { lantern_server.autoresize_disk }.not_to raise_error
     end
   end
+
+  describe "#query_string" do
+    it "requires ssl if there's domain" do
+      expect(lantern_server).to receive(:domain).and_return("db.lantern.dev").at_least(:once)
+      expect(lantern_server.query_string).to eq("sslmode=require")
+    end
+
+    it "does not add query string if there's no domain" do
+      expect(lantern_server).to receive(:domain).and_return(nil).at_least(:once)
+      expect(lantern_server.query_string).to be_nil
+    end
+  end
 end

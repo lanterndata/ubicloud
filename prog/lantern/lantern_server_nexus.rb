@@ -173,6 +173,12 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
 
     lantern_server.update(synchronization_status: "ready")
     lantern_server.resource.delete_replication_slot(lantern_server.ubid)
+
+    if !lantern_server.domain && !lantern_server.resource.representative_server.domain.nil?
+      add_domain_to_stack(lantern_server.resource.representative_server.domain)
+      incr_setup_ssl
+    end
+
     hop_wait_synchronization if lantern_server.resource.ha_type == LanternResource::HaType::SYNC
     hop_wait
   end
@@ -331,10 +337,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
 
     lantern_server.update(domain: frame["domain"])
 
-    current_frame = strand.stack.first
-    current_frame.delete("domain")
-    strand.modified!(:stack)
-    strand.save_changes
+    remove_domain_from_stack
 
     decr_add_domain
     register_deadline(:wait, 5 * 60)
@@ -346,24 +349,40 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     cf_client.delete_dns_record(lantern_server.domain)
   end
 
+  def add_domain_to_stack(domain)
+    current_frame = strand.stack.first
+    current_frame["domain"] = domain
+    strand.modified!(:stack)
+    strand.save_changes
+  end
+
+  def remove_domain_from_stack
+    current_frame = strand.stack.first
+    current_frame.delete("domain")
+    strand.modified!(:stack)
+    strand.save_changes
+  end
+
   label def setup_ssl
     case vm.sshable.cmd("common/bin/daemonizer --check setup_ssl")
     when "Succeeded"
       vm.sshable.cmd("common/bin/daemonizer --clean setup_ssl")
       decr_setup_ssl
+      remove_domain_from_stack
       hop_wait_db_available
     when "NotStarted"
       vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/setup_ssl' setup_ssl", stdin: JSON.generate({
         dns_token: Config.cf_token,
         dns_zone_id: Config.cf_zone_id,
         dns_email: Config.lantern_dns_email,
-        domain: lantern_server.domain
+        domain: frame["domain"] || lantern_server.domain
       }))
     when "Failed"
       logs = JSON.parse(vm.sshable.cmd("common/bin/daemonizer --logs setup_ssl"))
       Clog.emit("Lantern SSL Setup Failed for #{lantern_server.resource.name}") { {logs: logs, name: lantern_server.resource.name, lantern_server: lantern_server.id} }
       Prog::PageNexus.assemble_with_logs("Lantern SSL Setup Failed for #{lantern_server.resource.name}", [lantern_server.resource.ubid, lantern_server.ubid], logs, "error", "LanternSSLSetupFailed", lantern_server.ubid)
       vm.sshable.cmd("common/bin/daemonizer --clean setup_ssl")
+      remove_domain_from_stack
       decr_setup_ssl
       hop_wait
     end
@@ -496,7 +515,6 @@ SQL
     lantern_server.change_replication_mode("master")
 
     incr_initial_provisioning
-    incr_setup_ssl
     hop_wait_db_available
   end
 

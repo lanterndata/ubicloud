@@ -305,9 +305,12 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
 
     it "hops to wait_synchronization" do
-      leader = instance_double(LanternServer)
+      leader = instance_double(LanternServer, domain: "db.lantern.dev")
+      expect(nx).to receive(:add_domain_to_stack).with(leader.domain)
+      expect(nx).to receive(:incr_setup_ssl)
+      expect(lantern_server).to receive(:domain).and_return(nil)
       expect(lantern_server).to receive(:update).with({synchronization_status: "ready"})
-      expect(lantern_server.resource).to receive(:representative_server).and_return(leader)
+      expect(lantern_server.resource).to receive(:representative_server).and_return(leader).at_least(:once)
       expect(lantern_server.resource).to receive(:ha_type).and_return(LanternResource::HaType::SYNC)
       expect(lantern_server.resource).to receive(:delete_replication_slot).with(lantern_server.ubid)
       expect(leader).to receive(:run_query).and_return((1 * 1024 * 1024).to_s)
@@ -315,9 +318,9 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
 
     it "hops to wait" do
-      leader = instance_double(LanternServer)
+      leader = instance_double(LanternServer, domain: nil)
       expect(lantern_server).to receive(:update).with({synchronization_status: "ready"})
-      expect(lantern_server.resource).to receive(:representative_server).and_return(leader)
+      expect(lantern_server.resource).to receive(:representative_server).and_return(leader).at_least(:once)
       expect(lantern_server.resource).to receive(:ha_type).and_return(LanternResource::HaType::ASYNC)
       expect(lantern_server.resource).to receive(:delete_replication_slot).with(lantern_server.ubid)
       expect(leader).to receive(:run_query).and_return((1 * 1024 * 1024).to_s)
@@ -593,7 +596,46 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
   end
 
+  describe "#add_domain_to_stack" do
+    it "adds domain to current frame" do
+      domain = "db.lantern.dev"
+      frame = {}
+      expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(frame).to receive(:[]=).with("domain", domain)
+      expect(nx.strand).to receive(:modified!).with(:stack)
+      expect(nx.strand).to receive(:save_changes)
+      expect { nx.add_domain_to_stack(domain) }.not_to raise_error
+    end
+  end
+
+  describe "#remove_domain_from_stack" do
+    it "removes domain from current frame" do
+      domain = "db.lantern.dev"
+      frame = {"domain" => domain}
+      expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(frame).to receive(:delete).with("domain")
+      expect(nx.strand).to receive(:modified!).with(:stack)
+      expect(nx.strand).to receive(:save_changes)
+      expect { nx.remove_domain_from_stack }.not_to raise_error
+    end
+  end
+
   describe "#setup_ssl" do
+    it "calls setup ssl with domain from frame and naps" do
+      expect(nx).to receive(:frame).and_return({"domain" => "db.lantern.dev"})
+      expect(Config).to receive(:cf_token).and_return("test_cf_token").at_least(:once)
+      expect(Config).to receive(:cf_zone_id).and_return("test_zone_id").at_least(:once)
+      expect(Config).to receive(:lantern_dns_email).and_return("test@example.com").at_least(:once)
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check setup_ssl").and_return("NotStarted")
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/setup_ssl' setup_ssl", stdin: JSON.generate({
+        dns_token: Config.cf_token,
+        dns_zone_id: Config.cf_zone_id,
+        dns_email: Config.lantern_dns_email,
+        domain: "db.lantern.dev"
+      }))
+      expect { nx.setup_ssl }.to nap(10)
+    end
+
     it "calls setup ssl and naps" do
       expect(lantern_server).to receive(:domain).and_return("example.com").at_least(:once)
       expect(Config).to receive(:cf_token).and_return("test_cf_token").at_least(:once)
@@ -617,6 +659,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     it "sets up ssl and hops to wait_db_available" do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check setup_ssl").and_return("Succeeded")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean setup_ssl")
+      expect(nx).to receive(:remove_domain_from_stack)
       expect { nx.setup_ssl }.to hop("wait_db_available")
     end
 
@@ -626,6 +669,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       logs = {"stdout" => "", "stderr" => "oom"}
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --logs setup_ssl").and_return(JSON.generate(logs))
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean setup_ssl")
+      expect(nx).to receive(:remove_domain_from_stack)
       expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Lantern SSL Setup Failed for test", [lantern_server.resource.ubid, lantern_server.ubid], logs, "error", "LanternSSLSetupFailed", lantern_server.ubid)
       expect { nx.setup_ssl }.to hop("wait")
     end
@@ -980,7 +1024,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(current_master).to receive(:change_replication_mode).with("slave", update_env: false)
       expect(lantern_server).to receive(:change_replication_mode).with("master")
       expect(nx).to receive(:incr_initial_provisioning)
-      expect(nx).to receive(:incr_setup_ssl)
       expect { nx.promote_server }.to hop("wait_db_available")
     end
   end
