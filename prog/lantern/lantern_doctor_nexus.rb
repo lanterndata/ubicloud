@@ -100,6 +100,7 @@ class Prog::Lantern::LanternDoctorNexus < Prog::Base
           end
 
           if status == "Failed"
+            # unexpected failure
             all_output = [{"db" => "*", "result" => logs["stdout"][..200], "err" => logs["stderr"], "success" => false}] + all_output.select { _1["success"] }
           else
             # resolve errored page if exists
