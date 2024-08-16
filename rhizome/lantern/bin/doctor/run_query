@@ -52,7 +52,7 @@ def run_for_db(db)
     err = e.message
   end
 
-  [success, {db: db, result: output, err: err, success: success}]
+  {db: db, result: output, err: err, success: success}
 end
 
 class SystemQueries
@@ -193,10 +193,7 @@ if is_system && fn_label && !SystemQueries.respond_to?(fn_label)
 end
 
 dbs.each do |db|
-  success, res = run_for_db(db)
-  if !success
-    exit_code = 1
-  end
+  res = run_for_db(db)
   response.push(res)
 end
 
