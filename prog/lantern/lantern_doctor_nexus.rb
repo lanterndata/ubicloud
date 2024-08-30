@@ -108,12 +108,17 @@ class Prog::Lantern::LanternDoctorNexus < Prog::Base
           end
 
           condition = "healthy"
+          failed_count = 0
           all_output.each do |output|
             if !output["success"]
               condition = "failed"
+              failed_count += 1
             end
 
-            query.update_page_status(output["db"], vm.name, output["success"], output["result"], output["err"])
+            # if many databases in the cluster failed the healthcheck send maximum 2 alerts to not spam
+            if output["success"] || failed_count < 3
+              query.update_page_status(output["db"], vm.name, output["success"], output["result"], output["err"])
+            end
           end
 
           query.update(condition: condition, last_checked: Time.new)
