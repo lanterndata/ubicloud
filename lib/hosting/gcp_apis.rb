@@ -483,4 +483,30 @@ class Hosting::GcpApis
     response = connection.put(path: "/compute/v1/projects/#{@project}/global/firewalls/#{firewall_name}", body: JSON.dump(firewall_rule), expects: [200, 400])
     Hosting::GcpApis.check_errors(response)
   end
+
+  def add_delete_lifecycle_rule(bucket, prefix)
+    connection = Excon.new("https://storage.googleapis.com", headers: @host[:headers])
+    query = {fields: "lifecycle"}
+
+    response = connection.get(path: "/storage/v1/b/#{bucket}", query: query, expects: [200, 400])
+    Hosting::GcpApis.check_errors(response)
+    data = JSON.parse(response.body)
+
+    lifecycle_rule = {
+      "action" => {"type" => "Delete"},
+      "condition" => {
+        age: 0,
+        matchesPrefix: [prefix]
+      }
+    }
+
+    if data.empty?
+      data = {"lifecycle" => {"rule" => [lifecycle_rule]}}
+    else
+      data["lifecycle"]["rule"].push(lifecycle_rule)
+    end
+
+    response = connection.patch(path: "/storage/v1/b/#{bucket}", query: query, body: JSON.dump(data), expects: [200, 400])
+    Hosting::GcpApis.check_errors(response)
+  end
 end

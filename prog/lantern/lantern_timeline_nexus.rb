@@ -85,14 +85,17 @@ class Prog::Lantern::LanternTimelineNexus < Prog::Base
   end
 
   label def destroy
-    decr_destroy
+    when_destroy_set? do
+      decr_destroy
+      nap 60 * 60 * 24 * 30 # 30 days
+    end
+
     destroy_blob_storage
     lantern_timeline.destroy
     pop "lantern timeline is deleted"
   end
 
   def destroy_blob_storage
-    # TODO
-    # Remove all backups
+    lantern_timeline.blob_storage_client.add_delete_lifecycle_rule(Config.lantern_backup_bucket, lantern_timeline.ubid)
   end
 end
