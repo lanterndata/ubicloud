@@ -185,9 +185,24 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
   end
 
   describe "#destroy" do
-    it "exits with message" do
+    it "naps for one month" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect { nx.destroy }.to nap(60 * 60 * 24 * 30)
+    end
+
+    it "destroys storage" do
+      expect(nx).to receive(:destroy_blob_storage)
       expect(lantern_server.timeline).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "lantern timeline is deleted"})
+    end
+  end
+
+  describe "#destroy_blob_storage" do
+    it "deletes objects" do
+      api = instance_double(Hosting::GcpApis)
+      expect(lantern_server.timeline).to receive(:blob_storage_client).and_return(api)
+      expect(api).to receive(:add_delete_lifecycle_rule).with(Config.lantern_backup_bucket, lantern_server.timeline.ubid)
+      expect { nx.destroy_blob_storage }.not_to raise_error
     end
   end
 end
