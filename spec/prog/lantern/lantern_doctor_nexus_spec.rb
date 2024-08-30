@@ -194,6 +194,20 @@ RSpec.describe Prog::Lantern::LanternDoctorNexus do
         expect { nx.wait_queries }.to hop("wait")
       end
 
+      it "does not spam notifications" do
+        expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check test_query2").and_return("Succeeded")
+        expect(sshable).to receive(:cmd).with("common/bin/daemonizer --logs test_query2").and_return(JSON.generate({"stdout" => '[{"db": "test_db", "result": "success", "success": false }, {"db": "test_db2", "result": "success", "success": false }, {"db": "test_db3", "result": "success", "success": false }]', "stderr" => ""}))
+        expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean test_query2").and_return("cleaned")
+        query = instance_double(LanternDoctorQuery, servers: [server], db_name: "postgres", task_name: "test_query2")
+        expect(lantern_doctor).to receive(:queries).and_return([query])
+        expect(query).to receive(:update_page_status).with("*", vm.name, true, nil, nil)
+        expect(query).to receive(:update_page_status).with("test_db", vm.name, false, "success", nil)
+        expect(query).to receive(:update_page_status).with("test_db2", vm.name, false, "success", nil)
+        expect(query).to receive(:update).with(condition: "failed", last_checked: instance_of(Time))
+
+        expect { nx.wait_queries }.to hop("wait")
+      end
+
       it "handles update_needed" do
         query = instance_double(LanternDoctorQuery, servers: [server], db_name: "postgres", task_name: "test_query")
         expect(lantern_doctor).to receive(:queries).and_return([query])
