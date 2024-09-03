@@ -61,7 +61,7 @@ class LanternServer < Sequel::Model
   end
 
   def run_query(query, db: "postgres", user: "postgres")
-    vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} exec -T postgresql psql -q -U #{user} -t --csv #{db}", stdin: query).chomp
+    vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} exec -T postgresql psql -q -U #{user} -p6432 -t --csv #{db}", stdin: query).chomp
   end
 
   def run_query_all(query)
@@ -242,7 +242,7 @@ SQL
   end
 
   def list_all_databases
-    vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} exec postgresql psql -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'")
+    vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} exec postgresql psql -p6432 -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'")
       .chomp
       .strip
       .split("\n")

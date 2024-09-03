@@ -10,7 +10,7 @@ $configure_hash = JSON.parse($stdin.read)
 dbs = $configure_hash["dbs"]
 
 def exec_sql(sql, user: "postgres", db: "postgres")
-  r("docker compose -f #{$compose_file} exec -T postgresql psql -q -U #{user} -t --csv #{db}", stdin: sql).chomp.strip
+  r("docker compose -f #{$compose_file} exec -T postgresql psql -q -U #{user} -p6432 -t --csv #{db}", stdin: sql).chomp.strip
 end
 
 def run_for_db(db)
