@@ -75,7 +75,7 @@ def setup_env
       f.puts("PROMETHEUS_WRITER_PASSWORD=#{$configure_hash["prom_password"]}")
       f.puts("PROMETHEUS_WRITER_URL=https://prometheus.lantern.dev/api/v1/write")
       f.puts("POSTGRESQL_ENABLE_COREDUMPS=#{$configure_hash["enable_coredumps"]}")
-      f.puts("ENABLE_TELEMETRY=#{$configure_hash["enable_telemetry"]}")
+      f.puts("ENABLE_TELEMETRY=#{$configure_hash["enable_telemetry"] ? 'yes' : 'no'}")
       f.puts("GOOGLE_APPLICATION_CREDENTIALS_B64=#{$configure_hash["gcp_creds_coredumps_b64"]}")
       f.puts("GOOGLE_APPLICATION_CREDENTIALS_WALG_B64=#{$configure_hash["gcp_creds_walg_b64"]}")
       f.puts("WALG_GS_PREFIX=#{$configure_hash["walg_gs_prefix"]}")
