@@ -99,7 +99,7 @@ class Prog::GcpVm::Nexus < Prog::Base
     gcp_vm.set_failed_on_deadline
     gcp_client = Hosting::GcpApis.new
     labels = frame["labels"]
-    gcp_client.create_vm(gcp_vm.name, "#{gcp_vm.location}-a", gcp_vm.boot_image, gcp_vm.public_key, gcp_vm.unix_user, "#{gcp_vm.family}-#{gcp_vm.cores}", gcp_vm.storage_size_gib, labels: labels)
+    gcp_client.create_vm(gcp_vm.name, "#{gcp_vm.location}-a", gcp_vm.boot_image, gcp_vm.public_key, gcp_vm.unix_user, "#{gcp_vm.family}-#{gcp_vm.cores}", gcp_vm.storage_size_gib, use_local_ssd: true, labels: labels)
 
     # remove labels from stack
     current_frame = strand.stack.first

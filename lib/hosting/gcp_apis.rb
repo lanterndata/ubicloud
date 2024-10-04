@@ -53,9 +53,35 @@ class Hosting::GcpApis
     zone[..-3]
   end
 
-  def create_vm(name, zone, image, ssh_key, user, machine_type, disk_size_gb, labels: {})
+  def create_vm(name, zone, image, ssh_key, user, machine_type, disk_size_gb, use_local_ssd: false, labels: {})
     region = get_region_from_zone(zone)
     connection = Excon.new(@host[:connection_string], headers: @host[:headers])
+
+    data_disk = if use_local_ssd
+      {
+        autoDelete: true,
+        deviceName: "#{name}-data",
+        initializeParams: {
+          diskSizeGb: "375",
+          diskType: "projects/#{@project}/zones/#{zone}/diskTypes/local-ssd"
+        },
+        interface: "NVME",
+        mode: "READ_WRITE",
+        type: "SCRATCH"
+      }
+    else
+      {
+        autoDelete: true,
+        deviceName: "#{name}-data",
+        initializeParams: {
+          diskSizeGb: disk_size_gb,
+          diskType: "projects/#{@project}/zones/#{zone}/diskTypes/pd-ssd"
+        },
+        mode: "READ_WRITE",
+        type: "PERSISTENT"
+      }
+
+    end
     instance = {
       name: name,
       canIpForward: false,
@@ -77,16 +103,7 @@ class Hosting::GcpApis
           mode: "READ_WRITE",
           type: "PERSISTENT"
         },
-        {
-          autoDelete: true,
-          deviceName: "#{name}-data",
-          initializeParams: {
-            diskSizeGb: disk_size_gb,
-            diskType: "projects/#{@project}/zones/#{zone}/diskTypes/pd-ssd"
-          },
-          mode: "READ_WRITE",
-          type: "PERSISTENT"
-        }
+        data_disk
       ],
       displayDevice: {
         enableDisplay: false

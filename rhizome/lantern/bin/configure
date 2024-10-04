@@ -46,9 +46,9 @@ def setup_fs
   r "sudo swapon /swapfile"
 
   # Mount data volume
-  r "sudo mkfs.ext4 /dev/sdb"
-  r "sudo mount /dev/sdb #{$datadir}"
-  r "sudo su -c \"echo '/dev/sdb #{$datadir} ext4 defaults 0 0' >> /etc/fstab\""
+  r "sudo mkfs.ext4 /dev/nvme0"
+  r "sudo mount /dev/nvme0 #{$datadir}"
+  r "sudo su -c \"echo '/dev/nvme0 #{$datadir} ext4 defaults 0 0' >> /etc/fstab\""
 
   r "sudo chown -R 1001:1001 #{$datadir}"
 end
