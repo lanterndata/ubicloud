@@ -15,8 +15,8 @@ end
 
 version = $configure_hash["version"]
 
-r "rm -rf /tmp/lantern-extras* || true"
-r "wget https://github.com/lanterndata/lantern_extras/releases/download/#{version}/lantern-extras-#{version}.tar -O /tmp/lantern-extras.tar"
-r "cd /tmp && tar xf lantern-extras.tar"
-r "cd /tmp/lantern-extras-#{version} && PG_CONFIG=#{$pg_mount_path}/bin/pg_config make install"
-r "rm -rf /tmp/lantern-extras*"
+r "rm -rf /tmp/lantern-* || true"
+r "wget https://github.com/lanterndata/lantern/releases/download/v#{version}/lantern-#{version}.tar -O /tmp/lantern.tar"
+r "cd /tmp && tar xf lantern.tar"
+r "cd /tmp/lantern-#{version} && PG_CONFIG=#{$pg_mount_path}/bin/pg_config make -C lantern-extras-#{version} install"
+r "rm -rf /tmp/lantern*"
