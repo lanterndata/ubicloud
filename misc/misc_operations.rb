@@ -222,7 +222,6 @@ chmod +x /tmp/get-docker.sh
 rm -rf /tmp/get-docker.sh
 sudo sed -i 's/ulimit -Hn/ulimit -n/' /etc/init.d/docker
 sudo service docker restart
-echo #{Config.gcp_creds_gcr_b64} | base64 -d | sudo docker login -u _json_key --password-stdin https://gcr.io
 sudo docker pull #{container_image}
 sudo docker logout
 history -cw

@@ -136,13 +136,12 @@ module Config
   # GCP
   override :gcp_project_id, "lantern-development", string
   override :gcp_compute_service_account, "339254316100-compute@developer.gserviceaccount.com", string
-  optional :gcp_creds_gcr_b64, string
   optional :gcp_creds_logging_b64, string
   optional :gcp_creds_coredumps_b64, string
   optional :gcp_creds_walg_b64, string
   optional :prom_password, string
   override :gcp_default_image, "projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy-v20240319", string
-  override :gcr_image, "gcr.io/ringed-griffin-394922/lantern-bitnami"
+  override :gcr_image, "lanterndata/lantern-self-hosted"
 
   # Lantern
   override :lantern_top_domain, "db.lantern.dev", string

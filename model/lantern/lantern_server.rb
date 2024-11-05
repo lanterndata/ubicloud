@@ -140,7 +140,6 @@ class LanternServer < Sequel::Model
       master_host: resource.representative_server.hostname,
       master_port: 5432,
       prom_password: Config.prom_password,
-      gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
       gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
       gcp_creds_logging_b64: Config.gcp_creds_logging_b64,
       container_image: "#{Config.gcr_image}:lantern-#{lantern_version}-extras-#{extras_version}-minor-#{minor_version}",

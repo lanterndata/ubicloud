@@ -148,7 +148,7 @@ end
 if $configure_hash[:skip_deps].nil?
   install_dependencies
   puts "dependencies installed"
-  configure_gcr($configure_hash["gcp_creds_gcr_b64"], $configure_hash["container_image"])
+  configure_gcr($configure_hash["container_image"])
   puts "GCR repo ready"
 end
 

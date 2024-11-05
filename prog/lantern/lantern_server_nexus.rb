@@ -119,10 +119,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   end
 
   label def setup_docker_stack
-    if !Config.gcp_creds_gcr_b64
-      raise "GCP_CREDS_GCR_B64 is required to setup docker stack for Lantern"
-    end
-
     # wait for service account to be created
     nap 10 if lantern_server.timeline.strand.label == "start"
 
@@ -307,7 +303,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       hop_update_lantern_extension
     when "NotStarted"
       vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/update_docker_image' update_docker_image", stdin: JSON.generate({
-        gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
         container_image: lantern_server.container_image
       }))
     when "Failed"

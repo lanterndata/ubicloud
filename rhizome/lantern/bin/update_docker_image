@@ -9,9 +9,8 @@ require_relative "../lib/common"
 $configure_hash = JSON.parse($stdin.read)
 
 container_image = $configure_hash["container_image"]
-gcp_creds_gcr_b64 = $configure_hash["gcp_creds_gcr_b64"]
 
-configure_gcr(gcp_creds_gcr_b64, container_image)
+configure_gcr(container_image)
 map = YAML.load_file $compose_file
 map["services"]["postgresql"]["image"] = container_image
 

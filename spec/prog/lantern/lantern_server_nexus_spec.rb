@@ -206,17 +206,10 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
     it "naps if timeline is not ready" do
       expect(lantern_server.timeline).to receive(:strand).and_return(instance_double(Strand, label: "start"))
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds")
       expect { nx.setup_docker_stack }.to nap(10)
     end
 
-    it "raises if gcr credentials are not provided" do
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return(nil)
-      expect { nx.setup_docker_stack }.to raise_error "GCP_CREDS_GCR_B64 is required to setup docker stack for Lantern"
-    end
-
     it "calls setup if not started" do
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_lantern").and_return("NotStarted")
       expect(lantern_server).to receive(:configure_hash).and_return("test")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/configure' configure_lantern", stdin: "test")
@@ -224,7 +217,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
 
     it "calls setup if failed" do
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_lantern").and_return("Failed")
       expect(lantern_server).to receive(:configure_hash).and_return("test")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/configure' configure_lantern", stdin: "test")
@@ -232,7 +224,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
 
     it "calls add domain after succeeded" do
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_lantern").and_return("Succeeded")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_lantern")
       expect(nx).to receive(:frame).and_return({"domain" => "db.lantern.dev"})
@@ -243,7 +234,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
 
     it "hop to wait_db_available" do
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_lantern").and_return("Succeeded")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_lantern")
       expect(nx).to receive(:frame).and_return({})
@@ -253,7 +243,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
 
     it "naps if in progress" do
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_lantern").and_return("InProgress")
       expect { nx.setup_docker_stack }.to nap(5)
     end
@@ -523,11 +512,9 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
   describe "#update_image" do
     it "updates image and naps" do
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
       expect(lantern_server).to receive(:container_image).and_return("test-image").at_least(:once)
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check update_docker_image").and_return("NotStarted")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/update_docker_image' update_docker_image", stdin: JSON.generate({
-        gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
         container_image: lantern_server.container_image
       }))
       expect { nx.update_image }.to nap(10)

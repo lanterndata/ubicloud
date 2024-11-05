@@ -11,8 +11,7 @@ $env_file = "#{$workdir}/.env"
 $pg_mount_path = "#{$workdir}/pg"
 $container_name = "lantern-postgresql-1"
 
-def configure_gcr(gcp_creds_gcr_b64, container_image)
-  r "echo #{gcp_creds_gcr_b64} | base64 -d | sudo docker login -u _json_key --password-stdin https://gcr.io"
+def configure_gcr(container_image)
   r "sudo docker pull #{container_image}"
 end
 
