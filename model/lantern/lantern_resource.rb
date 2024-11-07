@@ -199,7 +199,7 @@ SQL
     representative_server.run_query_all("ALTER SUBSCRIPTION sub_#{ubid} DISABLE")
   end
 
-  def create_logical_replica(lantern_version: nil, extras_version: nil, minor_version: nil)
+  def create_logical_replica(lantern_version: nil, extras_version: nil, minor_version: nil, pg_upgrade: nil)
     # TODO::
     # 1. If new database will be created during logical replication it won't be added automatically
     # 2. New timeline will be generated for lantern resource
@@ -224,7 +224,9 @@ SQL
       logical_replication: true,
       lantern_version: lantern_version || representative_server.lantern_version,
       extras_version: extras_version || representative_server.extras_version,
-      minor_version: minor_version || representative_server.minor_version
+      minor_version: minor_version || representative_server.minor_version,
+      pg_version: pg_version,
+      pg_upgrade: pg_upgrade
     )
   end
 

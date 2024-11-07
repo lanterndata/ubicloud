@@ -1,0 +1,47 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "yaml"
+require_relative "../../common/lib/util"
+require_relative "../lib/common"
+
+$configure_hash = JSON.parse($stdin.read)
+data = YAML.load_file $compose_file
+
+container_image = $configure_hash["container_image"]
+old_pg_version = $configure_hash["old_pg_version"]
+current_container_image = data["services"]["postgresql"]["image"]
+
+r "sudo docker compose -f #{$compose_file} down -t 10"
+r "sudo mv #{$datadir}/data #{$datadir}/old-data-#{old_pg_version}"
+r "sudo docker rm -f tc 2>/dev/null || true"
+r "sudo docker create --name tc #{current_container_image}"
+r "sudo docker cp tc:/usr/lib/postgresql/#{old_pg_version}/lib #{$datadir}/old-lib-#{old_pg_version}"
+r "sudo docker cp tc:/usr/lib/postgresql/#{old_pg_version}/bin #{$datadir}/old-bin-#{old_pg_version}"
+r "sudo docker cp tc:/usr/share/postgresql/#{old_pg_version} #{$datadir}/old-share-#{old_pg_version}"
+r "sudo docker rm tc"
+r "sudo chown -R 1001:1001 #{$datadir}"
+
+append_env([
+  ["POSTGRESQL_RUN_PGUPGRADE", "yes"],
+  ["PGUPGRADE_OLD_VERSION", old_pg_version]
+])
+
+data["services"]["postgresql"]["image"] = container_image
+data["services"]["postgresql"]["user"] = "root"
+File.open($compose_file, "w") { |f| YAML.dump(data, f) }
+
+r "sudo docker compose -f #{$compose_file} up"
+
+data = YAML.load_file $compose_file
+data["services"]["postgresql"].delete("user")
+r "sudo rm -rf #{$datadir}/old-lib-#{old_pg_version} #{$datadir}/old-bin-#{old_pg_version} #{$datadir}/old-share-#{old_pg_version}"
+r "sudo chown -R 1001:1001 #{$datadir}"
+File.open($compose_file, "w") { |f| YAML.dump(data, f) }
+
+append_env([
+  ["POSTGRESQL_RUN_PGUPGRADE", "no"]
+])
+
+r "sudo docker compose -f #{$compose_file} up -d"

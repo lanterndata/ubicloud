@@ -10,13 +10,13 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   extend Forwardable
   def_delegators :lantern_server, :vm
 
-  semaphore :initial_provisioning, :update_user_password, :update_lantern_extension, :update_extras_extension, :update_image, :add_domain, :update_rhizome, :checkup
+  semaphore :initial_provisioning, :update_user_password, :update_lantern_extension, :update_extras_extension, :update_image, :add_domain, :update_rhizome, :checkup, :run_pg_upgrade
   semaphore :start_server, :stop_server, :restart_server, :take_over, :destroy, :update_storage_size, :update_vm_size, :update_memory_limits, :init_sql, :restart, :container_stopped, :setup_ssl
 
   def self.assemble(
     resource_id: nil, lantern_version: "0.2.2", extras_version: "0.1.4", minor_version: "1", domain: nil,
     timeline_access: "push", representative_at: nil, target_vm_size: nil, target_storage_size_gib: 50, timeline_id: nil,
-    max_storage_autoresize_gib: 0
+    max_storage_autoresize_gib: 0, pg_upgrade: nil
   )
 
     DB.transaction do
@@ -54,6 +54,10 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       )
 
       stack_frame = domain.nil? ? {} : {domain: domain}
+
+      if pg_upgrade
+        stack_frame["pg_upgrade"] = pg_upgrade
+      end
       Strand.create(prog: "Lantern::LanternServerNexus", label: "start", stack: [stack_frame]) { _1.id = lantern_server.id }
     end
   end
@@ -198,6 +202,8 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       end
     end
 
+    current_frame = strand.stack.first
+
     if !is_in_recovery
       timeline_id = Prog::Lantern::LanternTimelineNexus.assemble(parent_id: lantern_server.timeline.id).id
       lantern_server.timeline_id = timeline_id
@@ -218,12 +224,57 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
           incr_update_extras_extension
           lantern_server.update(extras_version: extras_version)
         end
+      elsif !current_frame["pg_upgrade"].nil?
+        incr_run_pg_upgrade
       end
 
       hop_wait_timeline_available
     end
 
     nap 5
+  end
+
+  label def run_pg_upgrade
+    decr_run_pg_upgrade
+    current_frame = strand.stack.first
+    resource = lantern_server.resource
+    pg_upgrade_info = current_frame["pg_upgrade"]
+    # prepare files
+    lantern_server.update(
+      lantern_version: pg_upgrade_info["lantern_version"],
+      extras_version: pg_upgrade_info["extras_version"],
+      minor_version: pg_upgrade_info["minor_version"]
+    )
+    vm.sshable.cmd(
+      "common/bin/daemonizer 'sudo lantern/bin/run_pg_upgrade' pg_upgrade",
+      stdin: JSON.generate({
+        container_image: lantern_server.container_image,
+        old_pg_version: resource.pg_version
+      })
+    )
+    resource.update(pg_version: pg_upgrade_info["pg_version"])
+    # run scripts
+    hop_wait_pg_upgrade
+  end
+
+  label def wait_pg_upgrade
+    current_frame = strand.stack.first
+    case vm.sshable.cmd("common/bin/daemonizer --check pg_upgrade")
+    when "Succeeded"
+      current_frame.delete("pg_upgrade")
+      strand.modified!(:stack)
+      strand.save_changes
+      vm.sshable.cmd("common/bin/daemonizer --clean pg_upgrade")
+      register_deadline(:wait, 40 * 60)
+      hop_init_sql
+    when "Failed"
+      logs = JSON.parse(vm.sshable.cmd("common/bin/daemonizer --logs pg_upgrade"))
+      Clog.emit("Postgres upgrade failed") { {logs: logs, name: lantern_server.resource.name, lantern_server: lantern_server.id} }
+      Prog::PageNexus.assemble_with_logs("Postgres update failed on #{lantern_server.resource.name} (#{lantern_server.resource.label})", [lantern_server.resource.ubid, lantern_server.ubid], logs, "critical", "LanternPGUpgradeFailed", lantern_server.ubid)
+      vm.sshable.cmd("common/bin/daemonizer --clean pg_upgrade")
+      hop_wait
+    end
+    nap 10
   end
 
   label def wait_timeline_available
@@ -417,6 +468,10 @@ SQL
         register_deadline(:wait, 5 * 60)
         hop_unavailable
       end
+    end
+
+    when_run_pg_upgrade_set? do
+      hop_run_pg_upgrade
     end
 
     when_update_user_password_set? do

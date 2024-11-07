@@ -99,6 +99,10 @@ class LanternServer < Sequel::Model
     standby? ? "reader" : "writer"
   end
 
+  def container_image
+    "#{Config.gcr_image}:lantern-#{lantern_version}-extras-#{extras_version}-minor-#{minor_version}"
+  end
+
   def configure_hash
     walg_config = timeline.generate_walg_config
     backup_label = ""
@@ -142,7 +146,7 @@ class LanternServer < Sequel::Model
       prom_password: Config.prom_password,
       gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
       gcp_creds_logging_b64: Config.gcp_creds_logging_b64,
-      container_image: "#{Config.gcr_image}:lantern-#{lantern_version}-extras-#{extras_version}-minor-#{minor_version}",
+      container_image: container_image,
       postgresql_recover_from_backup: backup_label,
       postgresql_recovery_target_time: postgresql_recovery_target_time,
       postgresql_recovery_target_lsn: postgresql_recovery_target_lsn,
@@ -172,10 +176,6 @@ class LanternServer < Sequel::Model
       ["GOOGLE_APPLICATION_CREDENTIALS_WALG_B64", walg_config[:gcp_creds_b64]],
       ["POSTGRESQL_RECOVER_FROM_BACKUP", ""]
     ]))
-  end
-
-  def container_image
-    "#{Config.gcr_image}:lantern-#{lantern_version}-extras-#{extras_version}-minor-#{minor_version}"
   end
 
   def init_health_monitor_session
