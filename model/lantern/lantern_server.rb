@@ -149,7 +149,8 @@ class LanternServer < Sequel::Model
       gcp_creds_walg_b64: walg_config[:gcp_creds_b64],
       walg_gs_prefix: walg_config[:walg_gs_prefix],
       gcp_creds_big_query_b64: resource.gcp_creds_b64,
-      big_query_dataset: Config.lantern_log_dataset
+      big_query_dataset: Config.lantern_log_dataset,
+      pg_version: resource.pg_version
     })
   end
 

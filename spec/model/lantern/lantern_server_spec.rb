@@ -273,6 +273,7 @@ RSpec.describe LanternServer do
         gcp_creds_b64: "test-creds",
         recovery_target_lsn: nil,
         representative_server: lantern_server,
+        pg_version: 17,
         restore_target: nil)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
       expect(Config).to receive(:gcp_creds_logging_b64).and_return("test-creds").at_least(:once)
@@ -315,7 +316,8 @@ RSpec.describe LanternServer do
         gcp_creds_walg_b64: walg_conf[:gcp_creds_b64],
         walg_gs_prefix: walg_conf[:walg_gs_prefix],
         gcp_creds_big_query_b64: resource.gcp_creds_b64,
-        big_query_dataset: Config.lantern_log_dataset
+        big_query_dataset: Config.lantern_log_dataset,
+        pg_version: 17
       })
       expect(lantern_server.configure_hash).to eq(expected_conf)
     end
@@ -339,6 +341,7 @@ RSpec.describe LanternServer do
         gcp_creds_b64: "test-creds",
         recovery_target_lsn: nil,
         representative_server: lantern_server,
+        pg_version: 17,
         restore_target: Time.now)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
       expect(Config).to receive(:gcp_creds_logging_b64).and_return("test-creds").at_least(:once)
@@ -381,7 +384,8 @@ RSpec.describe LanternServer do
         gcp_creds_walg_b64: walg_conf[:gcp_creds_b64],
         walg_gs_prefix: walg_conf[:walg_gs_prefix],
         gcp_creds_big_query_b64: resource.gcp_creds_b64,
-        big_query_dataset: Config.lantern_log_dataset
+        big_query_dataset: Config.lantern_log_dataset,
+        pg_version: 17
       })
       expect(lantern_server.configure_hash).to eq(expected_conf)
     end
@@ -405,6 +409,7 @@ RSpec.describe LanternServer do
         gcp_creds_b64: "test-creds",
         recovery_target_lsn: "16/B374D848",
         representative_server: lantern_server,
+        pg_version: 17,
         restore_target: nil)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
       expect(Config).to receive(:gcp_creds_logging_b64).and_return("test-creds").at_least(:once)
@@ -446,7 +451,8 @@ RSpec.describe LanternServer do
         gcp_creds_walg_b64: walg_conf[:gcp_creds_b64],
         walg_gs_prefix: walg_conf[:walg_gs_prefix],
         gcp_creds_big_query_b64: resource.gcp_creds_b64,
-        big_query_dataset: Config.lantern_log_dataset
+        big_query_dataset: Config.lantern_log_dataset,
+        pg_version: 17
       })
       expect(lantern_server.configure_hash).to eq(expected_conf)
     end
@@ -470,6 +476,7 @@ RSpec.describe LanternServer do
         gcp_creds_b64: "test-creds",
         recovery_target_lsn: "16/B374D848",
         representative_server: lantern_server,
+        pg_version: 17,
         restore_target: Time.now)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
       expect(Config).to receive(:gcp_creds_logging_b64).and_return("test-creds").at_least(:once)
@@ -513,7 +520,8 @@ RSpec.describe LanternServer do
         gcp_creds_walg_b64: walg_conf[:gcp_creds_b64],
         walg_gs_prefix: walg_conf[:walg_gs_prefix],
         gcp_creds_big_query_b64: resource.gcp_creds_b64,
-        big_query_dataset: Config.lantern_log_dataset
+        big_query_dataset: Config.lantern_log_dataset,
+        pg_version: 17
       })
       expect(lantern_server.configure_hash).to eq(expected_conf)
     end

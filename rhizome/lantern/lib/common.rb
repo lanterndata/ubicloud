@@ -37,9 +37,9 @@ def wait_for_pg
   end
 end
 
-def run_database(container_image)
+def run_database(container_image, pg_version)
   # Run database
-  volume_mount = "#{$pg_mount_path}:/opt/bitnami/postgresql"
+  volume_mount = "#{$pg_mount_path}:/usr/lib/postgresql/#{pg_version}"
   # Copy postgres fs to host to mount
   r "sudo rm -rf #{$pg_mount_path}"
   data = YAML.load_file $compose_file

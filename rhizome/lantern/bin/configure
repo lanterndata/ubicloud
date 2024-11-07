@@ -112,7 +112,7 @@ def setup_initial_compose_file
         "ports" => ["5432:5432", "6432:6432"],
         "volumes" => ["/var/lib/lantern-data:/bitnami/postgresql"],
         "deploy" => {
-          "restart_policy" => {"condition" => "always"},
+          "restart_policy" => {"condition" => "on-failure"},
           "resources" => {"limits" => {"memory" => memory_sizes[:shared_bufs]}}
         },
         "env_file" => $env_file,
@@ -159,5 +159,5 @@ setup_env
 puts ".env setted up"
 setup_initial_compose_file
 puts "docker-compose.yaml ready"
-run_database($configure_hash["container_image"])
+run_database($configure_hash["container_image"], $configure_hash["pg_version"])
 puts "database ready"

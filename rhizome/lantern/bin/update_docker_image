@@ -17,4 +17,4 @@ map["services"]["postgresql"]["image"] = container_image
 File.open($compose_file, "w") { |f| YAML.dump(map, f) }
 
 r "sudo docker compose -f #{$compose_file} down"
-run_database(container_image)
+run_database(container_image, $configure_hash["pg_version"])

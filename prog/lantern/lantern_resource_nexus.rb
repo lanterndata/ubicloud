@@ -13,7 +13,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, ubid: LanternResource.generate_ubid, ha_type: LanternResource::HaType::NONE, parent_id: nil, restore_target: nil, recovery_target_lsn: nil,
     org_id: nil, db_name: "postgres", db_user: "postgres", db_user_password: nil, superuser_password: nil, repl_password: nil, app_env: Config.rack_env,
     lantern_version: Config.lantern_default_version, extras_version: Config.lantern_extras_default_version, minor_version: Config.lantern_minor_default_version, domain: nil, enable_debug: false,
-    label: "", version_upgrade: false, logical_replication: false, max_storage_autoresize_gib: 0)
+    label: "", version_upgrade: false, logical_replication: false, max_storage_autoresize_gib: 0, pg_version: 17)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -82,7 +82,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
         restore_target: restore_target, db_name: db_name, db_user: db_user,
         db_user_password: db_user_password, repl_user: repl_user, repl_password: repl_password,
         label: label, doctor_id: lantern_doctor.id, recovery_target_lsn: recovery_target_lsn, version_upgrade: version_upgrade,
-        logical_replication: logical_replication
+        logical_replication: logical_replication, pg_version: pg_version
       ) { _1.id = ubid.to_uuid }
       lantern_resource.associate_with_project(project)
 
