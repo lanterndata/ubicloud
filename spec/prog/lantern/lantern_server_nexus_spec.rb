@@ -1024,7 +1024,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(current_master.vm.sshable).to receive(:cmd)
       expect(current_master).to receive(:incr_container_stopped)
 
-      expect { nx.take_over }.to hop("swap_ip")
+      expect { nx.take_over }.to hop("swap_dns")
     end
 
     it "swap ips" do
@@ -1079,11 +1079,11 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       image = "#{Config.gcr_image}:lantern-0.5.0-extras-0.5.0-minor-1"
       frame = {"pg_upgrade" => {"lantern_version" => "0.5.0", "extras_version" => "0.5.0", "minor_version" => "1", "pg_version" => 17}}
       expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
-      expect(lantern_server).to receive(:update).with(extras_version: "0.5.0", lantern_version: "0.5.0", minor_version: "1")
-      expect(lantern_server.resource).to receive(:update).with(pg_version: 17)
       expect(lantern_server).to receive(:container_image).and_return(image).at_least(:once)
+      expect(lantern_server.resource).to receive(:drop_ddl_log_trigger)
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/run_pg_upgrade' pg_upgrade", stdin: JSON.generate(
         container_image: lantern_server.container_image,
+        pg_version: 17,
         old_pg_version: lantern_server.resource.pg_version
       ))
 
@@ -1107,7 +1107,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
       logs = {"stdout" => "", "stderr" => "error happened"}
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --logs pg_upgrade").and_return(JSON.generate(logs))
-      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean pg_upgrade")
       expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Postgres update failed on #{lantern_server.resource.name} (#{lantern_server.resource.label})", [lantern_server.resource.ubid, lantern_server.ubid], logs, "critical", "LanternPGUpgradeFailed", lantern_server.ubid)
       expect { nx.wait_pg_upgrade }.to hop("wait")
     end
@@ -1116,12 +1115,41 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       frame = {"pg_upgrade" => {"lantern_version" => "0.5.0", "extras_version" => "0.5.0", "minor_version" => "1", "pg_version" => 17}}
       expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check pg_upgrade").and_return("Succeeded")
+      expect(lantern_server).to receive(:update).with(extras_version: "0.5.0", lantern_version: "0.5.0", minor_version: "1")
+      expect(lantern_server.resource).to receive(:update).with(pg_version: 17)
       expect(frame).to receive(:delete).with("pg_upgrade")
       expect(nx.strand).to receive(:modified!).with(:stack)
       expect(nx.strand).to receive(:save_changes)
       expect(nx).to receive(:register_deadline).with(:wait, 40 * 60)
-      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean pg_upgrade")
       expect { nx.wait_pg_upgrade }.to hop("init_sql")
+    end
+  end
+
+  describe "#swap_dns" do
+    it "calls swap dns with representative_server" do
+      leader = instance_double(LanternServer)
+      expect(lantern_server.resource).to receive(:representative_server).and_return(leader)
+      expect(lantern_server).to receive(:swap_dns).with(leader)
+      expect { nx.swap_dns }.to hop("wait")
+    end
+  end
+
+  describe "#wait_swap_dns" do
+    it "naps 10" do
+      expect(lantern_server).to receive(:is_dns_correct?).and_return(false)
+      expect { nx.wait_swap_dns }.to nap 5
+    end
+
+    it "naps 5" do
+      expect(lantern_server).to receive(:is_dns_correct?).and_return(true)
+      expect(lantern_server).to receive(:run_query).and_raise "test"
+      expect { nx.wait_swap_dns }.to nap 5
+    end
+
+    it "hops to promote" do
+      expect(lantern_server).to receive(:is_dns_correct?).and_return(true)
+      expect(lantern_server).to receive(:run_query).and_return("1")
+      expect { nx.wait_swap_dns }.to hop("promote_server")
     end
   end
 end

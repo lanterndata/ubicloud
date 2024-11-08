@@ -146,19 +146,19 @@ RSpec.describe LanternServer do
   end
 
   it "runs query on vm" do
-    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U postgres -t --csv postgres", stdin: "SELECT 1").and_return("1\n")
+    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U postgres -t --csv -v ON_ERROR_STOP=1 postgres", stdin: "SELECT 1").and_return("1\n")
     expect(lantern_server.run_query("SELECT 1")).to eq("1")
   end
 
   it "runs query on vm with different user and db" do
-    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U lantern -t --csv db2", stdin: "SELECT 1").and_return("1\n")
+    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U lantern -t --csv -v ON_ERROR_STOP=1 db2", stdin: "SELECT 1").and_return("1\n")
     expect(lantern_server.run_query("SELECT 1", db: "db2", user: "lantern")).to eq("1")
   end
 
   it "runs query on vm for all databases" do
     expect(lantern_server).to receive(:list_all_databases).and_return(["postgres", "db2"])
-    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U postgres -t --csv postgres", stdin: "SELECT 1").and_return("1\n")
-    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U postgres -t --csv db2", stdin: "SELECT 1").and_return("2\n")
+    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U postgres -t --csv -v ON_ERROR_STOP=1 postgres", stdin: "SELECT 1").and_return("1\n")
+    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U postgres -t --csv -v ON_ERROR_STOP=1 db2", stdin: "SELECT 1").and_return("2\n")
     expect(lantern_server.run_query_all("SELECT 1")).to eq(
       [
         ["postgres", "1"],
@@ -781,6 +781,52 @@ SQL
     it "does not add query string if there's no domain" do
       expect(lantern_server).to receive(:domain).and_return(nil).at_least(:once)
       expect(lantern_server.query_string).to be_nil
+    end
+  end
+
+  describe "#swap_dns" do
+    it "swaps domains with another server" do
+      frame = {}
+      other = instance_double(described_class)
+      strand = instance_double(Strand)
+      expect(lantern_server).to receive(:strand).and_return(strand).at_least(:once)
+      expect(lantern_server.strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(lantern_server.strand).to receive(:modified!).with(:stack)
+      expect(lantern_server.strand).to receive(:save_changes)
+      expect(lantern_server).to receive(:incr_add_domain)
+      expect(other).to receive(:domain).and_return("test")
+      expect(other).to receive(:update).with(domain: nil)
+      expect { lantern_server.swap_dns(other) }.not_to raise_error
+    end
+  end
+
+  describe "#is_dns_correct?" do
+    it "returns true if host matches ip" do
+      expect(lantern_server).to receive(:domain).and_return("test-domain").at_least(:once)
+      expect(vm.sshable).to receive(:host).and_return("127.0.0.1").at_least(:once)
+      expect(Resolv).to receive(:getaddress).with("test-domain").and_return("127.0.0.1").at_least(:once)
+      expect(lantern_server.is_dns_correct?).to be(true)
+    end
+
+    it "returns false if host does not match the ip" do
+      expect(lantern_server).to receive(:domain).and_return("test-domain").at_least(:once)
+      expect(vm.sshable).to receive(:host).and_return("127.0.0.1").at_least(:once)
+      expect(Resolv).to receive(:getaddress).with("test-domain").and_return("127.0.1.1").at_least(:once)
+      expect(lantern_server.is_dns_correct?).to be(false)
+    end
+  end
+
+  describe "#stop_container" do
+    it "stops docker container" do
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f #{Config.compose_file} down -t 60 || true")
+      expect { lantern_server.stop_container }.not_to raise_error
+    end
+  end
+
+  describe "#start_container" do
+    it "starts docker container" do
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f #{Config.compose_file} up -d")
+      expect { lantern_server.start_container }.not_to raise_error
     end
   end
 end

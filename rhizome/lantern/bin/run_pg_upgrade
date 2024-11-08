@@ -11,6 +11,7 @@ data = YAML.load_file $compose_file
 
 container_image = $configure_hash["container_image"]
 old_pg_version = $configure_hash["old_pg_version"]
+pg_version = $configure_hash["pg_version"]
 current_container_image = data["services"]["postgresql"]["image"]
 
 r "sudo docker compose -f #{$compose_file} down -t 10"
@@ -30,12 +31,14 @@ append_env([
 
 data["services"]["postgresql"]["image"] = container_image
 data["services"]["postgresql"]["user"] = "root"
+data["services"]["postgresql"]["deploy"].delete("restart_policy")
 File.open($compose_file, "w") { |f| YAML.dump(data, f) }
 
 r "sudo docker compose -f #{$compose_file} up"
 
 data = YAML.load_file $compose_file
 data["services"]["postgresql"].delete("user")
+data["services"]["postgresql"]["deploy"]["restart_policy"] = {"condition" => "on-failure"}
 r "sudo rm -rf #{$datadir}/old-lib-#{old_pg_version} #{$datadir}/old-bin-#{old_pg_version} #{$datadir}/old-share-#{old_pg_version}"
 r "sudo chown -R 1001:1001 #{$datadir}"
 File.open($compose_file, "w") { |f| YAML.dump(data, f) }
@@ -44,4 +47,4 @@ append_env([
   ["POSTGRESQL_RUN_PGUPGRADE", "no"]
 ])
 
-r "sudo docker compose -f #{$compose_file} up -d"
+run_database(container_image, pg_version)

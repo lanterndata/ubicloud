@@ -61,7 +61,7 @@ class LanternServer < Sequel::Model
   end
 
   def run_query(query, db: "postgres", user: "postgres")
-    vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} exec -T postgresql psql -q -U #{user} -t --csv #{db}", stdin: query).chomp
+    vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} exec -T postgresql psql -q -U #{user} -t --csv -v ON_ERROR_STOP=1 #{db}", stdin: query).chomp
   end
 
   def run_query_all(query)
@@ -99,8 +99,8 @@ class LanternServer < Sequel::Model
     standby? ? "reader" : "writer"
   end
 
-  def container_image
-    "#{Config.gcr_image}:lantern-#{lantern_version}-extras-#{extras_version}-minor-#{minor_version}"
+  def container_image(p_lantern_version = lantern_version, p_extras_version = extras_version, p_minor_version = minor_version)
+    "#{Config.gcr_image}:lantern-#{p_lantern_version}-extras-#{p_extras_version}-minor-#{p_minor_version}"
   end
 
   def configure_hash
@@ -255,6 +255,26 @@ SQL
     update(target_storage_size_gib: new_storage_size)
     vm.update(storage_size_gib: new_storage_size)
     incr_update_storage_size
+  end
+
+  def swap_dns(other_server)
+    strand.stack.first["domain"] = other_server.domain
+    strand.modified!(:stack)
+    strand.save_changes
+    other_server.update(domain: nil)
+    incr_add_domain
+  end
+
+  def is_dns_correct?
+    Resolv.getaddress(domain) == vm.sshable.host
+  end
+
+  def stop_container
+    vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} down -t 60 || true")
+  end
+
+  def start_container
+    vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} up -d")
   end
 
   # def failover_target

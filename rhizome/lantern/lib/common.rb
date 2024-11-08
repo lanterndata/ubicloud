@@ -47,7 +47,7 @@ def run_database(container_image, pg_version)
   File.open($compose_file, "w") { |f| YAML.dump(data, f) }
   r "sudo docker rm -f tc 2>/dev/null || true"
   r "sudo docker create --name tc #{container_image}"
-  r "sudo docker cp tc:/opt/bitnami/postgresql #{$pg_mount_path}"
+  r "sudo docker cp tc:/usr/lib/postgresql/#{pg_version} #{$pg_mount_path}"
   r "sudo docker rm tc"
   r "sudo chown -R 1001:1001 #{$pg_mount_path}"
   # Mount extension dir, so we can make automatic updates from host

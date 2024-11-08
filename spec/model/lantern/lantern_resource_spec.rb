@@ -92,9 +92,19 @@ RSpec.describe LanternResource do
     it "sets up service account and updates resource" do
       api = instance_double(Hosting::GcpApis)
       allow(Hosting::GcpApis).to receive(:new).and_return(api)
-      allow(api).to receive_messages(create_service_account: {"email" => "test-sa"}, export_service_account_key: "test-key")
-      expect(lantern_resource).to receive(:update).with(gcp_creds_b64: "test-key", service_account_name: "test-sa")
+      allow(api).to receive_messages(create_service_account: {"email" => "test-sa"})
+      expect(lantern_resource).to receive(:update).with(service_account_name: "test-sa")
       expect { lantern_resource.setup_service_account }.not_to raise_error
+    end
+  end
+
+  describe "#export_service_account_key" do
+    it "exports service account key and updates resource" do
+      api = instance_double(Hosting::GcpApis)
+      allow(Hosting::GcpApis).to receive(:new).and_return(api)
+      allow(api).to receive_messages(export_service_account_key: "test-key")
+      expect(lantern_resource).to receive(:update).with(gcp_creds_b64: "test-key")
+      expect { lantern_resource.export_service_account_key }.not_to raise_error
     end
   end
 
@@ -141,6 +151,15 @@ RSpec.describe LanternResource do
       expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
       expect(lantern_resource.representative_server).to receive(:run_query_all).with(a_string_matching(/ddl_log/))
       expect { lantern_resource.create_ddl_log }.not_to raise_error
+    end
+  end
+
+  describe "#drop_ddl_log_trigger" do
+    it "drops ddl log trigger" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(lantern_resource.representative_server).to receive(:run_query_all).with(a_string_matching(/DROP .* log_ddl_trigger/))
+      expect { lantern_resource.drop_ddl_log_trigger }.not_to raise_error
     end
   end
 

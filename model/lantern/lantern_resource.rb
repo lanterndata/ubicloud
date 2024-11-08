@@ -21,7 +21,7 @@ class LanternResource < Sequel::Model
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
 
-  semaphore :destroy, :swap_leaders_with_parent
+  semaphore :destroy, :swap_leaders_with_parent, :switchover_with_parent
 
   plugin :column_encryption do |enc|
     enc.column :superuser_password
@@ -74,8 +74,13 @@ class LanternResource < Sequel::Model
   def setup_service_account
     api = Hosting::GcpApis.new
     service_account = api.create_service_account("lt-#{ubid}", "Service Account for Lantern #{name}")
-    key = api.export_service_account_key(service_account["email"])
-    update(gcp_creds_b64: key, service_account_name: service_account["email"])
+    update(service_account_name: service_account["email"])
+  end
+
+  def export_service_account_key
+    api = Hosting::GcpApis.new
+    key = api.export_service_account_key(service_account_name)
+    update(gcp_creds_b64: key)
   end
 
   def allow_timeline_access_to_bucket
@@ -126,6 +131,13 @@ class LanternResource < Sequel::Model
     ON ddl_command_end
     EXECUTE FUNCTION log_ddl_changes();
     COMMIT;
+SQL
+    representative_server.run_query_all(commands)
+  end
+
+  def drop_ddl_log_trigger
+    commands = <<SQL
+   DROP EVENT TRIGGER IF EXISTS log_ddl_trigger;
 SQL
     representative_server.run_query_all(commands)
   end

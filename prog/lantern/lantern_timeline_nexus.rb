@@ -87,7 +87,7 @@ class Prog::Lantern::LanternTimelineNexus < Prog::Base
   label def destroy
     when_destroy_set? do
       decr_destroy
-      nap 60 * 60 * 24 * 30 # 30 days
+      nap Config.backup_retention_days_after_deletion * 60 * 60 * 24
     end
 
     destroy_blob_storage

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "forwardable"
+require "resolv"
 
 class Prog::Lantern::LanternResourceNexus < Prog::Base
   subject_is :lantern_resource
@@ -8,7 +9,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   extend Forwardable
   def_delegators :lantern_resource, :servers, :representative_server
 
-  semaphore :destroy, :swap_leaders_with_parent
+  semaphore :destroy, :swap_leaders_with_parent, :switchover_with_parent
 
   def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, ubid: LanternResource.generate_ubid, ha_type: LanternResource::HaType::NONE, parent_id: nil, restore_target: nil, recovery_target_lsn: nil,
     org_id: nil, db_name: "postgres", db_user: "postgres", db_user_password: nil, superuser_password: nil, repl_password: nil, app_env: Config.rack_env,
@@ -126,10 +127,22 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
     end
   end
 
-  label def start
+  label def setup_service_account
     lantern_resource.setup_service_account
-    lantern_resource.create_logging_table
+    hop_export_service_account_key
+  end
 
+  label def export_service_account_key
+    lantern_resource.export_service_account_key
+    hop_create_logging_table
+  end
+
+  label def create_logging_table
+    lantern_resource.create_logging_table
+    hop_setup_timeline_access
+  end
+
+  label def setup_timeline_access
     if lantern_resource.parent_id.nil?
       lantern_resource.allow_timeline_access_to_bucket
       register_deadline(:wait, 10 * 60)
@@ -138,6 +151,10 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
     end
 
     hop_wait_servers
+  end
+
+  label def start
+    hop_setup_service_account
   end
 
   # TODO:: check why is this needed
@@ -199,6 +216,17 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
       end
     end
 
+    when_switchover_with_parent_set? do
+      if lantern_resource.parent.nil?
+        decr_switchover_with_parent
+      else
+        lantern_resource.update(display_state: "failover")
+        lantern_resource.parent.update(display_state: "failover")
+        register_deadline(:wait, 10 * 60)
+        hop_switchover_with_parent
+      end
+    end
+
     nap 30
   end
 
@@ -242,6 +270,33 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
     lantern_resource.sync_sequences_with_parent
     lantern_resource.representative_server.vm.swap_ip(lantern_resource.parent.representative_server.vm)
     hop_wait_swap_ip
+  end
+
+  label def switchover_with_parent
+    decr_switchover_with_parent
+    lantern_resource.parent.set_to_readonly
+    hop_disable_logical_subscription
+  end
+
+  label def disable_logical_subscription
+    lantern_resource.disable_logical_subscription
+    hop_sync_sequences_with_parent
+  end
+
+  label def sync_sequences_with_parent
+    lantern_resource.sync_sequences_with_parent
+    hop_switch_dns_with_parent
+  end
+
+  label def switch_dns_with_parent
+    lantern_resource.parent.representative_server.stop_container
+
+    if lantern_resource.parent.representative_server.domain.nil?
+      hop_wait_servers
+    end
+
+    lantern_resource.representative_server.swap_dns(lantern_resource.parent.representative_server)
+    hop_wait_servers
   end
 
   label def destroy

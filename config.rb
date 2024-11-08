@@ -152,6 +152,7 @@ module Config
   override :lantern_backup_bucket, "walg-dev-backups"
   override :e2e_test, "0"
   override :backup_retention_days, 7, int
+  override :backup_retention_days_after_deletion, 0, int
   override :lantern_log_dataset, "lantern_logs", string
   override :compose_file, "/var/lib/lantern/docker-compose.yaml", string
 

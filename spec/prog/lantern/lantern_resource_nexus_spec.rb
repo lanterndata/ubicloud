@@ -126,22 +126,8 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
   end
 
   describe "#start" do
-    it "sets up gcp service account and allows bucket usage" do
-      expect(lantern_resource).to receive(:setup_service_account)
-      expect(lantern_resource).to receive(:create_logging_table)
-      expect(lantern_resource).to receive(:parent_id).and_return("test-parent")
-      expect(lantern_resource).not_to receive(:allow_timeline_access_to_bucket)
-      expect(nx).to receive(:register_deadline)
-      expect { nx.start }.to hop("wait_servers")
-    end
-
-    it "sets up gcp service account" do
-      expect(lantern_resource).to receive(:setup_service_account)
-      expect(lantern_resource).to receive(:create_logging_table)
-      expect(lantern_resource).to receive(:parent_id).and_return(nil)
-      expect(lantern_resource).to receive(:allow_timeline_access_to_bucket)
-      expect(nx).to receive(:register_deadline)
-      expect { nx.start }.to hop("wait_servers")
+    it "hops to setup_service_account" do
+      expect { nx.start }.to hop("setup_service_account")
     end
 
     # it "buds trigger_pg_current_xact_id_on_parent if it has parent" do
@@ -151,6 +137,43 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
     # expect(nx).to receive(:bud).with(described_class, {}, :trigger_pg_current_xact_id_on_parent)
     # expect { nx.start }.to hop("wait_servers")
     # end
+  end
+
+  describe "#setup_timeline_access" do
+    it "allows bucket usage" do
+      expect(lantern_resource).to receive(:parent_id).and_return("test-parent")
+      expect(lantern_resource).not_to receive(:allow_timeline_access_to_bucket)
+      expect(nx).to receive(:register_deadline)
+      expect { nx.setup_timeline_access }.to hop("wait_servers")
+    end
+
+    it "sets up gcp service account" do
+      expect(lantern_resource).to receive(:parent_id).and_return(nil)
+      expect(lantern_resource).to receive(:allow_timeline_access_to_bucket)
+      expect(nx).to receive(:register_deadline)
+      expect { nx.setup_timeline_access }.to hop("wait_servers")
+    end
+  end
+
+  describe "#create_logging_table" do
+    it "hops to setup_timeline_access" do
+      expect(lantern_resource).to receive(:create_logging_table)
+      expect { nx.create_logging_table }.to hop("setup_timeline_access")
+    end
+  end
+
+  describe "#setup_service_account" do
+    it "hops to export_service_account_key" do
+      expect(lantern_resource).to receive(:setup_service_account)
+      expect { nx.setup_service_account }.to hop("export_service_account_key")
+    end
+  end
+
+  describe "#export_service_account_key" do
+    it "hops to create_logging_table" do
+      expect(lantern_resource).to receive(:export_service_account_key)
+      expect { nx.export_service_account_key }.to hop("create_logging_table")
+    end
   end
 
   # describe "#wait_trigger_pg_current_xact_id_on_parent" do
@@ -226,6 +249,16 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect { nx.wait }.to nap(30)
     end
 
+    it "naps if no parent on swap_dns" do
+      expect(lantern_resource).to receive(:required_standby_count).and_return(0)
+      expect(lantern_resource).to receive(:display_state).and_return(nil)
+      expect(lantern_resource).to receive(:servers).and_return([instance_double(LanternServer, strand: instance_double(Strand, label: "wait"))]).at_least(:once)
+      expect(nx).to receive(:when_switchover_with_parent_set?).and_yield
+      expect(lantern_resource).to receive(:parent).and_return(nil)
+      expect(nx).to receive(:decr_switchover_with_parent)
+      expect { nx.wait }.to nap(30)
+    end
+
     it "hops to swap_leaders" do
       expect(lantern_resource).to receive(:required_standby_count).and_return(0)
       expect(lantern_resource).to receive(:display_state).and_return(nil)
@@ -236,6 +269,18 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(parent).to receive(:update).with(display_state: "failover")
       expect(lantern_resource).to receive(:update).with(display_state: "failover")
       expect { nx.wait }.to hop("swap_leaders_with_parent")
+    end
+
+    it "hops to swap_dns" do
+      expect(lantern_resource).to receive(:required_standby_count).and_return(0)
+      expect(lantern_resource).to receive(:display_state).and_return(nil)
+      expect(lantern_resource).to receive(:servers).and_return([instance_double(LanternServer, strand: instance_double(Strand, label: "wait"))]).at_least(:once)
+      expect(nx).to receive(:when_switchover_with_parent_set?).and_yield
+      parent = instance_double(LanternResource)
+      expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)
+      expect(parent).to receive(:update).with(display_state: "failover")
+      expect(lantern_resource).to receive(:update).with(display_state: "failover")
+      expect { nx.wait }.to hop("switchover_with_parent")
     end
   end
 
@@ -334,6 +379,48 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(timeline).to receive(:update).with(parent_id: nil)
 
       expect { nx.update_hosts }.to hop("wait")
+    end
+  end
+
+  describe "#switchover_with_parent" do
+    it "sets parent to readonly and hop" do
+      parent = instance_double(LanternResource)
+      expect(lantern_resource).to receive(:parent).and_return(parent)
+      expect(parent).to receive(:set_to_readonly)
+      expect(nx).to receive(:decr_switchover_with_parent)
+
+      expect { nx.switchover_with_parent }.to hop("disable_logical_subscription")
+    end
+  end
+
+  describe "#disable_logical_subscription" do
+    it "disables susbcription and hop" do
+      expect(lantern_resource).to receive(:disable_logical_subscription)
+      expect { nx.disable_logical_subscription }.to hop("sync_sequences_with_parent")
+    end
+  end
+
+  describe "#sync_sequences_with_parent" do
+    it "syncs sequences and hop" do
+      expect(lantern_resource).to receive(:sync_sequences_with_parent)
+      expect { nx.sync_sequences_with_parent }.to hop("switch_dns_with_parent")
+    end
+  end
+
+  describe "#switch_dns_with_parent" do
+    it "hops to wait_servers" do
+      parent = instance_double(LanternResource, representative_server: instance_double(LanternServer, domain: nil))
+      expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)
+      expect(lantern_resource.parent.representative_server).to receive(:stop_container)
+      expect { nx.switch_dns_with_parent }.to hop("wait_servers")
+    end
+
+    it "switches dns with parent and hop to wait_servers" do
+      parent = instance_double(LanternResource, representative_server: instance_double(LanternServer, domain: "test-domain"))
+      expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)
+      expect(lantern_resource.parent.representative_server).to receive(:stop_container)
+      expect(lantern_resource.representative_server).to receive(:swap_dns).with(parent.representative_server)
+      expect { nx.switch_dns_with_parent }.to hop("wait_servers")
     end
   end
 end

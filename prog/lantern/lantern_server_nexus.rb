@@ -236,24 +236,20 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
 
   label def run_pg_upgrade
     decr_run_pg_upgrade
-    current_frame = strand.stack.first
-    resource = lantern_server.resource
-    pg_upgrade_info = current_frame["pg_upgrade"]
-    # prepare files
-    lantern_server.update(
-      lantern_version: pg_upgrade_info["lantern_version"],
-      extras_version: pg_upgrade_info["extras_version"],
-      minor_version: pg_upgrade_info["minor_version"]
-    )
+    lantern_server.resource.drop_ddl_log_trigger
+    pg_upgrade_info = strand.stack.first["pg_upgrade"]
     vm.sshable.cmd(
       "common/bin/daemonizer 'sudo lantern/bin/run_pg_upgrade' pg_upgrade",
       stdin: JSON.generate({
-        container_image: lantern_server.container_image,
-        old_pg_version: resource.pg_version
+        container_image: lantern_server.container_image(
+          pg_upgrade_info["lantern_version"],
+          pg_upgrade_info["extras_version"],
+          pg_upgrade_info["minor_version"]
+        ),
+        pg_version: pg_upgrade_info["pg_version"],
+        old_pg_version: lantern_server.resource.pg_version
       })
     )
-    resource.update(pg_version: pg_upgrade_info["pg_version"])
-    # run scripts
     hop_wait_pg_upgrade
   end
 
@@ -261,17 +257,22 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     current_frame = strand.stack.first
     case vm.sshable.cmd("common/bin/daemonizer --check pg_upgrade")
     when "Succeeded"
+      pg_upgrade_info = current_frame["pg_upgrade"]
+      lantern_server.resource.update(pg_version: pg_upgrade_info["pg_version"])
+      lantern_server.update(
+        lantern_version: pg_upgrade_info["lantern_version"],
+        extras_version: pg_upgrade_info["extras_version"],
+        minor_version: pg_upgrade_info["minor_version"]
+      )
       current_frame.delete("pg_upgrade")
       strand.modified!(:stack)
       strand.save_changes
-      vm.sshable.cmd("common/bin/daemonizer --clean pg_upgrade")
       register_deadline(:wait, 40 * 60)
       hop_init_sql
     when "Failed"
       logs = JSON.parse(vm.sshable.cmd("common/bin/daemonizer --logs pg_upgrade"))
       Clog.emit("Postgres upgrade failed") { {logs: logs, name: lantern_server.resource.name, lantern_server: lantern_server.id} }
       Prog::PageNexus.assemble_with_logs("Postgres update failed on #{lantern_server.resource.name} (#{lantern_server.resource.label})", [lantern_server.resource.ubid, lantern_server.ubid], logs, "critical", "LanternPGUpgradeFailed", lantern_server.ubid)
-      vm.sshable.cmd("common/bin/daemonizer --clean pg_upgrade")
       hop_wait
     end
     nap 10
@@ -579,6 +580,18 @@ SQL
     hop_promote_server
   end
 
+  label def wait_swap_dns
+    # wait until ip change will propogate
+    begin
+      nap 5 if !lantern_server.is_dns_correct?
+      lantern_server.run_query("SELECT 1")
+    rescue
+      nap 5
+    end
+
+    hop_promote_server
+  end
+
   label def take_over
     decr_take_over
     if !lantern_server.standby?
@@ -589,7 +602,12 @@ SQL
     # put the old server in container_stopped mode, so no healthcheck will be done
     lantern_server.resource.representative_server.incr_container_stopped
 
-    hop_swap_ip
+    hop_swap_dns
+  end
+
+  label def swap_dns
+    lantern_server.swap_dns(lantern_server.resource.representative_server)
+    hop_wait
   end
 
   label def swap_ip
