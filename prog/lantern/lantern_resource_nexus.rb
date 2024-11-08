@@ -293,7 +293,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   end
 
   label def switch_dns_with_parent
-    lantern_resource.parent.representative_server.stop_container
+    lantern_resource.parent.representative_server.stop_container(1)
     lantern_resource.update(logical_replication: false)
 
     if lantern_resource.parent.representative_server.domain.nil?
