@@ -183,7 +183,7 @@ SQL
         "SELECT setval('#{values[0]}.#{values[1]}', #{values[2]});"
       end
 
-      representative_server.run_query(statements, db: db)
+      representative_server.run_query(statements.join("\n"), db: db)
     end
   end
 

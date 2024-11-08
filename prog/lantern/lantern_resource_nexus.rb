@@ -230,14 +230,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
     nap 30
   end
 
-  label def update_hosts
-    current_master = lantern_resource.parent.representative_server
-    current_master_domain = current_master.domain
-    new_master_domain = lantern_resource.representative_server.domain
-
-    lantern_resource.representative_server.update(domain: current_master_domain)
-    current_master.update(domain: new_master_domain)
-
+  label def finish_take_over
     # update display_states
     lantern_resource.update(display_state: nil)
     lantern_resource.parent.update(display_state: nil)
@@ -246,6 +239,17 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
     lantern_resource.update(parent_id: nil)
     lantern_resource.timeline.update(parent_id: nil)
     hop_wait
+  end
+
+  label def update_hosts
+    current_master = lantern_resource.parent.representative_server
+    current_master_domain = current_master.domain
+    new_master_domain = lantern_resource.representative_server.domain
+
+    lantern_resource.representative_server.update(domain: current_master_domain)
+    current_master.update(domain: new_master_domain)
+
+    hop_finish_take_over
   end
 
   label def wait_swap_ip
@@ -290,13 +294,19 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
 
   label def switch_dns_with_parent
     lantern_resource.parent.representative_server.stop_container
+    lantern_resource.update(logical_replication: false)
 
     if lantern_resource.parent.representative_server.domain.nil?
-      hop_wait_servers
+      hop_finish_take_over
     end
 
     lantern_resource.representative_server.swap_dns(lantern_resource.parent.representative_server)
-    hop_wait_servers
+    hop_wait_switch_dns
+  end
+
+  label def wait_switch_dns
+    nap 10 if !lantern_resource.representative_server.is_dns_correct?
+    hop_finish_take_over
   end
 
   label def destroy

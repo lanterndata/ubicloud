@@ -614,16 +614,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
   end
 
-  describe "#destroy_domain" do
-    it "destroys domain" do
-      cf_client = instance_double(Dns::Cloudflare)
-      expect(Dns::Cloudflare).to receive(:new).and_return(cf_client)
-      expect(lantern_server).to receive(:domain).and_return("example.com")
-      expect(cf_client).to receive(:delete_dns_record).with("example.com")
-      nx.destroy_domain
-    end
-  end
-
   describe "#add_domain_to_stack" do
     it "adds domain to current frame" do
       domain = "db.lantern.dev"
@@ -831,7 +821,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server).to receive(:primary?).and_return(true)
       expect(lantern_server.timeline).to receive(:incr_destroy).at_least(:once)
       expect(lantern_server).to receive(:domain).and_return("example.com")
-      expect(nx).to receive(:destroy_domain)
+      expect(lantern_server).to receive(:destroy_domain)
       expect(lantern_server).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "lantern server was deleted"})
     end

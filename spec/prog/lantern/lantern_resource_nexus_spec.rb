@@ -359,17 +359,27 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
   end
 
   describe "#update_hosts" do
-    it "updates the domains of the current and new master, updates display states, and removes fork association" do
+    it "updates the domains of the current and new master" do
       parent = instance_double(LanternResource)
       current_master = instance_double(LanternServer, domain: "current-master-domain.com")
       new_master = instance_double(LanternServer, domain: "new-master-domain.com")
-      timeline = instance_double(LanternTimeline)
 
       expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)
       expect(parent).to receive(:representative_server).and_return(current_master).at_least(:once)
       expect(lantern_resource).to receive(:representative_server).and_return(new_master).at_least(:once)
       expect(new_master).to receive(:update).with(domain: "current-master-domain.com")
       expect(current_master).to receive(:update).with(domain: "new-master-domain.com")
+
+      expect { nx.update_hosts }.to hop("finish_take_over")
+    end
+  end
+
+  describe "#finish_take_over" do
+    it "updates display states, and removes fork association" do
+      parent = instance_double(LanternResource)
+      timeline = instance_double(LanternTimeline)
+
+      expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)
 
       expect(lantern_resource).to receive(:update).with(display_state: nil)
       expect(parent).to receive(:update).with(display_state: nil)
@@ -378,7 +388,7 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(lantern_resource).to receive(:timeline).and_return(timeline)
       expect(timeline).to receive(:update).with(parent_id: nil)
 
-      expect { nx.update_hosts }.to hop("wait")
+      expect { nx.finish_take_over }.to hop("wait")
     end
   end
 
@@ -408,19 +418,36 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
   end
 
   describe "#switch_dns_with_parent" do
-    it "hops to wait_servers" do
+    it "hops to finish_take_over" do
       parent = instance_double(LanternResource, representative_server: instance_double(LanternServer, domain: nil))
       expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)
       expect(lantern_resource.parent.representative_server).to receive(:stop_container)
-      expect { nx.switch_dns_with_parent }.to hop("wait_servers")
+      expect { nx.switch_dns_with_parent }.to hop("finish_take_over")
     end
 
-    it "switches dns with parent and hop to wait_servers" do
+    it "switches dns with parent and hop to wait_switch_dns" do
       parent = instance_double(LanternResource, representative_server: instance_double(LanternServer, domain: "test-domain"))
       expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)
       expect(lantern_resource.parent.representative_server).to receive(:stop_container)
       expect(lantern_resource.representative_server).to receive(:swap_dns).with(parent.representative_server)
-      expect { nx.switch_dns_with_parent }.to hop("wait_servers")
+      expect(lantern_resource).to receive(:update).with(logical_replication: false)
+      expect { nx.switch_dns_with_parent }.to hop("wait_switch_dns")
+    end
+  end
+
+  describe "#wait_switch_dns" do
+    it "naps if dns is not ready" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:is_dns_correct?).and_return(false)
+      expect { nx.wait_switch_dns }.to nap 10
+    end
+
+    it "hops to finish_take_over" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:is_dns_correct?).and_return(true)
+      expect { nx.wait_switch_dns }.to hop("finish_take_over")
     end
   end
 end

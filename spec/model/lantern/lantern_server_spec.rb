@@ -785,6 +785,23 @@ SQL
   end
 
   describe "#swap_dns" do
+    it "swaps domains with another server and removes domain" do
+      frame = {}
+      other = instance_double(described_class)
+      strand = instance_double(Strand)
+      expect(lantern_server).to receive(:strand).and_return(strand).at_least(:once)
+      expect(lantern_server).to receive(:domain).and_return("old-domain").at_least(:once)
+      expect(lantern_server).to receive(:update).with(domain: nil)
+      expect(lantern_server.strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(lantern_server.strand).to receive(:modified!).with(:stack)
+      expect(lantern_server.strand).to receive(:save_changes)
+      expect(lantern_server).to receive(:incr_add_domain)
+      expect(lantern_server).to receive(:destroy_domain)
+      expect(other).to receive(:domain).and_return("test")
+      expect(other).to receive(:update).with(domain: nil)
+      expect { lantern_server.swap_dns(other) }.not_to raise_error
+    end
+
     it "swaps domains with another server" do
       frame = {}
       other = instance_double(described_class)
@@ -827,6 +844,16 @@ SQL
     it "starts docker container" do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f #{Config.compose_file} up -d")
       expect { lantern_server.start_container }.not_to raise_error
+    end
+  end
+
+  describe "#destroy_domain" do
+    it "destroys domain" do
+      cf_client = instance_double(Dns::Cloudflare)
+      expect(Dns::Cloudflare).to receive(:new).and_return(cf_client)
+      expect(lantern_server).to receive(:domain).and_return("example.com")
+      expect(cf_client).to receive(:delete_dns_record).with("example.com")
+      lantern_server.destroy_domain
     end
   end
 end

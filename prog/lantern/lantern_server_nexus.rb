@@ -391,11 +391,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     hop_setup_ssl
   end
 
-  def destroy_domain
-    cf_client = Dns::Cloudflare.new
-    cf_client.delete_dns_record(lantern_server.domain)
-  end
-
   def add_domain_to_stack(domain)
     current_frame = strand.stack.first
     current_frame["domain"] = domain
@@ -659,7 +654,7 @@ SQL
       strand.children.each { _1.destroy }
 
       if !lantern_server.domain.nil?
-        destroy_domain
+        lantern_server.destroy_domain
       end
 
       if lantern_server.primary?

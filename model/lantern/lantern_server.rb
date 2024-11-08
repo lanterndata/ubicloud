@@ -257,16 +257,27 @@ SQL
     incr_update_storage_size
   end
 
+  def destroy_domain
+    cf_client = Dns::Cloudflare.new
+    cf_client.delete_dns_record(domain)
+  end
+
   def swap_dns(other_server)
     strand.stack.first["domain"] = other_server.domain
     strand.modified!(:stack)
     strand.save_changes
     other_server.update(domain: nil)
+
+    if domain
+      destroy_domain
+      update(domain: nil)
+    end
+
     incr_add_domain
   end
 
   def is_dns_correct?
-    Resolv.getaddress(domain) == vm.sshable.host
+    domain && Resolv.getaddress(domain) == vm.sshable.host
   end
 
   def stop_container

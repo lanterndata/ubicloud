@@ -312,8 +312,8 @@ RSpec.describe LanternResource do
       ]
       statements_db2 = statements_db1 # identical statements for the test
 
-      expect(representative_server).to receive(:run_query).with(statements_db1, db: "db1")
-      expect(representative_server).to receive(:run_query).with(statements_db2, db: "db2")
+      expect(representative_server).to receive(:run_query).with(statements_db1.join("\n"), db: "db1")
+      expect(representative_server).to receive(:run_query).with(statements_db2.join("\n"), db: "db2")
 
       expect { lantern_resource.sync_sequences_with_parent }.not_to raise_error
     end
