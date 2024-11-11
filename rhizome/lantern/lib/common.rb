@@ -78,21 +78,34 @@ def append_env(env_arr)
   File.open($env_file, "w") { |f| combined_env.each { |key, value| f.puts "#{key}=#{value}" } }
 end
 
-def configure_tls(domain, email, dns_token, dns_zone_id, provider)
-  puts "Configuring TLS for domain #{domain}"
-  r "curl -s https://get.acme.sh | sh -s email=#{email}"
-  env = if provider == "dns_cf"
-    "CF_Token='#{dns_token}' CF_Zone_ID='#{dns_zone_id}'"
-  else
-    "GOOGLEDOMAINS_ACCESS_TOKEN='#{dns_token}'"
+def tls_already_configured?(domain)
+  is_domain_configured = !r("test -f /root/.acme.sh/acme.sh && /root/.acme.sh/acme.sh --list -d #{domain}").chomp.empty?
+
+  if !is_domain_configured
+    return false
   end
 
-  r "#{env} /root/.acme.sh/acme.sh --server letsencrypt --issue --dns #{provider} -d #{domain}"
-  reload_cmd = "sudo docker compose -f #{$compose_file} exec postgresql psql -U postgres -c 'SELECT pg_reload_conf()' && sudo docker compose -f #{$compose_file} exec postgresql psql -p6432 -U postgres pgbouncer -c RELOAD"
-  r "/root/.acme.sh/acme.sh --install-cert -d #{domain} --key-file #{$datadir}/server.key  --fullchain-file #{$datadir}/server.crt --reloadcmd \"#{reload_cmd}\""
-  r "sudo chown 1001:1001 #{$datadir}/server.key"
-  r "sudo chown 1001:1001 #{$datadir}/server.crt"
-  r "sudo chmod 600 #{$datadir}/server.key"
+  !r("(test -f #{$datadir}/server.key && test -f #{$datadir}/server.crt && echo 1) || echo ''").chomp.empty?
+end
+
+def configure_tls(domain, email, dns_token, dns_zone_id, provider)
+  puts "Configuring TLS for domain #{domain}"
+
+  if !tls_already_configured?
+    r "curl -s https://get.acme.sh | sh -s email=#{email}"
+    env = if provider == "dns_cf"
+      "CF_Token='#{dns_token}' CF_Zone_ID='#{dns_zone_id}'"
+    else
+      "GOOGLEDOMAINS_ACCESS_TOKEN='#{dns_token}'"
+    end
+
+    r "#{env} /root/.acme.sh/acme.sh --server letsencrypt --issue --dns #{provider} -d #{domain}"
+    reload_cmd = "sudo docker compose -f #{$compose_file} exec postgresql psql -U postgres -c 'SELECT pg_reload_conf()' && sudo docker compose -f #{$compose_file} exec postgresql psql -p6432 -U postgres pgbouncer -c RELOAD"
+    r "/root/.acme.sh/acme.sh --install-cert -d #{domain} --key-file #{$datadir}/server.key  --fullchain-file #{$datadir}/server.crt --reloadcmd \"#{reload_cmd}\""
+    r "sudo chown 1001:1001 #{$datadir}/server.key"
+    r "sudo chown 1001:1001 #{$datadir}/server.crt"
+    r "sudo chmod 600 #{$datadir}/server.key"
+  end
 
   append_env([
     ["POSTGRESQL_ENABLE_TLS", "yes"],

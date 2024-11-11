@@ -262,6 +262,20 @@ SQL
     cf_client.delete_dns_record(domain)
   end
 
+  def add_domain_to_stack(domain)
+    current_frame = strand.stack.first
+    current_frame["domain"] = domain
+    strand.modified!(:stack)
+    strand.save_changes
+  end
+
+  def remove_domain_from_stack
+    current_frame = strand.stack.first
+    current_frame.delete("domain")
+    strand.modified!(:stack)
+    strand.save_changes
+  end
+
   def swap_dns(other_server)
     strand.stack.first["domain"] = other_server.domain
     strand.modified!(:stack)

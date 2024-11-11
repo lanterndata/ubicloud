@@ -311,6 +311,12 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
 
   label def wait_switch_dns
     nap 10 if !lantern_resource.representative_server.is_dns_correct?
+    begin
+      connection = Sequel.connect(lantern_resource.connection_string)
+      connection["SELECT 1"].first
+    rescue
+      nap 10
+    end
     hop_finish_take_over
   end
 

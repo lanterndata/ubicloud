@@ -480,8 +480,21 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect { nx.wait_switch_dns }.to nap 10
     end
 
+    it "waits if db is not ready" do
+      representative_server = instance_double(LanternServer)
+      expect(Sequel).to receive(:connect).and_return(DB)
+      expect(DB).to receive(:[]).with("SELECT 1").and_raise
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:is_dns_correct?).and_return(true)
+      expect { nx.wait_switch_dns }.to nap 10
+    end
+
     it "hops to finish_take_over" do
       representative_server = instance_double(LanternServer)
+      expect(Sequel).to receive(:connect).and_return(DB)
+      res = instance_double(Sequel::Dataset)
+      expect(res).to receive(:first)
+      expect(DB).to receive(:[]).with("SELECT 1").and_return(res)
       expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
       expect(representative_server).to receive(:is_dns_correct?).and_return(true)
       expect { nx.wait_switch_dns }.to hop("finish_take_over")

@@ -856,4 +856,32 @@ SQL
       lantern_server.destroy_domain
     end
   end
+
+  describe "#add_domain_to_stack" do
+    it "adds domain to current frame" do
+      domain = "db.lantern.dev"
+      frame = {}
+      strand = instance_double(Strand)
+      expect(lantern_server).to receive(:strand).and_return(strand).at_least(:once)
+      expect(strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(frame).to receive(:[]=).with("domain", domain)
+      expect(strand).to receive(:modified!).with(:stack)
+      expect(strand).to receive(:save_changes)
+      expect { lantern_server.add_domain_to_stack(domain) }.not_to raise_error
+    end
+  end
+
+  describe "#remove_domain_from_stack" do
+    it "removes domain from current frame" do
+      domain = "db.lantern.dev"
+      frame = {"domain" => domain}
+      strand = instance_double(Strand)
+      expect(lantern_server).to receive(:strand).and_return(strand).at_least(:once)
+      expect(strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(frame).to receive(:delete).with("domain")
+      expect(strand).to receive(:modified!).with(:stack)
+      expect(strand).to receive(:save_changes)
+      expect { lantern_server.remove_domain_from_stack }.not_to raise_error
+    end
+  end
 end

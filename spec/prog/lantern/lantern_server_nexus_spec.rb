@@ -322,7 +322,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
     it "hops to wait_synchronization" do
       leader = instance_double(LanternServer, domain: "db.lantern.dev")
-      expect(nx).to receive(:add_domain_to_stack).with(leader.domain)
+      expect(lantern_server).to receive(:add_domain_to_stack).with(leader.domain)
       expect(nx).to receive(:incr_setup_ssl)
       expect(lantern_server).to receive(:domain).and_return(nil)
       expect(lantern_server).to receive(:update).with({synchronization_status: "ready"})
@@ -368,6 +368,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
   describe "#wait_recovery_completion" do
     it "hop to wait if recovery finished" do
       expect(lantern_server.resource).to receive(:allow_timeline_access_to_bucket)
+      expect(lantern_server.resource).to receive(:logical_replication).and_return(false)
       expect(lantern_server).to receive(:run_query).and_return("t", "paused", "t", lantern_server.lantern_version, lantern_server.extras_version)
       expect(lantern_server).to receive(:timeline_id=)
       expect(lantern_server).to receive(:timeline_access=).with("push")
@@ -378,6 +379,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
     it "hop to wait if not in recovery" do
       expect(lantern_server.resource).to receive(:allow_timeline_access_to_bucket)
+      expect(lantern_server.resource).to receive(:logical_replication).and_return(false)
       expect(lantern_server).to receive(:run_query).and_return("f", lantern_server.lantern_version, lantern_server.extras_version)
       expect(lantern_server).to receive(:timeline_id=)
       expect(lantern_server).to receive(:timeline_access=).with("push")
@@ -388,6 +390,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
     it "do not update extension on upgrade" do
       expect(lantern_server.resource).to receive(:allow_timeline_access_to_bucket)
+      expect(lantern_server.resource).to receive(:logical_replication).and_return(false)
       expect(lantern_server).to receive(:run_query).and_return("f")
       expect(lantern_server).to receive(:timeline_id=)
       expect(lantern_server).to receive(:timeline_access=).with("push")
@@ -398,6 +401,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
 
     it "update extension on version mismatch" do
+      expect(lantern_server.resource).to receive(:logical_replication).and_return(false)
       expect(lantern_server.resource).to receive(:allow_timeline_access_to_bucket)
       expect(lantern_server).to receive(:run_query).and_return("t", "paused", "t", "0.2.4", "0.1.4")
       expect(lantern_server).to receive(:timeline_id=)
@@ -411,8 +415,36 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect { nx.wait_recovery_completion }.to hop("wait_timeline_available")
     end
 
-    it "run pg_upgrade if frame has pg_upgrade info" do
+    it "does not setup ssl if parent has no domain" do
+      parent_reosurce = instance_double(LanternResource)
+      representative_server = instance_double(LanternServer)
+      expect(parent_reosurce).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:domain).and_return(nil).at_least(:once)
+      expect(lantern_server.resource).to receive(:parent).and_return(parent_reosurce).at_least(:once)
+      expect(lantern_server.resource).to receive(:logical_replication).and_return(true)
       expect(lantern_server.resource).to receive(:allow_timeline_access_to_bucket)
+      expect(lantern_server).to receive(:run_query).and_return("f")
+      expect(lantern_server).to receive(:timeline_id=)
+      expect(lantern_server).to receive(:timeline_access=).with("push")
+      expect(lantern_server).to receive(:save_changes)
+      frame = {"pg_upgrade" => {"lantern_version" => "0.5.0", "extras_version" => "0.5.0", "minor_version" => "1", "pg_version" => 17}}
+      expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(lantern_server.resource).to receive(:version_upgrade).and_return(true)
+      expect(Prog::Lantern::LanternTimelineNexus).to receive(:assemble).and_return(instance_double(Strand, id: "104b0033-b3f6-8214-ae27-0cd3cef18ce5"))
+      expect(nx).to receive(:incr_run_pg_upgrade)
+      expect { nx.wait_recovery_completion }.to hop("wait_timeline_available")
+    end
+
+    it "run pg_upgrade if frame has pg_upgrade info" do
+      parent_reosurce = instance_double(LanternResource)
+      representative_server = instance_double(LanternServer)
+      expect(parent_reosurce).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:domain).and_return("example.com").at_least(:once)
+      expect(lantern_server.resource).to receive(:parent).and_return(parent_reosurce).at_least(:once)
+      expect(lantern_server.resource).to receive(:logical_replication).and_return(true)
+      expect(lantern_server.resource).to receive(:allow_timeline_access_to_bucket)
+      expect(lantern_server).to receive(:add_domain_to_stack).with(parent_reosurce.representative_server.domain)
+      expect(nx).to receive(:incr_setup_ssl)
       expect(lantern_server).to receive(:run_query).and_return("f")
       expect(lantern_server).to receive(:timeline_id=)
       expect(lantern_server).to receive(:timeline_access=).with("push")
@@ -607,32 +639,9 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
       expect(nx).to receive(:frame).and_return({"domain" => "test.lantern.dev"}).at_least(:once)
       expect(lantern_server).to receive(:update).with({domain: "test.lantern.dev"})
+      expect(lantern_server).to receive(:remove_domain_from_stack)
       expect(cf_client).to receive(:upsert_dns_record).with("test.lantern.dev", "1.1.1.1")
       expect { nx.add_domain }.to hop("setup_ssl")
-    end
-  end
-
-  describe "#add_domain_to_stack" do
-    it "adds domain to current frame" do
-      domain = "db.lantern.dev"
-      frame = {}
-      expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
-      expect(frame).to receive(:[]=).with("domain", domain)
-      expect(nx.strand).to receive(:modified!).with(:stack)
-      expect(nx.strand).to receive(:save_changes)
-      expect { nx.add_domain_to_stack(domain) }.not_to raise_error
-    end
-  end
-
-  describe "#remove_domain_from_stack" do
-    it "removes domain from current frame" do
-      domain = "db.lantern.dev"
-      frame = {"domain" => domain}
-      expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
-      expect(frame).to receive(:delete).with("domain")
-      expect(nx.strand).to receive(:modified!).with(:stack)
-      expect(nx.strand).to receive(:save_changes)
-      expect { nx.remove_domain_from_stack }.not_to raise_error
     end
   end
 
@@ -675,7 +684,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     it "sets up ssl and hops to wait_db_available" do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check setup_ssl").and_return("Succeeded")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean setup_ssl")
-      expect(nx).to receive(:remove_domain_from_stack)
+      expect(lantern_server).to receive(:remove_domain_from_stack)
       expect { nx.setup_ssl }.to hop("wait_db_available")
     end
 
@@ -685,7 +694,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       logs = {"stdout" => "", "stderr" => "oom"}
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --logs setup_ssl").and_return(JSON.generate(logs))
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean setup_ssl")
-      expect(nx).to receive(:remove_domain_from_stack)
+      expect(lantern_server).to receive(:remove_domain_from_stack)
       expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Lantern SSL Setup Failed for test", [lantern_server.resource.ubid, lantern_server.ubid], logs, "error", "LanternSSLSetupFailed", lantern_server.ubid)
       expect { nx.setup_ssl }.to hop("wait")
     end
