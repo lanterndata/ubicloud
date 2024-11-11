@@ -91,7 +91,7 @@ end
 def configure_tls(domain, email, dns_token, dns_zone_id, provider)
   puts "Configuring TLS for domain #{domain}"
 
-  if !tls_already_configured?
+  if !tls_already_configured?(domain)
     r "curl -s https://get.acme.sh | sh -s email=#{email}"
     env = if provider == "dns_cf"
       "CF_Token='#{dns_token}' CF_Zone_ID='#{dns_zone_id}'"
