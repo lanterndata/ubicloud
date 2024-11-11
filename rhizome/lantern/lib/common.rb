@@ -79,7 +79,7 @@ def append_env(env_arr)
 end
 
 def tls_already_configured?(domain)
-  is_domain_configured = !r("test -f /root/.acme.sh/acme.sh && /root/.acme.sh/acme.sh --list -d #{domain}").chomp.empty?
+  is_domain_configured = !r("(test -f /root/.acme.sh/acme.sh && /root/.acme.sh/acme.sh --list -d #{domain}) || echo ''").chomp.empty?
 
   if !is_domain_configured
     return false

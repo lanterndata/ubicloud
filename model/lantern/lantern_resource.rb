@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "uri"
 require_relative "../../model"
 
 class LanternResource < Sequel::Model
@@ -159,6 +160,7 @@ SQL
    END;
    $$ LANGUAGE plpgsql;
 
+   DROP TRIGGER IF EXISTS execute_ddl_after_insert ON ddl_log;
    CREATE TRIGGER execute_ddl_after_insert
    AFTER INSERT ON ddl_log
    FOR EACH ROW
@@ -197,9 +199,12 @@ SQL
 
   def create_and_enable_subscription
     representative_server.list_all_databases.each do |db|
+      uri = URI.parse(parent.connection_string(port: 5432))
+      new_query_ar = URI.decode_www_form(String(uri.query)) << ["dbname", db]
+      uri.query = URI.encode_www_form(new_query_ar)
       commands = <<SQL
       CREATE SUBSCRIPTION sub_#{ubid}
-      CONNECTION '#{parent.connection_string(port: 5432)}/#{db}'
+      CONNECTION '#{uri}'
       PUBLICATION pub_#{ubid}
       WITH (
         copy_data = false,

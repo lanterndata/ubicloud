@@ -322,7 +322,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
     it "hops to wait_synchronization" do
       leader = instance_double(LanternServer, domain: "db.lantern.dev")
-      expect(lantern_server).to receive(:add_domain_to_stack).with(leader.domain)
+      expect(lantern_server).to receive(:add_domain_to_stack).with(leader.domain, nx.strand)
       expect(nx).to receive(:incr_setup_ssl)
       expect(lantern_server).to receive(:domain).and_return(nil)
       expect(lantern_server).to receive(:update).with({synchronization_status: "ready"})
@@ -443,7 +443,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.resource).to receive(:parent).and_return(parent_reosurce).at_least(:once)
       expect(lantern_server.resource).to receive(:logical_replication).and_return(true)
       expect(lantern_server.resource).to receive(:allow_timeline_access_to_bucket)
-      expect(lantern_server).to receive(:add_domain_to_stack).with(parent_reosurce.representative_server.domain)
+      expect(lantern_server).to receive(:add_domain_to_stack).with(parent_reosurce.representative_server.domain, nx.strand)
       expect(nx).to receive(:incr_setup_ssl)
       expect(lantern_server).to receive(:run_query).and_return("f")
       expect(lantern_server).to receive(:timeline_id=)

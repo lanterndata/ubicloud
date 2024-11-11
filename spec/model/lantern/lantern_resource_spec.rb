@@ -245,8 +245,8 @@ RSpec.describe LanternResource do
       representative_server = instance_double(LanternServer)
       expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
       expect(lantern_resource.representative_server).to receive(:list_all_databases).and_return(["db1", "db2"])
-      expect(lantern_resource.representative_server).to receive(:run_query).with(a_string_matching(/CREATE SUBSCRIPTION/), db: "db1")
-      expect(lantern_resource.representative_server).to receive(:run_query).with(a_string_matching(/CREATE SUBSCRIPTION/), db: "db2")
+      expect(lantern_resource.representative_server).to receive(:run_query).with(a_string_matching(/CREATE SUBSCRIPTION.*dbname=db1/m), db: "db1")
+      expect(lantern_resource.representative_server).to receive(:run_query).with(a_string_matching(/CREATE SUBSCRIPTION.*dbname=db2/m), db: "db2")
       expect(lantern_resource).to receive(:connection_string).and_return("postgres://localhost:5432").at_least(:once)
       expect(lantern_resource).to receive(:parent).and_return(lantern_resource).at_least(:once)
       expect { lantern_resource.create_and_enable_subscription }.not_to raise_error

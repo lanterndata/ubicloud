@@ -869,6 +869,17 @@ SQL
       expect(strand).to receive(:save_changes)
       expect { lantern_server.add_domain_to_stack(domain) }.not_to raise_error
     end
+
+    it "adds domain to current frame of specified strand" do
+      domain = "db.lantern.dev"
+      frame = {}
+      strand = instance_double(Strand)
+      expect(strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(frame).to receive(:[]=).with("domain", domain)
+      expect(strand).to receive(:modified!).with(:stack)
+      expect(strand).to receive(:save_changes)
+      expect { lantern_server.add_domain_to_stack(domain, strand) }.not_to raise_error
+    end
   end
 
   describe "#remove_domain_from_stack" do
@@ -882,6 +893,17 @@ SQL
       expect(strand).to receive(:modified!).with(:stack)
       expect(strand).to receive(:save_changes)
       expect { lantern_server.remove_domain_from_stack }.not_to raise_error
+    end
+
+    it "removes domain from current frame of specified strand" do
+      domain = "db.lantern.dev"
+      frame = {"domain" => domain}
+      strand = instance_double(Strand)
+      expect(strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(frame).to receive(:delete).with("domain")
+      expect(strand).to receive(:modified!).with(:stack)
+      expect(strand).to receive(:save_changes)
+      expect { lantern_server.remove_domain_from_stack(strand) }.not_to raise_error
     end
   end
 end
