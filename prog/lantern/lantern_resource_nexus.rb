@@ -279,6 +279,11 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   label def switchover_with_parent
     decr_switchover_with_parent
     lantern_resource.parent.set_to_readonly
+    hop_wait_for_synchronization
+  end
+
+  label def wait_for_synchronization
+    nap 5 if lantern_resource.parent.get_logical_replication_lag("slot_#{lantern_resource.ubid}") != 0
     hop_delete_logical_subscription
   end
 

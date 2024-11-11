@@ -109,6 +109,10 @@ class LanternResource < Sequel::Model
     representative_server.run_query("SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_name='#{name}';")
   end
 
+  def get_logical_replication_lag(slot_name)
+    representative_server.run_query("SELECT (pg_current_wal_lsn() - confirmed_flush_lsn) FROM pg_catalog.pg_replication_slots WHERE slot_name = '#{slot_name}'").chomp.to_i
+  end
+
   def create_ddl_log
     commands = <<SQL
     BEGIN;

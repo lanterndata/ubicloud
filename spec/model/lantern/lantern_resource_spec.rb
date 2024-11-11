@@ -327,4 +327,13 @@ RSpec.describe LanternResource do
       expect { lantern_resource.sync_sequences_with_parent }.not_to raise_error
     end
   end
+
+  describe "#get_logical_replication_lag" do
+    it "gets the lag" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:run_query).with("SELECT (pg_current_wal_lsn() - confirmed_flush_lsn) FROM pg_catalog.pg_replication_slots WHERE slot_name = 'test_slot'").and_return("0\n")
+      expect(lantern_resource.get_logical_replication_lag("test_slot")).to be(0)
+    end
+  end
 end
