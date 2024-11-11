@@ -213,6 +213,24 @@ RSpec.describe LanternResource do
     end
   end
 
+  describe "#delete_publication" do
+    it "drops replication slot" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(lantern_resource.representative_server).to receive(:run_query_all).with("DROP PUBLICATION IF EXISTS test")
+      expect { lantern_resource.delete_publication("test") }.not_to raise_error
+    end
+  end
+
+  describe "#delete_logical_subscription" do
+    it "drops subscription" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(lantern_resource.representative_server).to receive(:run_query_all).with("DROP SUBSCRIPTION IF EXISTS test")
+      expect { lantern_resource.delete_logical_subscription("test") }.not_to raise_error
+    end
+  end
+
   describe "#create_publication" do
     it "creates new publication" do
       representative_server = instance_double(LanternServer)
@@ -232,15 +250,6 @@ RSpec.describe LanternResource do
       expect(lantern_resource).to receive(:connection_string).and_return("postgres://localhost:5432").at_least(:once)
       expect(lantern_resource).to receive(:parent).and_return(lantern_resource).at_least(:once)
       expect { lantern_resource.create_and_enable_subscription }.not_to raise_error
-    end
-  end
-
-  describe "#disable_logical_subscription" do
-    it "disables subscription" do
-      representative_server = instance_double(LanternServer)
-      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
-      expect(lantern_resource.representative_server).to receive(:run_query_all).with("ALTER SUBSCRIPTION sub_#{lantern_resource.ubid} DISABLE")
-      expect { lantern_resource.disable_logical_subscription }.not_to raise_error
     end
   end
 

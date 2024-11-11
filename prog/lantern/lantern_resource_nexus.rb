@@ -270,7 +270,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   label def swap_leaders_with_parent
     decr_swap_leaders_with_parent
     lantern_resource.parent.set_to_readonly
-    lantern_resource.disable_logical_subscription
+    lantern_resource.delete_logical_subscription("sub_#{lantern_resource.ubid}")
     lantern_resource.sync_sequences_with_parent
     lantern_resource.representative_server.vm.swap_ip(lantern_resource.parent.representative_server.vm)
     hop_wait_swap_ip
@@ -279,11 +279,11 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   label def switchover_with_parent
     decr_switchover_with_parent
     lantern_resource.parent.set_to_readonly
-    hop_disable_logical_subscription
+    hop_delete_logical_subscription
   end
 
-  label def disable_logical_subscription
-    lantern_resource.disable_logical_subscription
+  label def delete_logical_subscription
+    lantern_resource.delete_logical_subscription("sub_#{lantern_resource.ubid}")
     hop_sync_sequences_with_parent
   end
 
@@ -313,6 +313,15 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
     register_deadline(nil, 5 * 60)
 
     decr_destroy
+
+    if lantern_resource.parent
+      begin
+        lantern_resource.delete_logical_subscription("sub_#{lantern_resource.ubid}")
+        lantern_resource.parent.delete_publication("pub_#{lantern_resource.ubid}")
+        lantern_resource.parent.delete_replication_slot("slot_#{lantern_resource.ubid}")
+      rescue
+      end
+    end
 
     strand.children.each { _1.destroy }
     unless servers.empty?

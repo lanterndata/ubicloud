@@ -280,7 +280,7 @@ SQL
     domain && Resolv.getaddress(domain) == vm.sshable.host
   end
 
-  def stop_container(timeout=60)
+  def stop_container(timeout = 60)
     vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} down -t #{timeout} || true")
   end
 

@@ -168,6 +168,10 @@ SQL
     representative_server.run_query_all("CREATE PUBLICATION #{name} FOR ALL TABLES")
   end
 
+  def delete_publication(name)
+    representative_server.run_query_all("DROP PUBLICATION IF EXISTS #{name}")
+  end
+
   def sync_sequences_with_parent
     representative_server.list_all_databases.each do |db|
       res = parent.representative_server.run_query("
@@ -207,8 +211,8 @@ SQL
     end
   end
 
-  def disable_logical_subscription
-    representative_server.run_query_all("ALTER SUBSCRIPTION sub_#{ubid} DISABLE")
+  def delete_logical_subscription(name)
+    representative_server.run_query_all("DROP SUBSCRIPTION IF EXISTS #{name}")
   end
 
   def create_logical_replica(lantern_version: nil, extras_version: nil, minor_version: nil, pg_upgrade: nil)

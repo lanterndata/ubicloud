@@ -298,6 +298,25 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect { nx.destroy }.to exit({"msg" => "lantern resource is deleted"})
     end
 
+    it "deletes replication slot and publications on parent" do
+      expect(lantern_resource.servers).to all(receive(:incr_destroy))
+      expect { nx.destroy }.to nap(5)
+
+      parent_reosurce = instance_double(LanternResource)
+      expect(lantern_resource).to receive(:ubid).and_return("test-ubid").at_least(:once)
+      expect(parent_reosurce).to receive(:delete_replication_slot).with("slot_#{lantern_resource.ubid}")
+      expect(parent_reosurce).to receive(:delete_publication).with("pub_#{lantern_resource.ubid}")
+      expect(lantern_resource).to receive(:delete_logical_subscription).with("sub_#{lantern_resource.ubid}")
+      expect(lantern_resource).to receive(:parent).and_return(parent_reosurce).at_least(:once)
+      expect(lantern_resource).to receive(:servers).and_return([])
+      expect(lantern_resource).to receive(:dissociate_with_project)
+      expect(lantern_resource).to receive(:destroy)
+      expect(lantern_resource).to receive(:doctor).and_return(nil)
+      expect(lantern_resource).to receive(:service_account_name).and_return(nil)
+
+      expect { nx.destroy }.to exit({"msg" => "lantern resource is deleted"})
+    end
+
     it "triggers server deletion and deletes doctor" do
       expect(lantern_resource.servers).to all(receive(:incr_destroy))
       expect { nx.destroy }.to nap(5)
@@ -332,7 +351,7 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       vm = instance_double(GcpVm)
       expect(parent).to receive(:representative_server).and_return(representative_server)
       expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
-      expect(lantern_resource).to receive(:disable_logical_subscription)
+      expect(lantern_resource).to receive(:delete_logical_subscription).with("sub_#{lantern_resource.ubid}")
       expect(lantern_resource).to receive(:sync_sequences_with_parent)
       expect(representative_server).to receive(:vm).and_return(vm).at_least(:once)
       expect(vm).to receive(:swap_ip)
@@ -399,14 +418,14 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(parent).to receive(:set_to_readonly)
       expect(nx).to receive(:decr_switchover_with_parent)
 
-      expect { nx.switchover_with_parent }.to hop("disable_logical_subscription")
+      expect { nx.switchover_with_parent }.to hop("delete_logical_subscription")
     end
   end
 
-  describe "#disable_logical_subscription" do
-    it "disables susbcription and hop" do
-      expect(lantern_resource).to receive(:disable_logical_subscription)
-      expect { nx.disable_logical_subscription }.to hop("sync_sequences_with_parent")
+  describe "#delete_logical_subscription" do
+    it "deletes susbcription and hop" do
+      expect(lantern_resource).to receive(:delete_logical_subscription).with("sub_#{lantern_resource.ubid}")
+      expect { nx.delete_logical_subscription }.to hop("sync_sequences_with_parent")
     end
   end
 

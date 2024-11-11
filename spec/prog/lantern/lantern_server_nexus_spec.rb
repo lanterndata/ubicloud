@@ -328,7 +328,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server).to receive(:update).with({synchronization_status: "ready"})
       expect(lantern_server.resource).to receive(:representative_server).and_return(leader).at_least(:once)
       expect(lantern_server.resource).to receive(:ha_type).and_return(LanternResource::HaType::SYNC)
-      expect(lantern_server.resource).to receive(:delete_replication_slot).with(lantern_server.ubid)
       expect(leader).to receive(:run_query).and_return((1 * 1024 * 1024).to_s)
       expect { nx.wait_catch_up }.to hop("wait_synchronization")
     end
@@ -338,7 +337,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server).to receive(:update).with({synchronization_status: "ready"})
       expect(lantern_server.resource).to receive(:representative_server).and_return(leader).at_least(:once)
       expect(lantern_server.resource).to receive(:ha_type).and_return(LanternResource::HaType::ASYNC)
-      expect(lantern_server.resource).to receive(:delete_replication_slot).with(lantern_server.ubid)
       expect(leader).to receive(:run_query).and_return((1 * 1024 * 1024).to_s)
       expect { nx.wait_catch_up }.to hop("wait")
     end
@@ -812,7 +810,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server).to receive(:primary?).and_return(false)
       expect(lantern_server).to receive(:domain).and_return(nil)
       expect(lantern_server).to receive(:destroy)
-      expect(lantern_server.resource).to receive(:delete_replication_slot).with(lantern_server.ubid)
       expect { nx.destroy }.to exit({"msg" => "lantern server was deleted"})
     end
 

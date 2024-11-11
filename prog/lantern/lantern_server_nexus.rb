@@ -172,7 +172,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     nap 30 if lag.empty? || lag.to_i > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
 
     lantern_server.update(synchronization_status: "ready")
-    lantern_server.resource.delete_replication_slot(lantern_server.ubid)
 
     if !lantern_server.domain && !lantern_server.resource.representative_server.domain.nil?
       add_domain_to_stack(lantern_server.resource.representative_server.domain)
@@ -659,12 +658,8 @@ SQL
 
       if lantern_server.primary?
         lantern_server.timeline.incr_destroy
-      else
-        begin
-          lantern_server.resource.delete_replication_slot(lantern_server.ubid)
-        rescue
-        end
       end
+
       lantern_server.destroy
 
       vm.incr_destroy
