@@ -379,13 +379,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     end
 
     cf_client = Dns::Cloudflare.new
-    begin
-      cf_client.upsert_dns_record(frame["domain"], lantern_server.vm.sshable.host)
-    rescue => e
-      Clog.emit("Error while adding domain") { {error: e} }
-      decr_add_domain
-      hop_wait
-    end
+    cf_client.upsert_dns_record(frame["domain"], lantern_server.vm.sshable.host)
 
     lantern_server.update(domain: frame["domain"])
 

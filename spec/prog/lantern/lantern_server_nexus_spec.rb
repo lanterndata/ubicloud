@@ -623,15 +623,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect { nx.add_domain }.to raise_error "no domain in stack"
     end
 
-    it "fails to add domain" do
-      expect(nx).to receive(:frame).and_return({"domain" => "db.lantern.dev"}).at_least(:once)
-      expect(lantern_server.vm.sshable).to receive(:host).and_return("1.1.1.1")
-      cf_client = instance_double(Dns::Cloudflare)
-      expect(Dns::Cloudflare).to receive(:new).and_return(cf_client)
-      expect(cf_client).to receive(:upsert_dns_record).and_raise
-      expect { nx.add_domain }.to hop("wait")
-    end
-
     it "adds domain and setup ssl" do
       expect(lantern_server.vm.sshable).to receive(:host).and_return("1.1.1.1")
       cf_client = instance_double(Dns::Cloudflare)
