@@ -91,6 +91,11 @@ module Validation
     fail ValidationFailed.new({version: msg}) unless version && !version.to_s.strip.empty?
   end
 
+  def self.validate_rollback_request(parent_id)
+    msg = "parent_id should not be empty"
+    fail ValidationFailed.new({parent_id: msg}) unless parent_id && !parent_id.to_s.strip.empty?
+  end
+
   def self.validate_storage_volumes(storage_volumes, boot_disk_index)
     allowed_keys = [:encrypted, :size_gib, :boot, :skip_sync]
     fail ValidationFailed.new({storage_volumes: "At least one storage volume is required."}) if storage_volumes.empty?

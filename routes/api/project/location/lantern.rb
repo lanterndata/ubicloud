@@ -130,12 +130,14 @@ class CloverApi
       end
 
       r.get "backups" do
+        Authorization.authorize(@current_user.id, "Postgres:view", pg.id)
         pg.timeline.backups_with_metadata
           .sort_by { |hsh| hsh[:last_modified] }
           .map { |hsh| {time: hsh[:last_modified], label: pg.timeline.get_backup_label(hsh[:key]), compressed_size: hsh[:compressed_size], uncompressed_size: hsh[:uncompressed_size]} }
       end
 
       r.post "push-backup" do
+        Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
         pg.timeline.take_manual_backup
         response.status = 200
         r.halt
@@ -150,7 +152,42 @@ class CloverApi
       end
 
       r.post "dissociate-forks" do
+        Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
         pg.dissociate_forks
+        response.status = 200
+        r.halt
+      end
+
+      r.post "upgrade-with-replica" do
+        Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
+        Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
+        lantern_version = r.params["lantern_version"].empty? ? nil : r.params["lantern_version"]
+        extras_version = r.params["extras_version"].empty? ? nil : r.params["extras_version"]
+        minor_version = r.params["minor_version"].empty? ? nil : r.params["minor_version"]
+        pg_upgrade = r.params["pg_upgrade"].empty? ? nil : r.params["pg_upgrade"]
+        st = pg.create_logical_replica(
+          lantern_version: lantern_version,
+          extras_version: extras_version,
+          minor_version: minor_version,
+          pg_upgrade: pg_upgrade
+        )
+        replica = LanternResource[st.id]
+        serialize(replica, :detailed)
+      end
+
+      r.post "switchover" do
+        Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
+        pg.incr_switchover_with_parent
+        response.status = 200
+        r.halt
+      end
+
+      r.post "rollback-switchover" do
+        Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
+        parent = LanternResource[r.params["parent_id"]]
+        Authorization.authorize(@current_user.id, "Postgres:edit", parent.id)
+        Validation.validate_rollback_request(r.params["parent_id"])
+        MiscOperations.rollback_switchover(pg, parent)
         response.status = 200
         r.halt
       end

@@ -170,6 +170,16 @@ RSpec.describe Validation do
       end
     end
 
+    describe "#validate_rollback_request" do
+      it "valid request" do
+        expect(described_class.validate_rollback_request("test-id")).to be_nil
+      end
+
+      it "invalid version" do
+        expect { described_class.validate_rollback_request("") }.to raise_error described_class::ValidationFailed
+      end
+    end
+
     describe "#validate_lantern_size" do
       it "valid lantern size" do
         expect(described_class.validate_lantern_size("n1-standard-2").name).to eq("n1-standard-2")

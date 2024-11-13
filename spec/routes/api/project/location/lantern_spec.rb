@@ -322,5 +322,76 @@ RSpec.describe Clover, "lantern" do
         expect(last_response.status).to eq(200)
       end
     end
+
+    describe "upgrade-with-replica" do
+      it "creates a new replica" do
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        query_res = class_double(LanternResource, first: pg)
+        allow(query_res).to receive(:where).and_return(query_res)
+        expect(project).to receive(:lantern_resources_dataset).and_return(query_res)
+        expect(pg).to receive(:create_logical_replica).with(
+          lantern_version: nil,
+          extras_version: nil,
+          minor_version: nil,
+          pg_upgrade: nil
+        ).and_return(instance_double(Strand, id: pg.id))
+
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/upgrade-with-replica", {lantern_version: "", extras_version: "", minor_version: "", pg_upgrade: ""}
+        expect(last_response.status).to eq(200)
+      end
+
+      it "creates a new replica with upgrade request" do
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        query_res = class_double(LanternResource, first: pg)
+        allow(query_res).to receive(:where).and_return(query_res)
+        expect(project).to receive(:lantern_resources_dataset).and_return(query_res)
+        expect(pg).to receive(:create_logical_replica).with(
+          lantern_version: "0.5.0",
+          extras_version: "0.5.0",
+          minor_version: "1",
+          pg_upgrade: {"lantern_version" => "0.6.0", "extras_version" => "0.6.0", "minor_version" => "1", "pg_version" => "17"}
+        ).and_return(instance_double(Strand, id: pg.id))
+
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/upgrade-with-replica", {
+          lantern_version: "0.5.0",
+          extras_version: "0.5.0",
+          minor_version: "1",
+          pg_upgrade: {"lantern_version" => "0.6.0", "extras_version" => "0.6.0", "minor_version" => "1", "pg_version" => 17}
+        }
+        expect(last_response.status).to eq(200)
+      end
+    end
+
+    describe "switchover" do
+      it "performs a switchover" do
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        query_res = class_double(LanternResource, first: pg)
+        allow(query_res).to receive(:where).and_return(query_res)
+        expect(project).to receive(:lantern_resources_dataset).and_return(query_res)
+        expect(pg).to receive(:incr_switchover_with_parent)
+
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/switchover"
+        expect(last_response.status).to eq(200)
+      end
+    end
+
+    describe "rollback-switchover" do
+      it "rolls back a switchover" do
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        query_res = class_double(LanternResource, first: pg)
+        allow(query_res).to receive(:where).and_return(query_res)
+        expect(project).to receive(:lantern_resources_dataset).and_return(query_res)
+        parent_id = LanternResource.generate_uuid
+        parent_resource = instance_double(LanternResource, id: parent_id)
+        expect(Authorization).to receive(:authorize).with(user.id, "Postgres:edit", pg.id)
+        expect(Authorization).to receive(:authorize).with(user.id, "Postgres:edit", parent_resource.id)
+        allow(LanternResource).to receive(:[]).with(parent_id).and_return(parent_resource)
+        expect(Validation).to receive(:validate_rollback_request).with(parent_id)
+        expect(MiscOperations).to receive(:rollback_switchover).with(pg, parent_resource)
+
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/rollback-switchover", {parent_id: parent_id}
+        expect(last_response.status).to eq(200)
+      end
+    end
   end
 end
