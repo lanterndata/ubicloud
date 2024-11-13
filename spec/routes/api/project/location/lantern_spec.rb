@@ -338,6 +338,8 @@ RSpec.describe Clover, "lantern" do
 
         post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/logical-replica", {lantern_version: "", extras_version: "", minor_version: "", pg_upgrade: ""}
         expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["id"]).to eq(pg.id)
+        expect(JSON.parse(last_response.body)["name"]).to eq(pg.name)
       end
 
       it "creates a new replica with upgrade request" do

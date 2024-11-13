@@ -161,10 +161,10 @@ class CloverApi
       r.post "logical-replica" do
         Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
         Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
-        lantern_version = r.params["lantern_version"].empty? ? nil : r.params["lantern_version"]
-        extras_version = r.params["extras_version"].empty? ? nil : r.params["extras_version"]
-        minor_version = r.params["minor_version"].empty? ? nil : r.params["minor_version"]
-        pg_upgrade = r.params["pg_upgrade"].empty? ? nil : r.params["pg_upgrade"]
+        lantern_version = (r.params["lantern_version"] && r.params["lantern_version"].empty?) ? nil : r.params["lantern_version"]
+        extras_version = (r.params["extras_version"] && r.params["extras_version"].empty?) ? nil : r.params["extras_version"]
+        minor_version = (r.params["minor_version"] && r.params["minor_version"].empty?) ? nil : r.params["minor_version"]
+        pg_upgrade = (r.params["pg_upgrade"] && r.params["pg_upgrade"].empty?) ? nil : r.params["pg_upgrade"]
         st = pg.create_logical_replica(
           lantern_version: lantern_version,
           extras_version: extras_version,

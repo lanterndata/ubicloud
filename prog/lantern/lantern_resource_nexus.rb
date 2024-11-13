@@ -70,6 +70,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
           lantern_version = parent.representative_server.lantern_version
           extras_version = parent.representative_server.extras_version
           minor_version = parent.representative_server.minor_version
+          pg_version = parent.pg_version
         end
 
         target_storage_size_gib = parent.representative_server.target_storage_size_gib
