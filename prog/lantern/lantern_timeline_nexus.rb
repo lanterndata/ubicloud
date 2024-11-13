@@ -50,7 +50,7 @@ class Prog::Lantern::LanternTimelineNexus < Prog::Base
 
     if lantern_timeline.need_cleanup?
       retain_after = (Time.new - (24 * 60 * 60 * Config.backup_retention_days)).strftime("%Y-%m-%dT%H:%M:%S.%LZ")
-      cmd = "docker compose -f /var/lib/lantern/docker-compose.yaml exec -T -u root postgresql bash -c \"GOOGLE_APPLICATION_CREDENTIALS=/tmp/google-application-credentials-wal-g.json /opt/bitnami/postgresql/bin/wal-g delete retain FULL 7 --after #{retain_after} --confirm\""
+      cmd = "docker compose -f /var/lib/lantern/docker-compose.yaml exec -T -u root postgresql bash -c \"GOOGLE_APPLICATION_CREDENTIALS=/tmp/google-application-credentials-wal-g.json /usr/local/go/bin/wal-g delete retain FULL 7 --after #{retain_after} --confirm\""
       lantern_timeline.leader.vm.sshable.cmd("common/bin/daemonizer '#{cmd}' delete_old_backups")
     end
 
