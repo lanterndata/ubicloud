@@ -92,9 +92,19 @@ RSpec.describe LanternResource do
     it "sets up service account and updates resource" do
       api = instance_double(Hosting::GcpApis)
       allow(Hosting::GcpApis).to receive(:new).and_return(api)
-      allow(api).to receive_messages(create_service_account: {"email" => "test-sa"}, export_service_account_key: "test-key")
-      expect(lantern_resource).to receive(:update).with(gcp_creds_b64: "test-key", service_account_name: "test-sa")
+      allow(api).to receive_messages(create_service_account: {"email" => "test-sa"})
+      expect(lantern_resource).to receive(:update).with(service_account_name: "test-sa")
       expect { lantern_resource.setup_service_account }.not_to raise_error
+    end
+  end
+
+  describe "#export_service_account_key" do
+    it "exports service account key and updates resource" do
+      api = instance_double(Hosting::GcpApis)
+      allow(Hosting::GcpApis).to receive(:new).and_return(api)
+      allow(api).to receive_messages(export_service_account_key: "test-key")
+      expect(lantern_resource).to receive(:update).with(gcp_creds_b64: "test-key")
+      expect { lantern_resource.export_service_account_key }.not_to raise_error
     end
   end
 
@@ -141,6 +151,15 @@ RSpec.describe LanternResource do
       expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
       expect(lantern_resource.representative_server).to receive(:run_query_all).with(a_string_matching(/ddl_log/))
       expect { lantern_resource.create_ddl_log }.not_to raise_error
+    end
+  end
+
+  describe "#drop_ddl_log_trigger" do
+    it "drops ddl log trigger" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(lantern_resource.representative_server).to receive(:run_query_all).with(a_string_matching(/DROP .* log_ddl_trigger/))
+      expect { lantern_resource.drop_ddl_log_trigger }.not_to raise_error
     end
   end
 
@@ -194,6 +213,24 @@ RSpec.describe LanternResource do
     end
   end
 
+  describe "#delete_publication" do
+    it "drops replication slot" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(lantern_resource.representative_server).to receive(:run_query_all).with("DROP PUBLICATION IF EXISTS test")
+      expect { lantern_resource.delete_publication("test") }.not_to raise_error
+    end
+  end
+
+  describe "#delete_logical_subscription" do
+    it "drops subscription" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(lantern_resource.representative_server).to receive(:run_query_all).with("DROP SUBSCRIPTION IF EXISTS test")
+      expect { lantern_resource.delete_logical_subscription("test") }.not_to raise_error
+    end
+  end
+
   describe "#create_publication" do
     it "creates new publication" do
       representative_server = instance_double(LanternServer)
@@ -208,20 +245,11 @@ RSpec.describe LanternResource do
       representative_server = instance_double(LanternServer)
       expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
       expect(lantern_resource.representative_server).to receive(:list_all_databases).and_return(["db1", "db2"])
-      expect(lantern_resource.representative_server).to receive(:run_query).with(a_string_matching(/CREATE SUBSCRIPTION/), db: "db1")
-      expect(lantern_resource.representative_server).to receive(:run_query).with(a_string_matching(/CREATE SUBSCRIPTION/), db: "db2")
+      expect(lantern_resource.representative_server).to receive(:run_query).with(a_string_matching(/CREATE SUBSCRIPTION.*dbname=db1/m), db: "db1")
+      expect(lantern_resource.representative_server).to receive(:run_query).with(a_string_matching(/CREATE SUBSCRIPTION.*dbname=db2/m), db: "db2")
       expect(lantern_resource).to receive(:connection_string).and_return("postgres://localhost:5432").at_least(:once)
       expect(lantern_resource).to receive(:parent).and_return(lantern_resource).at_least(:once)
       expect { lantern_resource.create_and_enable_subscription }.not_to raise_error
-    end
-  end
-
-  describe "#disable_logical_subscription" do
-    it "disables subscription" do
-      representative_server = instance_double(LanternServer)
-      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
-      expect(lantern_resource.representative_server).to receive(:run_query_all).with("ALTER SUBSCRIPTION sub_#{lantern_resource.ubid} DISABLE")
-      expect { lantern_resource.disable_logical_subscription }.not_to raise_error
     end
   end
 
@@ -293,10 +321,19 @@ RSpec.describe LanternResource do
       ]
       statements_db2 = statements_db1 # identical statements for the test
 
-      expect(representative_server).to receive(:run_query).with(statements_db1, db: "db1")
-      expect(representative_server).to receive(:run_query).with(statements_db2, db: "db2")
+      expect(representative_server).to receive(:run_query).with(statements_db1.join("\n"), db: "db1")
+      expect(representative_server).to receive(:run_query).with(statements_db2.join("\n"), db: "db2")
 
       expect { lantern_resource.sync_sequences_with_parent }.not_to raise_error
+    end
+  end
+
+  describe "#get_logical_replication_lag" do
+    it "gets the lag" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:run_query).with("SELECT (pg_current_wal_lsn() - confirmed_flush_lsn) FROM pg_catalog.pg_replication_slots WHERE slot_name = 'test_slot'").and_return("0\n")
+      expect(lantern_resource.get_logical_replication_lag("test_slot")).to be(0)
     end
   end
 end

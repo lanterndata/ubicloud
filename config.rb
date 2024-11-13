@@ -136,13 +136,12 @@ module Config
   # GCP
   override :gcp_project_id, "lantern-development", string
   override :gcp_compute_service_account, "339254316100-compute@developer.gserviceaccount.com", string
-  optional :gcp_creds_gcr_b64, string
   optional :gcp_creds_logging_b64, string
   optional :gcp_creds_coredumps_b64, string
   optional :gcp_creds_walg_b64, string
   optional :prom_password, string
   override :gcp_default_image, "projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy-v20240319", string
-  override :gcr_image, "gcr.io/ringed-griffin-394922/lantern-bitnami"
+  override :gcr_image, "lanterndata/lantern-self-hosted"
 
   # Lantern
   override :lantern_top_domain, "db.lantern.dev", string
@@ -153,6 +152,7 @@ module Config
   override :lantern_backup_bucket, "walg-dev-backups"
   override :e2e_test, "0"
   override :backup_retention_days, 7, int
+  override :backup_retention_days_after_deletion, 0, int
   override :lantern_log_dataset, "lantern_logs", string
   override :compose_file, "/var/lib/lantern/docker-compose.yaml", string
 

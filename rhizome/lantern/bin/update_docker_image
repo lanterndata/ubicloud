@@ -9,13 +9,12 @@ require_relative "../lib/common"
 $configure_hash = JSON.parse($stdin.read)
 
 container_image = $configure_hash["container_image"]
-gcp_creds_gcr_b64 = $configure_hash["gcp_creds_gcr_b64"]
 
-configure_gcr(gcp_creds_gcr_b64, container_image)
+configure_gcr(container_image)
 map = YAML.load_file $compose_file
 map["services"]["postgresql"]["image"] = container_image
 
 File.open($compose_file, "w") { |f| YAML.dump(map, f) }
 
 r "sudo docker compose -f #{$compose_file} down"
-run_database(container_image)
+run_database(container_image, $configure_hash["pg_version"])

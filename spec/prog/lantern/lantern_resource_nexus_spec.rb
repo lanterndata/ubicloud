@@ -126,22 +126,8 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
   end
 
   describe "#start" do
-    it "sets up gcp service account and allows bucket usage" do
-      expect(lantern_resource).to receive(:setup_service_account)
-      expect(lantern_resource).to receive(:create_logging_table)
-      expect(lantern_resource).to receive(:parent_id).and_return("test-parent")
-      expect(lantern_resource).not_to receive(:allow_timeline_access_to_bucket)
-      expect(nx).to receive(:register_deadline)
-      expect { nx.start }.to hop("wait_servers")
-    end
-
-    it "sets up gcp service account" do
-      expect(lantern_resource).to receive(:setup_service_account)
-      expect(lantern_resource).to receive(:create_logging_table)
-      expect(lantern_resource).to receive(:parent_id).and_return(nil)
-      expect(lantern_resource).to receive(:allow_timeline_access_to_bucket)
-      expect(nx).to receive(:register_deadline)
-      expect { nx.start }.to hop("wait_servers")
+    it "hops to setup_service_account" do
+      expect { nx.start }.to hop("setup_service_account")
     end
 
     # it "buds trigger_pg_current_xact_id_on_parent if it has parent" do
@@ -151,6 +137,43 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
     # expect(nx).to receive(:bud).with(described_class, {}, :trigger_pg_current_xact_id_on_parent)
     # expect { nx.start }.to hop("wait_servers")
     # end
+  end
+
+  describe "#setup_timeline_access" do
+    it "allows bucket usage" do
+      expect(lantern_resource).to receive(:parent_id).and_return("test-parent")
+      expect(lantern_resource).not_to receive(:allow_timeline_access_to_bucket)
+      expect(nx).to receive(:register_deadline)
+      expect { nx.setup_timeline_access }.to hop("wait_servers")
+    end
+
+    it "sets up gcp service account" do
+      expect(lantern_resource).to receive(:parent_id).and_return(nil)
+      expect(lantern_resource).to receive(:allow_timeline_access_to_bucket)
+      expect(nx).to receive(:register_deadline)
+      expect { nx.setup_timeline_access }.to hop("wait_servers")
+    end
+  end
+
+  describe "#create_logging_table" do
+    it "hops to setup_timeline_access" do
+      expect(lantern_resource).to receive(:create_logging_table)
+      expect { nx.create_logging_table }.to hop("setup_timeline_access")
+    end
+  end
+
+  describe "#setup_service_account" do
+    it "hops to export_service_account_key" do
+      expect(lantern_resource).to receive(:setup_service_account)
+      expect { nx.setup_service_account }.to hop("export_service_account_key")
+    end
+  end
+
+  describe "#export_service_account_key" do
+    it "hops to create_logging_table" do
+      expect(lantern_resource).to receive(:export_service_account_key)
+      expect { nx.export_service_account_key }.to hop("create_logging_table")
+    end
   end
 
   # describe "#wait_trigger_pg_current_xact_id_on_parent" do
@@ -226,6 +249,16 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect { nx.wait }.to nap(30)
     end
 
+    it "naps if no parent on swap_dns" do
+      expect(lantern_resource).to receive(:required_standby_count).and_return(0)
+      expect(lantern_resource).to receive(:display_state).and_return(nil)
+      expect(lantern_resource).to receive(:servers).and_return([instance_double(LanternServer, strand: instance_double(Strand, label: "wait"))]).at_least(:once)
+      expect(nx).to receive(:when_switchover_with_parent_set?).and_yield
+      expect(lantern_resource).to receive(:parent).and_return(nil)
+      expect(nx).to receive(:decr_switchover_with_parent)
+      expect { nx.wait }.to nap(30)
+    end
+
     it "hops to swap_leaders" do
       expect(lantern_resource).to receive(:required_standby_count).and_return(0)
       expect(lantern_resource).to receive(:display_state).and_return(nil)
@@ -237,6 +270,18 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(lantern_resource).to receive(:update).with(display_state: "failover")
       expect { nx.wait }.to hop("swap_leaders_with_parent")
     end
+
+    it "hops to swap_dns" do
+      expect(lantern_resource).to receive(:required_standby_count).and_return(0)
+      expect(lantern_resource).to receive(:display_state).and_return(nil)
+      expect(lantern_resource).to receive(:servers).and_return([instance_double(LanternServer, strand: instance_double(Strand, label: "wait"))]).at_least(:once)
+      expect(nx).to receive(:when_switchover_with_parent_set?).and_yield
+      parent = instance_double(LanternResource)
+      expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)
+      expect(parent).to receive(:update).with(display_state: "failover")
+      expect(lantern_resource).to receive(:update).with(display_state: "failover")
+      expect { nx.wait }.to hop("switchover_with_parent")
+    end
   end
 
   describe "#destroy" do
@@ -244,6 +289,25 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(lantern_resource.servers).to all(receive(:incr_destroy))
       expect { nx.destroy }.to nap(5)
 
+      expect(lantern_resource).to receive(:servers).and_return([])
+      expect(lantern_resource).to receive(:dissociate_with_project)
+      expect(lantern_resource).to receive(:destroy)
+      expect(lantern_resource).to receive(:doctor).and_return(nil)
+      expect(lantern_resource).to receive(:service_account_name).and_return(nil)
+
+      expect { nx.destroy }.to exit({"msg" => "lantern resource is deleted"})
+    end
+
+    it "deletes replication slot and publications on parent" do
+      expect(lantern_resource.servers).to all(receive(:incr_destroy))
+      expect { nx.destroy }.to nap(5)
+
+      parent_reosurce = instance_double(LanternResource)
+      expect(lantern_resource).to receive(:ubid).and_return("test-ubid").at_least(:once)
+      expect(parent_reosurce).to receive(:delete_replication_slot).with("slot_#{lantern_resource.ubid}")
+      expect(parent_reosurce).to receive(:delete_publication).with("pub_#{lantern_resource.ubid}")
+      expect(lantern_resource).to receive(:delete_logical_subscription).with("sub_#{lantern_resource.ubid}")
+      expect(lantern_resource).to receive(:parent).and_return(parent_reosurce).at_least(:once)
       expect(lantern_resource).to receive(:servers).and_return([])
       expect(lantern_resource).to receive(:dissociate_with_project)
       expect(lantern_resource).to receive(:destroy)
@@ -287,7 +351,7 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       vm = instance_double(GcpVm)
       expect(parent).to receive(:representative_server).and_return(representative_server)
       expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
-      expect(lantern_resource).to receive(:disable_logical_subscription)
+      expect(lantern_resource).to receive(:delete_logical_subscription).with("sub_#{lantern_resource.ubid}")
       expect(lantern_resource).to receive(:sync_sequences_with_parent)
       expect(representative_server).to receive(:vm).and_return(vm).at_least(:once)
       expect(vm).to receive(:swap_ip)
@@ -314,17 +378,27 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
   end
 
   describe "#update_hosts" do
-    it "updates the domains of the current and new master, updates display states, and removes fork association" do
+    it "updates the domains of the current and new master" do
       parent = instance_double(LanternResource)
       current_master = instance_double(LanternServer, domain: "current-master-domain.com")
       new_master = instance_double(LanternServer, domain: "new-master-domain.com")
-      timeline = instance_double(LanternTimeline)
 
       expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)
       expect(parent).to receive(:representative_server).and_return(current_master).at_least(:once)
       expect(lantern_resource).to receive(:representative_server).and_return(new_master).at_least(:once)
       expect(new_master).to receive(:update).with(domain: "current-master-domain.com")
       expect(current_master).to receive(:update).with(domain: "new-master-domain.com")
+
+      expect { nx.update_hosts }.to hop("finish_take_over")
+    end
+  end
+
+  describe "#finish_take_over" do
+    it "updates display states, and removes fork association" do
+      parent = instance_double(LanternResource)
+      timeline = instance_double(LanternTimeline)
+
+      expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)
 
       expect(lantern_resource).to receive(:update).with(display_state: nil)
       expect(parent).to receive(:update).with(display_state: nil)
@@ -333,7 +407,97 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(lantern_resource).to receive(:timeline).and_return(timeline)
       expect(timeline).to receive(:update).with(parent_id: nil)
 
-      expect { nx.update_hosts }.to hop("wait")
+      expect { nx.finish_take_over }.to hop("wait")
+    end
+  end
+
+  describe "#switchover_with_parent" do
+    it "sets parent to readonly and hop" do
+      parent = instance_double(LanternResource)
+      expect(lantern_resource).to receive(:parent).and_return(parent)
+      expect(parent).to receive(:set_to_readonly)
+      expect(nx).to receive(:decr_switchover_with_parent)
+
+      expect { nx.switchover_with_parent }.to hop("wait_for_synchronization")
+    end
+  end
+
+  describe "#wait_for_synchronization" do
+    it "naps 5" do
+      parent = instance_double(LanternResource)
+      expect(lantern_resource).to receive(:parent).and_return(parent)
+      expect(parent).to receive(:get_logical_replication_lag).with("slot_#{lantern_resource.ubid}").and_return(5)
+
+      expect { nx.wait_for_synchronization }.to nap(5)
+    end
+
+    it "hops to delete_logical_subscription" do
+      parent = instance_double(LanternResource)
+      expect(lantern_resource).to receive(:parent).and_return(parent)
+      expect(parent).to receive(:get_logical_replication_lag).with("slot_#{lantern_resource.ubid}").and_return(0)
+
+      expect { nx.wait_for_synchronization }.to hop("delete_logical_subscription")
+    end
+  end
+
+  describe "#delete_logical_subscription" do
+    it "deletes susbcription and hop" do
+      expect(lantern_resource).to receive(:delete_logical_subscription).with("sub_#{lantern_resource.ubid}")
+      expect { nx.delete_logical_subscription }.to hop("sync_sequences_with_parent")
+    end
+  end
+
+  describe "#sync_sequences_with_parent" do
+    it "syncs sequences and hop" do
+      expect(lantern_resource).to receive(:sync_sequences_with_parent)
+      expect { nx.sync_sequences_with_parent }.to hop("switch_dns_with_parent")
+    end
+  end
+
+  describe "#switch_dns_with_parent" do
+    it "hops to finish_take_over" do
+      parent = instance_double(LanternResource, representative_server: instance_double(LanternServer, domain: nil))
+      expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)
+      expect(lantern_resource.parent.representative_server).to receive(:stop_container)
+      expect { nx.switch_dns_with_parent }.to hop("finish_take_over")
+    end
+
+    it "switches dns with parent and hop to wait_switch_dns" do
+      parent = instance_double(LanternResource, representative_server: instance_double(LanternServer, domain: "test-domain"))
+      expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)
+      expect(lantern_resource.parent.representative_server).to receive(:stop_container)
+      expect(lantern_resource.representative_server).to receive(:swap_dns).with(parent.representative_server)
+      expect(lantern_resource).to receive(:update).with(logical_replication: false)
+      expect { nx.switch_dns_with_parent }.to hop("wait_switch_dns")
+    end
+  end
+
+  describe "#wait_switch_dns" do
+    it "naps if dns is not ready" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:is_dns_correct?).and_return(false)
+      expect { nx.wait_switch_dns }.to nap 10
+    end
+
+    it "waits if db is not ready" do
+      representative_server = instance_double(LanternServer)
+      expect(Sequel).to receive(:connect).and_return(DB)
+      expect(DB).to receive(:[]).with("SELECT 1").and_raise
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:is_dns_correct?).and_return(true)
+      expect { nx.wait_switch_dns }.to nap 10
+    end
+
+    it "hops to finish_take_over" do
+      representative_server = instance_double(LanternServer)
+      expect(Sequel).to receive(:connect).and_return(DB)
+      res = instance_double(Sequel::Dataset)
+      expect(res).to receive(:first)
+      expect(DB).to receive(:[]).with("SELECT 1").and_return(res)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:is_dns_correct?).and_return(true)
+      expect { nx.wait_switch_dns }.to hop("finish_take_over")
     end
   end
 end

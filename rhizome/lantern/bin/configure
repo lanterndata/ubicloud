@@ -7,9 +7,6 @@ require_relative "../../common/lib/util"
 require_relative "../lib/common"
 
 $configure_hash = JSON.parse($stdin.read)
-File.open("test.json", "a") do |f|
-  f.puts($configure_hash.to_json)
-end
 
 def install_dependencies
   # Install dependencies
@@ -112,7 +109,7 @@ def setup_initial_compose_file
         "ports" => ["5432:5432", "6432:6432"],
         "volumes" => ["/var/lib/lantern-data:/bitnami/postgresql"],
         "deploy" => {
-          "restart_policy" => {"condition" => "always"},
+          "restart_policy" => {"condition" => "on-failure"},
           "resources" => {"limits" => {"memory" => memory_sizes[:shared_bufs]}}
         },
         "env_file" => $env_file,
@@ -148,7 +145,7 @@ end
 if $configure_hash[:skip_deps].nil?
   install_dependencies
   puts "dependencies installed"
-  configure_gcr($configure_hash["gcp_creds_gcr_b64"], $configure_hash["container_image"])
+  configure_gcr($configure_hash["container_image"])
   puts "GCR repo ready"
 end
 
@@ -159,5 +156,5 @@ setup_env
 puts ".env setted up"
 setup_initial_compose_file
 puts "docker-compose.yaml ready"
-run_database($configure_hash["container_image"])
+run_database($configure_hash["container_image"], $configure_hash["pg_version"])
 puts "database ready"

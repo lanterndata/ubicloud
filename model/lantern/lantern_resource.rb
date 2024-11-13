@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "uri"
 require_relative "../../model"
 
 class LanternResource < Sequel::Model
@@ -21,7 +22,7 @@ class LanternResource < Sequel::Model
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
 
-  semaphore :destroy, :swap_leaders_with_parent
+  semaphore :destroy, :swap_leaders_with_parent, :switchover_with_parent
 
   plugin :column_encryption do |enc|
     enc.column :superuser_password
@@ -74,8 +75,13 @@ class LanternResource < Sequel::Model
   def setup_service_account
     api = Hosting::GcpApis.new
     service_account = api.create_service_account("lt-#{ubid}", "Service Account for Lantern #{name}")
-    key = api.export_service_account_key(service_account["email"])
-    update(gcp_creds_b64: key, service_account_name: service_account["email"])
+    update(service_account_name: service_account["email"])
+  end
+
+  def export_service_account_key
+    api = Hosting::GcpApis.new
+    key = api.export_service_account_key(service_account_name)
+    update(gcp_creds_b64: key)
   end
 
   def allow_timeline_access_to_bucket
@@ -104,6 +110,10 @@ class LanternResource < Sequel::Model
     representative_server.run_query("SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_name='#{name}';")
   end
 
+  def get_logical_replication_lag(slot_name)
+    representative_server.run_query("SELECT (pg_current_wal_lsn() - confirmed_flush_lsn) FROM pg_catalog.pg_replication_slots WHERE slot_name = '#{slot_name}'").chomp.to_i
+  end
+
   def create_ddl_log
     commands = <<SQL
     BEGIN;
@@ -130,6 +140,13 @@ SQL
     representative_server.run_query_all(commands)
   end
 
+  def drop_ddl_log_trigger
+    commands = <<SQL
+   DROP EVENT TRIGGER IF EXISTS log_ddl_trigger;
+SQL
+    representative_server.run_query_all(commands)
+  end
+
   def listen_ddl_log
     commands = <<SQL
    DROP EVENT TRIGGER IF EXISTS log_ddl_trigger;
@@ -143,6 +160,7 @@ SQL
    END;
    $$ LANGUAGE plpgsql;
 
+   DROP TRIGGER IF EXISTS execute_ddl_after_insert ON ddl_log;
    CREATE TRIGGER execute_ddl_after_insert
    AFTER INSERT ON ddl_log
    FOR EACH ROW
@@ -154,6 +172,10 @@ SQL
 
   def create_publication(name)
     representative_server.run_query_all("CREATE PUBLICATION #{name} FOR ALL TABLES")
+  end
+
+  def delete_publication(name)
+    representative_server.run_query_all("DROP PUBLICATION IF EXISTS #{name}")
   end
 
   def sync_sequences_with_parent
@@ -171,15 +193,18 @@ SQL
         "SELECT setval('#{values[0]}.#{values[1]}', #{values[2]});"
       end
 
-      representative_server.run_query(statements, db: db)
+      representative_server.run_query(statements.join("\n"), db: db)
     end
   end
 
   def create_and_enable_subscription
     representative_server.list_all_databases.each do |db|
+      uri = URI.parse(parent.connection_string(port: 5432))
+      new_query_ar = URI.decode_www_form(String(uri.query)) << ["dbname", db]
+      uri.query = URI.encode_www_form(new_query_ar)
       commands = <<SQL
       CREATE SUBSCRIPTION sub_#{ubid}
-      CONNECTION '#{parent.connection_string(port: 5432)}/#{db}'
+      CONNECTION '#{uri}'
       PUBLICATION pub_#{ubid}
       WITH (
         copy_data = false,
@@ -195,11 +220,11 @@ SQL
     end
   end
 
-  def disable_logical_subscription
-    representative_server.run_query_all("ALTER SUBSCRIPTION sub_#{ubid} DISABLE")
+  def delete_logical_subscription(name)
+    representative_server.run_query_all("DROP SUBSCRIPTION IF EXISTS #{name}")
   end
 
-  def create_logical_replica(lantern_version: nil, extras_version: nil, minor_version: nil)
+  def create_logical_replica(lantern_version: nil, extras_version: nil, minor_version: nil, pg_upgrade: nil)
     # TODO::
     # 1. If new database will be created during logical replication it won't be added automatically
     # 2. New timeline will be generated for lantern resource
@@ -224,7 +249,9 @@ SQL
       logical_replication: true,
       lantern_version: lantern_version || representative_server.lantern_version,
       extras_version: extras_version || representative_server.extras_version,
-      minor_version: minor_version || representative_server.minor_version
+      minor_version: minor_version || representative_server.minor_version,
+      pg_version: pg_version,
+      pg_upgrade: pg_upgrade
     )
   end
 

@@ -18,12 +18,14 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       resource: instance_double(LanternResource,
         org_id: 0,
         name: "test",
+        label: "none",
         db_name: "postgres",
         db_user: "postgres",
         service_account_name: "test-sa",
         gcp_creds_b64: "test-creds",
         version_upgrade: false,
-        superuser_password: "pwd123"),
+        superuser_password: "pwd123",
+        pg_version: 15),
       vm: instance_double(
         GcpVm,
         id: "104b0033-b3f6-8214-ae27-0cd3cef18ce4",
@@ -70,6 +72,31 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
         target_storage_size_gib: 50,
         representative_at: Time.now,
         domain: "db.lantern.dev"
+      )
+
+      lantern_server = LanternServer[st.id]
+      expect(lantern_server).not_to be_nil
+    end
+
+    it "creates lantern server as primary with upgrade info" do
+      project = Project.create_with_id(name: "default", provider: "gcp").tap { _1.associate_with_project(_1) }
+      lantern_resource = instance_double(LanternResource,
+        name: "test",
+        project_id: project.id,
+        location: "us-central1")
+
+      expect(LanternResource).to receive(:[]).and_return(lantern_resource)
+
+      st = described_class.assemble(
+        resource_id: "6ae7e513-c34a-8039-a72a-7be45b53f2a0",
+        lantern_version: "0.2.0",
+        extras_version: "0.1.3",
+        minor_version: "2",
+        target_vm_size: "n1-standard-2",
+        target_storage_size_gib: 50,
+        representative_at: Time.now,
+        domain: "db.lantern.dev",
+        pg_upgrade: {"lantern_version" => "0.5.0", "extras_version" => "0.5.0", "minor_version" => "1", "pg_version" => 17}
       )
 
       lantern_server = LanternServer[st.id]
@@ -206,17 +233,10 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
     it "naps if timeline is not ready" do
       expect(lantern_server.timeline).to receive(:strand).and_return(instance_double(Strand, label: "start"))
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds")
       expect { nx.setup_docker_stack }.to nap(10)
     end
 
-    it "raises if gcr credentials are not provided" do
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return(nil)
-      expect { nx.setup_docker_stack }.to raise_error "GCP_CREDS_GCR_B64 is required to setup docker stack for Lantern"
-    end
-
     it "calls setup if not started" do
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_lantern").and_return("NotStarted")
       expect(lantern_server).to receive(:configure_hash).and_return("test")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/configure' configure_lantern", stdin: "test")
@@ -224,7 +244,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
 
     it "calls setup if failed" do
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_lantern").and_return("Failed")
       expect(lantern_server).to receive(:configure_hash).and_return("test")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/configure' configure_lantern", stdin: "test")
@@ -232,7 +251,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
 
     it "calls add domain after succeeded" do
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_lantern").and_return("Succeeded")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_lantern")
       expect(nx).to receive(:frame).and_return({"domain" => "db.lantern.dev"})
@@ -243,7 +261,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
 
     it "hop to wait_db_available" do
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_lantern").and_return("Succeeded")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_lantern")
       expect(nx).to receive(:frame).and_return({})
@@ -253,7 +270,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
 
     it "naps if in progress" do
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_lantern").and_return("InProgress")
       expect { nx.setup_docker_stack }.to nap(5)
     end
@@ -306,13 +322,12 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
     it "hops to wait_synchronization" do
       leader = instance_double(LanternServer, domain: "db.lantern.dev")
-      expect(nx).to receive(:add_domain_to_stack).with(leader.domain)
+      expect(lantern_server).to receive(:add_domain_to_stack).with(leader.domain, nx.strand)
       expect(nx).to receive(:incr_setup_ssl)
       expect(lantern_server).to receive(:domain).and_return(nil)
       expect(lantern_server).to receive(:update).with({synchronization_status: "ready"})
       expect(lantern_server.resource).to receive(:representative_server).and_return(leader).at_least(:once)
       expect(lantern_server.resource).to receive(:ha_type).and_return(LanternResource::HaType::SYNC)
-      expect(lantern_server.resource).to receive(:delete_replication_slot).with(lantern_server.ubid)
       expect(leader).to receive(:run_query).and_return((1 * 1024 * 1024).to_s)
       expect { nx.wait_catch_up }.to hop("wait_synchronization")
     end
@@ -322,7 +337,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server).to receive(:update).with({synchronization_status: "ready"})
       expect(lantern_server.resource).to receive(:representative_server).and_return(leader).at_least(:once)
       expect(lantern_server.resource).to receive(:ha_type).and_return(LanternResource::HaType::ASYNC)
-      expect(lantern_server.resource).to receive(:delete_replication_slot).with(lantern_server.ubid)
       expect(leader).to receive(:run_query).and_return((1 * 1024 * 1024).to_s)
       expect { nx.wait_catch_up }.to hop("wait")
     end
@@ -354,6 +368,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
   describe "#wait_recovery_completion" do
     it "hop to wait if recovery finished" do
       expect(lantern_server.resource).to receive(:allow_timeline_access_to_bucket)
+      expect(lantern_server.resource).to receive(:logical_replication).and_return(false)
       expect(lantern_server).to receive(:run_query).and_return("t", "paused", "t", lantern_server.lantern_version, lantern_server.extras_version)
       expect(lantern_server).to receive(:timeline_id=)
       expect(lantern_server).to receive(:timeline_access=).with("push")
@@ -364,6 +379,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
     it "hop to wait if not in recovery" do
       expect(lantern_server.resource).to receive(:allow_timeline_access_to_bucket)
+      expect(lantern_server.resource).to receive(:logical_replication).and_return(false)
       expect(lantern_server).to receive(:run_query).and_return("f", lantern_server.lantern_version, lantern_server.extras_version)
       expect(lantern_server).to receive(:timeline_id=)
       expect(lantern_server).to receive(:timeline_access=).with("push")
@@ -374,6 +390,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
     it "do not update extension on upgrade" do
       expect(lantern_server.resource).to receive(:allow_timeline_access_to_bucket)
+      expect(lantern_server.resource).to receive(:logical_replication).and_return(false)
       expect(lantern_server).to receive(:run_query).and_return("f")
       expect(lantern_server).to receive(:timeline_id=)
       expect(lantern_server).to receive(:timeline_access=).with("push")
@@ -384,6 +401,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     end
 
     it "update extension on version mismatch" do
+      expect(lantern_server.resource).to receive(:logical_replication).and_return(false)
       expect(lantern_server.resource).to receive(:allow_timeline_access_to_bucket)
       expect(lantern_server).to receive(:run_query).and_return("t", "paused", "t", "0.2.4", "0.1.4")
       expect(lantern_server).to receive(:timeline_id=)
@@ -394,6 +412,48 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(nx).to receive(:incr_update_lantern_extension)
       expect(nx).to receive(:incr_update_extras_extension)
       expect(Prog::Lantern::LanternTimelineNexus).to receive(:assemble).and_return(instance_double(Strand, id: "104b0033-b3f6-8214-ae27-0cd3cef18ce5"))
+      expect { nx.wait_recovery_completion }.to hop("wait_timeline_available")
+    end
+
+    it "does not setup ssl if parent has no domain" do
+      parent_reosurce = instance_double(LanternResource)
+      representative_server = instance_double(LanternServer)
+      expect(parent_reosurce).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:domain).and_return(nil).at_least(:once)
+      expect(lantern_server.resource).to receive(:parent).and_return(parent_reosurce).at_least(:once)
+      expect(lantern_server.resource).to receive(:logical_replication).and_return(true)
+      expect(lantern_server.resource).to receive(:allow_timeline_access_to_bucket)
+      expect(lantern_server).to receive(:run_query).and_return("f")
+      expect(lantern_server).to receive(:timeline_id=)
+      expect(lantern_server).to receive(:timeline_access=).with("push")
+      expect(lantern_server).to receive(:save_changes)
+      frame = {"pg_upgrade" => {"lantern_version" => "0.5.0", "extras_version" => "0.5.0", "minor_version" => "1", "pg_version" => 17}}
+      expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(lantern_server.resource).to receive(:version_upgrade).and_return(true)
+      expect(Prog::Lantern::LanternTimelineNexus).to receive(:assemble).and_return(instance_double(Strand, id: "104b0033-b3f6-8214-ae27-0cd3cef18ce5"))
+      expect(nx).to receive(:incr_run_pg_upgrade)
+      expect { nx.wait_recovery_completion }.to hop("wait_timeline_available")
+    end
+
+    it "run pg_upgrade if frame has pg_upgrade info" do
+      parent_reosurce = instance_double(LanternResource)
+      representative_server = instance_double(LanternServer)
+      expect(parent_reosurce).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:domain).and_return("example.com").at_least(:once)
+      expect(lantern_server.resource).to receive(:parent).and_return(parent_reosurce).at_least(:once)
+      expect(lantern_server.resource).to receive(:logical_replication).and_return(true)
+      expect(lantern_server.resource).to receive(:allow_timeline_access_to_bucket)
+      expect(lantern_server).to receive(:add_domain_to_stack).with(parent_reosurce.representative_server.domain, nx.strand)
+      expect(nx).to receive(:incr_setup_ssl)
+      expect(lantern_server).to receive(:run_query).and_return("f")
+      expect(lantern_server).to receive(:timeline_id=)
+      expect(lantern_server).to receive(:timeline_access=).with("push")
+      expect(lantern_server).to receive(:save_changes)
+      frame = {"pg_upgrade" => {"lantern_version" => "0.5.0", "extras_version" => "0.5.0", "minor_version" => "1", "pg_version" => 17}}
+      expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(lantern_server.resource).to receive(:version_upgrade).and_return(true)
+      expect(Prog::Lantern::LanternTimelineNexus).to receive(:assemble).and_return(instance_double(Strand, id: "104b0033-b3f6-8214-ae27-0cd3cef18ce5"))
+      expect(nx).to receive(:incr_run_pg_upgrade)
       expect { nx.wait_recovery_completion }.to hop("wait_timeline_available")
     end
 
@@ -523,11 +583,9 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
   describe "#update_image" do
     it "updates image and naps" do
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
       expect(lantern_server).to receive(:container_image).and_return("test-image").at_least(:once)
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check update_docker_image").and_return("NotStarted")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/update_docker_image' update_docker_image", stdin: JSON.generate({
-        gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
         container_image: lantern_server.container_image
       }))
       expect { nx.update_image }.to nap(10)
@@ -565,15 +623,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect { nx.add_domain }.to raise_error "no domain in stack"
     end
 
-    it "fails to add domain" do
-      expect(nx).to receive(:frame).and_return({"domain" => "db.lantern.dev"}).at_least(:once)
-      expect(lantern_server.vm.sshable).to receive(:host).and_return("1.1.1.1")
-      cf_client = instance_double(Dns::Cloudflare)
-      expect(Dns::Cloudflare).to receive(:new).and_return(cf_client)
-      expect(cf_client).to receive(:upsert_dns_record).and_raise
-      expect { nx.add_domain }.to hop("wait")
-    end
-
     it "adds domain and setup ssl" do
       expect(lantern_server.vm.sshable).to receive(:host).and_return("1.1.1.1")
       cf_client = instance_double(Dns::Cloudflare)
@@ -581,42 +630,9 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
       expect(nx).to receive(:frame).and_return({"domain" => "test.lantern.dev"}).at_least(:once)
       expect(lantern_server).to receive(:update).with({domain: "test.lantern.dev"})
+      expect(lantern_server).to receive(:remove_domain_from_stack)
       expect(cf_client).to receive(:upsert_dns_record).with("test.lantern.dev", "1.1.1.1")
       expect { nx.add_domain }.to hop("setup_ssl")
-    end
-  end
-
-  describe "#destroy_domain" do
-    it "destroys domain" do
-      cf_client = instance_double(Dns::Cloudflare)
-      expect(Dns::Cloudflare).to receive(:new).and_return(cf_client)
-      expect(lantern_server).to receive(:domain).and_return("example.com")
-      expect(cf_client).to receive(:delete_dns_record).with("example.com")
-      nx.destroy_domain
-    end
-  end
-
-  describe "#add_domain_to_stack" do
-    it "adds domain to current frame" do
-      domain = "db.lantern.dev"
-      frame = {}
-      expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
-      expect(frame).to receive(:[]=).with("domain", domain)
-      expect(nx.strand).to receive(:modified!).with(:stack)
-      expect(nx.strand).to receive(:save_changes)
-      expect { nx.add_domain_to_stack(domain) }.not_to raise_error
-    end
-  end
-
-  describe "#remove_domain_from_stack" do
-    it "removes domain from current frame" do
-      domain = "db.lantern.dev"
-      frame = {"domain" => domain}
-      expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
-      expect(frame).to receive(:delete).with("domain")
-      expect(nx.strand).to receive(:modified!).with(:stack)
-      expect(nx.strand).to receive(:save_changes)
-      expect { nx.remove_domain_from_stack }.not_to raise_error
     end
   end
 
@@ -659,7 +675,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     it "sets up ssl and hops to wait_db_available" do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check setup_ssl").and_return("Succeeded")
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean setup_ssl")
-      expect(nx).to receive(:remove_domain_from_stack)
+      expect(lantern_server).to receive(:remove_domain_from_stack)
       expect { nx.setup_ssl }.to hop("wait_db_available")
     end
 
@@ -669,7 +685,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       logs = {"stdout" => "", "stderr" => "oom"}
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --logs setup_ssl").and_return(JSON.generate(logs))
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean setup_ssl")
-      expect(nx).to receive(:remove_domain_from_stack)
+      expect(lantern_server).to receive(:remove_domain_from_stack)
       expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Lantern SSL Setup Failed for test", [lantern_server.resource.ubid, lantern_server.ubid], logs, "error", "LanternSSLSetupFailed", lantern_server.ubid)
       expect { nx.setup_ssl }.to hop("wait")
     end
@@ -698,6 +714,11 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
     it "hops to restart_server" do
       nx.incr_restart_server
       expect { nx.wait }.to hop("restart_server")
+    end
+
+    it "hops to run_pg_upgrade" do
+      nx.incr_run_pg_upgrade
+      expect { nx.wait }.to hop("run_pg_upgrade")
     end
 
     it "hops to start_server" do
@@ -789,7 +810,6 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server).to receive(:primary?).and_return(false)
       expect(lantern_server).to receive(:domain).and_return(nil)
       expect(lantern_server).to receive(:destroy)
-      expect(lantern_server.resource).to receive(:delete_replication_slot).with(lantern_server.ubid)
       expect { nx.destroy }.to exit({"msg" => "lantern server was deleted"})
     end
 
@@ -798,7 +818,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server).to receive(:primary?).and_return(true)
       expect(lantern_server.timeline).to receive(:incr_destroy).at_least(:once)
       expect(lantern_server).to receive(:domain).and_return("example.com")
-      expect(nx).to receive(:destroy_domain)
+      expect(lantern_server).to receive(:destroy_domain)
       expect(lantern_server).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "lantern server was deleted"})
     end
@@ -991,7 +1011,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(current_master.vm.sshable).to receive(:cmd)
       expect(current_master).to receive(:incr_container_stopped)
 
-      expect { nx.take_over }.to hop("swap_ip")
+      expect { nx.take_over }.to hop("swap_dns")
     end
 
     it "swap ips" do
@@ -1037,6 +1057,86 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
 
     it "naps 15" do
       expect { nx.container_stopped }.to nap(15)
+    end
+  end
+
+  describe "#run_pg_upgrade" do
+    it "runs pg_upgrade" do
+      expect(nx).to receive(:decr_run_pg_upgrade)
+      image = "#{Config.gcr_image}:lantern-0.5.0-extras-0.5.0-minor-1"
+      frame = {"pg_upgrade" => {"lantern_version" => "0.5.0", "extras_version" => "0.5.0", "minor_version" => "1", "pg_version" => 17}}
+      expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(lantern_server).to receive(:container_image).and_return(image).at_least(:once)
+      expect(lantern_server.resource).to receive(:drop_ddl_log_trigger)
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/run_pg_upgrade' pg_upgrade", stdin: JSON.generate(
+        container_image: lantern_server.container_image,
+        pg_version: 17,
+        old_pg_version: lantern_server.resource.pg_version
+      ))
+
+      expect { nx.run_pg_upgrade }.to hop("wait_pg_upgrade")
+    end
+  end
+
+  describe "#wait_pg_upgrade" do
+    it "waits pg_upgrade and nap" do
+      frame = {"pg_upgrade" => {"lantern_version" => "0.5.0", "extras_version" => "0.5.0", "minor_version" => "1", "pg_version" => 17}}
+      expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check pg_upgrade").and_return("InProgress")
+      expect { nx.wait_pg_upgrade }.to nap 10
+    end
+
+    it "waits pg_upgrade and fail" do
+      frame = {"pg_upgrade" => {"lantern_version" => "0.5.0", "extras_version" => "0.5.0", "minor_version" => "1", "pg_version" => 17}}
+      expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(lantern_server.resource).to receive(:ubid).and_return("test").at_least(:once)
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check pg_upgrade").and_return("Failed")
+
+      logs = {"stdout" => "", "stderr" => "error happened"}
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --logs pg_upgrade").and_return(JSON.generate(logs))
+      expect(Prog::PageNexus).to receive(:assemble_with_logs).with("Postgres update failed on #{lantern_server.resource.name} (#{lantern_server.resource.label})", [lantern_server.resource.ubid, lantern_server.ubid], logs, "critical", "LanternPGUpgradeFailed", lantern_server.ubid)
+      expect { nx.wait_pg_upgrade }.to hop("wait")
+    end
+
+    it "waits pg_upgrade and succeed" do
+      frame = {"pg_upgrade" => {"lantern_version" => "0.5.0", "extras_version" => "0.5.0", "minor_version" => "1", "pg_version" => 17}}
+      expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check pg_upgrade").and_return("Succeeded")
+      expect(lantern_server).to receive(:update).with(extras_version: "0.5.0", lantern_version: "0.5.0", minor_version: "1")
+      expect(lantern_server.resource).to receive(:update).with(pg_version: 17)
+      expect(frame).to receive(:delete).with("pg_upgrade")
+      expect(nx.strand).to receive(:modified!).with(:stack)
+      expect(nx.strand).to receive(:save_changes)
+      expect(nx).to receive(:register_deadline).with(:wait, 40 * 60)
+      expect { nx.wait_pg_upgrade }.to hop("init_sql")
+    end
+  end
+
+  describe "#swap_dns" do
+    it "calls swap dns with representative_server" do
+      leader = instance_double(LanternServer)
+      expect(lantern_server.resource).to receive(:representative_server).and_return(leader)
+      expect(lantern_server).to receive(:swap_dns).with(leader)
+      expect { nx.swap_dns }.to hop("wait")
+    end
+  end
+
+  describe "#wait_swap_dns" do
+    it "naps 10" do
+      expect(lantern_server).to receive(:is_dns_correct?).and_return(false)
+      expect { nx.wait_swap_dns }.to nap 5
+    end
+
+    it "naps 5" do
+      expect(lantern_server).to receive(:is_dns_correct?).and_return(true)
+      expect(lantern_server).to receive(:run_query).and_raise "test"
+      expect { nx.wait_swap_dns }.to nap 5
+    end
+
+    it "hops to promote" do
+      expect(lantern_server).to receive(:is_dns_correct?).and_return(true)
+      expect(lantern_server).to receive(:run_query).and_return("1")
+      expect { nx.wait_swap_dns }.to hop("promote_server")
     end
   end
 end

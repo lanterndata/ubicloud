@@ -61,7 +61,7 @@ class LanternServer < Sequel::Model
   end
 
   def run_query(query, db: "postgres", user: "postgres")
-    vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} exec -T postgresql psql -q -U #{user} -t --csv #{db}", stdin: query).chomp
+    vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} exec -T postgresql psql -q -U #{user} -t --csv -v ON_ERROR_STOP=1 #{db}", stdin: query).chomp
   end
 
   def run_query_all(query)
@@ -97,6 +97,10 @@ class LanternServer < Sequel::Model
 
   def instance_type
     standby? ? "reader" : "writer"
+  end
+
+  def container_image(p_lantern_version = lantern_version, p_extras_version = extras_version, p_minor_version = minor_version)
+    "#{Config.gcr_image}:lantern-#{p_lantern_version}-extras-#{p_extras_version}-minor-#{p_minor_version}"
   end
 
   def configure_hash
@@ -140,17 +144,17 @@ class LanternServer < Sequel::Model
       master_host: resource.representative_server.hostname,
       master_port: 5432,
       prom_password: Config.prom_password,
-      gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
       gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
       gcp_creds_logging_b64: Config.gcp_creds_logging_b64,
-      container_image: "#{Config.gcr_image}:lantern-#{lantern_version}-extras-#{extras_version}-minor-#{minor_version}",
+      container_image: container_image,
       postgresql_recover_from_backup: backup_label,
       postgresql_recovery_target_time: postgresql_recovery_target_time,
       postgresql_recovery_target_lsn: postgresql_recovery_target_lsn,
       gcp_creds_walg_b64: walg_config[:gcp_creds_b64],
       walg_gs_prefix: walg_config[:walg_gs_prefix],
       gcp_creds_big_query_b64: resource.gcp_creds_b64,
-      big_query_dataset: Config.lantern_log_dataset
+      big_query_dataset: Config.lantern_log_dataset,
+      pg_version: resource.pg_version
     })
   end
 
@@ -172,10 +176,6 @@ class LanternServer < Sequel::Model
       ["GOOGLE_APPLICATION_CREDENTIALS_WALG_B64", walg_config[:gcp_creds_b64]],
       ["POSTGRESQL_RECOVER_FROM_BACKUP", ""]
     ]))
-  end
-
-  def container_image
-    "#{Config.gcr_image}:lantern-#{lantern_version}-extras-#{extras_version}-minor-#{minor_version}"
   end
 
   def init_health_monitor_session
@@ -255,6 +255,51 @@ SQL
     update(target_storage_size_gib: new_storage_size)
     vm.update(storage_size_gib: new_storage_size)
     incr_update_storage_size
+  end
+
+  def destroy_domain
+    cf_client = Dns::Cloudflare.new
+    cf_client.delete_dns_record(domain)
+  end
+
+  def add_domain_to_stack(domain, p_strand = strand)
+    current_frame = p_strand.stack.first
+    current_frame["domain"] = domain
+    p_strand.modified!(:stack)
+    p_strand.save_changes
+  end
+
+  def remove_domain_from_stack(p_strand = strand)
+    current_frame = p_strand.stack.first
+    current_frame.delete("domain")
+    p_strand.modified!(:stack)
+    p_strand.save_changes
+  end
+
+  def swap_dns(other_server)
+    strand.stack.first["domain"] = other_server.domain
+    strand.modified!(:stack)
+    strand.save_changes
+    other_server.update(domain: nil)
+
+    if domain
+      destroy_domain
+      update(domain: nil)
+    end
+
+    incr_add_domain
+  end
+
+  def is_dns_correct?
+    domain && Resolv.getaddress(domain) == vm.sshable.host
+  end
+
+  def stop_container(timeout = 60)
+    vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} down -t #{timeout} || true")
+  end
+
+  def start_container
+    vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} up -d")
   end
 
   # def failover_target

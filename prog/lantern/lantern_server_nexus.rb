@@ -10,13 +10,13 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   extend Forwardable
   def_delegators :lantern_server, :vm
 
-  semaphore :initial_provisioning, :update_user_password, :update_lantern_extension, :update_extras_extension, :update_image, :add_domain, :update_rhizome, :checkup
+  semaphore :initial_provisioning, :update_user_password, :update_lantern_extension, :update_extras_extension, :update_image, :add_domain, :update_rhizome, :checkup, :run_pg_upgrade
   semaphore :start_server, :stop_server, :restart_server, :take_over, :destroy, :update_storage_size, :update_vm_size, :update_memory_limits, :init_sql, :restart, :container_stopped, :setup_ssl
 
   def self.assemble(
     resource_id: nil, lantern_version: "0.2.2", extras_version: "0.1.4", minor_version: "1", domain: nil,
     timeline_access: "push", representative_at: nil, target_vm_size: nil, target_storage_size_gib: 50, timeline_id: nil,
-    max_storage_autoresize_gib: 0
+    max_storage_autoresize_gib: 0, pg_upgrade: nil
   )
 
     DB.transaction do
@@ -54,6 +54,10 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       )
 
       stack_frame = domain.nil? ? {} : {domain: domain}
+
+      if pg_upgrade
+        stack_frame["pg_upgrade"] = pg_upgrade
+      end
       Strand.create(prog: "Lantern::LanternServerNexus", label: "start", stack: [stack_frame]) { _1.id = lantern_server.id }
     end
   end
@@ -119,10 +123,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
   end
 
   label def setup_docker_stack
-    if !Config.gcp_creds_gcr_b64
-      raise "GCP_CREDS_GCR_B64 is required to setup docker stack for Lantern"
-    end
-
     # wait for service account to be created
     nap 10 if lantern_server.timeline.strand.label == "start"
 
@@ -172,10 +172,9 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     nap 30 if lag.empty? || lag.to_i > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
 
     lantern_server.update(synchronization_status: "ready")
-    lantern_server.resource.delete_replication_slot(lantern_server.ubid)
 
     if !lantern_server.domain && !lantern_server.resource.representative_server.domain.nil?
-      add_domain_to_stack(lantern_server.resource.representative_server.domain)
+      lantern_server.add_domain_to_stack(lantern_server.resource.representative_server.domain, strand)
       incr_setup_ssl
     end
 
@@ -202,6 +201,8 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       end
     end
 
+    current_frame = strand.stack.first
+
     if !is_in_recovery
       timeline_id = Prog::Lantern::LanternTimelineNexus.assemble(parent_id: lantern_server.timeline.id).id
       lantern_server.timeline_id = timeline_id
@@ -222,12 +223,64 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
           incr_update_extras_extension
           lantern_server.update(extras_version: extras_version)
         end
+      elsif !current_frame["pg_upgrade"].nil?
+        incr_run_pg_upgrade
+      end
+
+      if lantern_server.resource.logical_replication && !lantern_server.resource.parent.representative_server.domain.nil?
+        # prepare for fast switchover
+        lantern_server.add_domain_to_stack(lantern_server.resource.parent.representative_server.domain, strand)
+        incr_setup_ssl
       end
 
       hop_wait_timeline_available
     end
 
     nap 5
+  end
+
+  label def run_pg_upgrade
+    decr_run_pg_upgrade
+    lantern_server.resource.drop_ddl_log_trigger
+    pg_upgrade_info = strand.stack.first["pg_upgrade"]
+    vm.sshable.cmd(
+      "common/bin/daemonizer 'sudo lantern/bin/run_pg_upgrade' pg_upgrade",
+      stdin: JSON.generate({
+        container_image: lantern_server.container_image(
+          pg_upgrade_info["lantern_version"],
+          pg_upgrade_info["extras_version"],
+          pg_upgrade_info["minor_version"]
+        ),
+        pg_version: pg_upgrade_info["pg_version"],
+        old_pg_version: lantern_server.resource.pg_version
+      })
+    )
+    hop_wait_pg_upgrade
+  end
+
+  label def wait_pg_upgrade
+    current_frame = strand.stack.first
+    case vm.sshable.cmd("common/bin/daemonizer --check pg_upgrade")
+    when "Succeeded"
+      pg_upgrade_info = current_frame["pg_upgrade"]
+      lantern_server.resource.update(pg_version: pg_upgrade_info["pg_version"])
+      lantern_server.update(
+        lantern_version: pg_upgrade_info["lantern_version"],
+        extras_version: pg_upgrade_info["extras_version"],
+        minor_version: pg_upgrade_info["minor_version"]
+      )
+      current_frame.delete("pg_upgrade")
+      strand.modified!(:stack)
+      strand.save_changes
+      register_deadline(:wait, 40 * 60)
+      hop_init_sql
+    when "Failed"
+      logs = JSON.parse(vm.sshable.cmd("common/bin/daemonizer --logs pg_upgrade"))
+      Clog.emit("Postgres upgrade failed") { {logs: logs, name: lantern_server.resource.name, lantern_server: lantern_server.id} }
+      Prog::PageNexus.assemble_with_logs("Postgres update failed on #{lantern_server.resource.name} (#{lantern_server.resource.label})", [lantern_server.resource.ubid, lantern_server.ubid], logs, "critical", "LanternPGUpgradeFailed", lantern_server.ubid)
+      hop_wait
+    end
+    nap 10
   end
 
   label def wait_timeline_available
@@ -307,7 +360,6 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       hop_update_lantern_extension
     when "NotStarted"
       vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/update_docker_image' update_docker_image", stdin: JSON.generate({
-        gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
         container_image: lantern_server.container_image
       }))
     when "Failed"
@@ -327,40 +379,15 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     end
 
     cf_client = Dns::Cloudflare.new
-    begin
-      cf_client.upsert_dns_record(frame["domain"], lantern_server.vm.sshable.host)
-    rescue => e
-      Clog.emit("Error while adding domain") { {error: e} }
-      decr_add_domain
-      hop_wait
-    end
+    cf_client.upsert_dns_record(frame["domain"], lantern_server.vm.sshable.host)
 
     lantern_server.update(domain: frame["domain"])
 
-    remove_domain_from_stack
+    lantern_server.remove_domain_from_stack(strand)
 
     decr_add_domain
     register_deadline(:wait, 5 * 60)
     hop_setup_ssl
-  end
-
-  def destroy_domain
-    cf_client = Dns::Cloudflare.new
-    cf_client.delete_dns_record(lantern_server.domain)
-  end
-
-  def add_domain_to_stack(domain)
-    current_frame = strand.stack.first
-    current_frame["domain"] = domain
-    strand.modified!(:stack)
-    strand.save_changes
-  end
-
-  def remove_domain_from_stack
-    current_frame = strand.stack.first
-    current_frame.delete("domain")
-    strand.modified!(:stack)
-    strand.save_changes
   end
 
   label def setup_ssl
@@ -368,7 +395,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
     when "Succeeded"
       vm.sshable.cmd("common/bin/daemonizer --clean setup_ssl")
       decr_setup_ssl
-      remove_domain_from_stack
+      lantern_server.remove_domain_from_stack(strand)
       hop_wait_db_available
     when "NotStarted"
       vm.sshable.cmd("common/bin/daemonizer 'sudo lantern/bin/setup_ssl' setup_ssl", stdin: JSON.generate({
@@ -382,7 +409,7 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
       Clog.emit("Lantern SSL Setup Failed for #{lantern_server.resource.name}") { {logs: logs, name: lantern_server.resource.name, lantern_server: lantern_server.id} }
       Prog::PageNexus.assemble_with_logs("Lantern SSL Setup Failed for #{lantern_server.resource.name}", [lantern_server.resource.ubid, lantern_server.ubid], logs, "error", "LanternSSLSetupFailed", lantern_server.ubid)
       vm.sshable.cmd("common/bin/daemonizer --clean setup_ssl")
-      remove_domain_from_stack
+      lantern_server.remove_domain_from_stack(strand)
       decr_setup_ssl
       hop_wait
     end
@@ -422,6 +449,10 @@ SQL
         register_deadline(:wait, 5 * 60)
         hop_unavailable
       end
+    end
+
+    when_run_pg_upgrade_set? do
+      hop_run_pg_upgrade
     end
 
     when_update_user_password_set? do
@@ -529,6 +560,18 @@ SQL
     hop_promote_server
   end
 
+  label def wait_swap_dns
+    # wait until ip change will propogate
+    begin
+      nap 5 if !lantern_server.is_dns_correct?
+      lantern_server.run_query("SELECT 1")
+    rescue
+      nap 5
+    end
+
+    hop_promote_server
+  end
+
   label def take_over
     decr_take_over
     if !lantern_server.standby?
@@ -539,7 +582,12 @@ SQL
     # put the old server in container_stopped mode, so no healthcheck will be done
     lantern_server.resource.representative_server.incr_container_stopped
 
-    hop_swap_ip
+    hop_swap_dns
+  end
+
+  label def swap_dns
+    lantern_server.swap_dns(lantern_server.resource.representative_server)
+    hop_wait
   end
 
   label def swap_ip
@@ -591,17 +639,13 @@ SQL
       strand.children.each { _1.destroy }
 
       if !lantern_server.domain.nil?
-        destroy_domain
+        lantern_server.destroy_domain
       end
 
       if lantern_server.primary?
         lantern_server.timeline.incr_destroy
-      else
-        begin
-          lantern_server.resource.delete_replication_slot(lantern_server.ubid)
-        rescue
-        end
       end
+
       lantern_server.destroy
 
       vm.incr_destroy

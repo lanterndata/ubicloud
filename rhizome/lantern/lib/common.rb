@@ -11,8 +11,7 @@ $env_file = "#{$workdir}/.env"
 $pg_mount_path = "#{$workdir}/pg"
 $container_name = "lantern-postgresql-1"
 
-def configure_gcr(gcp_creds_gcr_b64, container_image)
-  r "echo #{gcp_creds_gcr_b64} | base64 -d | sudo docker login -u _json_key --password-stdin https://gcr.io"
+def configure_gcr(container_image)
   r "sudo docker pull #{container_image}"
 end
 
@@ -38,9 +37,9 @@ def wait_for_pg
   end
 end
 
-def run_database(container_image)
+def run_database(container_image, pg_version)
   # Run database
-  volume_mount = "#{$pg_mount_path}:/opt/bitnami/postgresql"
+  volume_mount = "#{$pg_mount_path}:/usr/lib/postgresql/#{pg_version}"
   # Copy postgres fs to host to mount
   r "sudo rm -rf #{$pg_mount_path}"
   data = YAML.load_file $compose_file
@@ -48,7 +47,7 @@ def run_database(container_image)
   File.open($compose_file, "w") { |f| YAML.dump(data, f) }
   r "sudo docker rm -f tc 2>/dev/null || true"
   r "sudo docker create --name tc #{container_image}"
-  r "sudo docker cp tc:/opt/bitnami/postgresql #{$pg_mount_path}"
+  r "sudo docker cp tc:/usr/lib/postgresql/#{pg_version} #{$pg_mount_path}"
   r "sudo docker rm tc"
   r "sudo chown -R 1001:1001 #{$pg_mount_path}"
   # Mount extension dir, so we can make automatic updates from host
@@ -79,21 +78,34 @@ def append_env(env_arr)
   File.open($env_file, "w") { |f| combined_env.each { |key, value| f.puts "#{key}=#{value}" } }
 end
 
-def configure_tls(domain, email, dns_token, dns_zone_id, provider)
-  puts "Configuring TLS for domain #{domain}"
-  r "curl -s https://get.acme.sh | sh -s email=#{email}"
-  env = if provider == "dns_cf"
-    "CF_Token='#{dns_token}' CF_Zone_ID='#{dns_zone_id}'"
-  else
-    "GOOGLEDOMAINS_ACCESS_TOKEN='#{dns_token}'"
+def tls_already_configured?(domain)
+  is_domain_configured = !r("(test -f /root/.acme.sh/acme.sh && /root/.acme.sh/acme.sh --list -d #{domain}) || echo ''").chomp.empty?
+
+  if !is_domain_configured
+    return false
   end
 
-  r "#{env} /root/.acme.sh/acme.sh --server letsencrypt --issue --dns #{provider} -d #{domain}"
-  reload_cmd = "sudo docker compose -f #{$compose_file} exec postgresql psql -U postgres -c 'SELECT pg_reload_conf()' && sudo docker compose -f #{$compose_file} exec postgresql psql -p6432 -U postgres pgbouncer -c RELOAD"
-  r "/root/.acme.sh/acme.sh --install-cert -d #{domain} --key-file #{$datadir}/server.key  --fullchain-file #{$datadir}/server.crt --reloadcmd \"#{reload_cmd}\""
-  r "sudo chown 1001:1001 #{$datadir}/server.key"
-  r "sudo chown 1001:1001 #{$datadir}/server.crt"
-  r "sudo chmod 600 #{$datadir}/server.key"
+  !r("(test -f #{$datadir}/server.key && test -f #{$datadir}/server.crt && echo 1) || echo ''").chomp.empty?
+end
+
+def configure_tls(domain, email, dns_token, dns_zone_id, provider)
+  puts "Configuring TLS for domain #{domain}"
+
+  if !tls_already_configured?(domain)
+    r "curl -s https://get.acme.sh | sh -s email=#{email}"
+    env = if provider == "dns_cf"
+      "CF_Token='#{dns_token}' CF_Zone_ID='#{dns_zone_id}'"
+    else
+      "GOOGLEDOMAINS_ACCESS_TOKEN='#{dns_token}'"
+    end
+
+    r "#{env} /root/.acme.sh/acme.sh --server letsencrypt --issue --dns #{provider} -d #{domain}"
+    reload_cmd = "sudo docker compose -f #{$compose_file} exec postgresql psql -U postgres -c 'SELECT pg_reload_conf()' && sudo docker compose -f #{$compose_file} exec postgresql psql -p6432 -U postgres pgbouncer -c RELOAD"
+    r "/root/.acme.sh/acme.sh --install-cert -d #{domain} --key-file #{$datadir}/server.key  --fullchain-file #{$datadir}/server.crt --reloadcmd \"#{reload_cmd}\""
+    r "sudo chown 1001:1001 #{$datadir}/server.key"
+    r "sudo chown 1001:1001 #{$datadir}/server.crt"
+    r "sudo chmod 600 #{$datadir}/server.key"
+  end
 
   append_env([
     ["POSTGRESQL_ENABLE_TLS", "yes"],

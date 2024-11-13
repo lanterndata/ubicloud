@@ -216,7 +216,7 @@ RSpec.describe Clover, "lantern" do
       it "adds domain" do
         post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/add-domain", {domain: "example.com"}
         server = LanternServer.where(id: pg.representative_server.id).first
-        expect(server.domain).to eq("example.com")
+        expect(server.strand.stack.first["domain"]).to eq("example.com")
         expect(last_response.status).to eq(200)
       end
     end

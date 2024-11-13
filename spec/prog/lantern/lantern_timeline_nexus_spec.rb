@@ -187,6 +187,7 @@ RSpec.describe Prog::Lantern::LanternTimelineNexus do
   describe "#destroy" do
     it "naps for one month" do
       expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(Config).to receive(:backup_retention_days_after_deletion).and_return(30)
       expect { nx.destroy }.to nap(60 * 60 * 24 * 30)
     end
 

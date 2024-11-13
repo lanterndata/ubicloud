@@ -146,19 +146,19 @@ RSpec.describe LanternServer do
   end
 
   it "runs query on vm" do
-    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U postgres -t --csv postgres", stdin: "SELECT 1").and_return("1\n")
+    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U postgres -t --csv -v ON_ERROR_STOP=1 postgres", stdin: "SELECT 1").and_return("1\n")
     expect(lantern_server.run_query("SELECT 1")).to eq("1")
   end
 
   it "runs query on vm with different user and db" do
-    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U lantern -t --csv db2", stdin: "SELECT 1").and_return("1\n")
+    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U lantern -t --csv -v ON_ERROR_STOP=1 db2", stdin: "SELECT 1").and_return("1\n")
     expect(lantern_server.run_query("SELECT 1", db: "db2", user: "lantern")).to eq("1")
   end
 
   it "runs query on vm for all databases" do
     expect(lantern_server).to receive(:list_all_databases).and_return(["postgres", "db2"])
-    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U postgres -t --csv postgres", stdin: "SELECT 1").and_return("1\n")
-    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U postgres -t --csv db2", stdin: "SELECT 1").and_return("2\n")
+    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U postgres -t --csv -v ON_ERROR_STOP=1 postgres", stdin: "SELECT 1").and_return("1\n")
+    expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec -T postgresql psql -q -U postgres -t --csv -v ON_ERROR_STOP=1 db2", stdin: "SELECT 1").and_return("2\n")
     expect(lantern_server.run_query_all("SELECT 1")).to eq(
       [
         ["postgres", "1"],
@@ -273,9 +273,9 @@ RSpec.describe LanternServer do
         gcp_creds_b64: "test-creds",
         recovery_target_lsn: nil,
         representative_server: lantern_server,
+        pg_version: 17,
         restore_target: nil)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
       expect(Config).to receive(:gcp_creds_logging_b64).and_return("test-creds").at_least(:once)
       expect(timeline).to receive(:generate_walg_config).and_return({gcp_creds_b64: "test-creds-push", walg_gs_prefix: "test-bucket-push"}).at_least(:once)
       expect(lantern_server).to receive(:resource).and_return(resource).at_least(:once)
@@ -306,7 +306,6 @@ RSpec.describe LanternServer do
         master_host: resource.representative_server.hostname,
         master_port: 5432,
         prom_password: Config.prom_password,
-        gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
         gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
         gcp_creds_logging_b64: Config.gcp_creds_logging_b64,
 
@@ -317,7 +316,8 @@ RSpec.describe LanternServer do
         gcp_creds_walg_b64: walg_conf[:gcp_creds_b64],
         walg_gs_prefix: walg_conf[:walg_gs_prefix],
         gcp_creds_big_query_b64: resource.gcp_creds_b64,
-        big_query_dataset: Config.lantern_log_dataset
+        big_query_dataset: Config.lantern_log_dataset,
+        pg_version: 17
       })
       expect(lantern_server.configure_hash).to eq(expected_conf)
     end
@@ -341,9 +341,9 @@ RSpec.describe LanternServer do
         gcp_creds_b64: "test-creds",
         recovery_target_lsn: nil,
         representative_server: lantern_server,
+        pg_version: 17,
         restore_target: Time.now)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
       expect(Config).to receive(:gcp_creds_logging_b64).and_return("test-creds").at_least(:once)
       expect(timeline).to receive(:latest_backup_label_before_target).and_return("test-label").at_least(:once)
       expect(timeline).to receive(:generate_walg_config).and_return({gcp_creds_b64: "test-creds-push", walg_gs_prefix: "test-bucket-push"}).at_least(:once)
@@ -375,7 +375,6 @@ RSpec.describe LanternServer do
         master_host: resource.representative_server.hostname,
         master_port: 5432,
         prom_password: Config.prom_password,
-        gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
         gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
         gcp_creds_logging_b64: Config.gcp_creds_logging_b64,
         container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}",
@@ -385,7 +384,8 @@ RSpec.describe LanternServer do
         gcp_creds_walg_b64: walg_conf[:gcp_creds_b64],
         walg_gs_prefix: walg_conf[:walg_gs_prefix],
         gcp_creds_big_query_b64: resource.gcp_creds_b64,
-        big_query_dataset: Config.lantern_log_dataset
+        big_query_dataset: Config.lantern_log_dataset,
+        pg_version: 17
       })
       expect(lantern_server.configure_hash).to eq(expected_conf)
     end
@@ -409,9 +409,9 @@ RSpec.describe LanternServer do
         gcp_creds_b64: "test-creds",
         recovery_target_lsn: "16/B374D848",
         representative_server: lantern_server,
+        pg_version: 17,
         restore_target: nil)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
       expect(Config).to receive(:gcp_creds_logging_b64).and_return("test-creds").at_least(:once)
       expect(timeline).to receive(:generate_walg_config).and_return({gcp_creds_b64: "test-creds-push", walg_gs_prefix: "test-bucket-push"}).at_least(:once)
       expect(lantern_server).to receive(:resource).and_return(resource).at_least(:once)
@@ -442,7 +442,6 @@ RSpec.describe LanternServer do
         master_host: resource.representative_server.hostname,
         master_port: 5432,
         prom_password: Config.prom_password,
-        gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
         gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
         gcp_creds_logging_b64: Config.gcp_creds_logging_b64,
         container_image: "#{Config.gcr_image}:lantern-#{lantern_server.lantern_version}-extras-#{lantern_server.extras_version}-minor-#{lantern_server.minor_version}",
@@ -452,7 +451,8 @@ RSpec.describe LanternServer do
         gcp_creds_walg_b64: walg_conf[:gcp_creds_b64],
         walg_gs_prefix: walg_conf[:walg_gs_prefix],
         gcp_creds_big_query_b64: resource.gcp_creds_b64,
-        big_query_dataset: Config.lantern_log_dataset
+        big_query_dataset: Config.lantern_log_dataset,
+        pg_version: 17
       })
       expect(lantern_server.configure_hash).to eq(expected_conf)
     end
@@ -476,9 +476,9 @@ RSpec.describe LanternServer do
         gcp_creds_b64: "test-creds",
         recovery_target_lsn: "16/B374D848",
         representative_server: lantern_server,
+        pg_version: 17,
         restore_target: Time.now)
       expect(Config).to receive(:prom_password).and_return("pwd123").at_least(:once)
-      expect(Config).to receive(:gcp_creds_gcr_b64).and_return("test-creds").at_least(:once)
       expect(Config).to receive(:gcp_creds_logging_b64).and_return("test-creds").at_least(:once)
 
       expect(timeline).to receive(:generate_walg_config).and_return({gcp_creds_b64: "test-creds-push", walg_gs_prefix: "test-bucket-push"}).at_least(:once)
@@ -510,7 +510,6 @@ RSpec.describe LanternServer do
         master_host: resource.representative_server.hostname,
         master_port: 5432,
         prom_password: Config.prom_password,
-        gcp_creds_gcr_b64: Config.gcp_creds_gcr_b64,
         gcp_creds_coredumps_b64: Config.gcp_creds_coredumps_b64,
         gcp_creds_logging_b64: Config.gcp_creds_logging_b64,
 
@@ -521,7 +520,8 @@ RSpec.describe LanternServer do
         gcp_creds_walg_b64: walg_conf[:gcp_creds_b64],
         walg_gs_prefix: walg_conf[:walg_gs_prefix],
         gcp_creds_big_query_b64: resource.gcp_creds_b64,
-        big_query_dataset: Config.lantern_log_dataset
+        big_query_dataset: Config.lantern_log_dataset,
+        pg_version: 17
       })
       expect(lantern_server.configure_hash).to eq(expected_conf)
     end
@@ -781,6 +781,129 @@ SQL
     it "does not add query string if there's no domain" do
       expect(lantern_server).to receive(:domain).and_return(nil).at_least(:once)
       expect(lantern_server.query_string).to be_nil
+    end
+  end
+
+  describe "#swap_dns" do
+    it "swaps domains with another server and removes domain" do
+      frame = {}
+      other = instance_double(described_class)
+      strand = instance_double(Strand)
+      expect(lantern_server).to receive(:strand).and_return(strand).at_least(:once)
+      expect(lantern_server).to receive(:domain).and_return("old-domain").at_least(:once)
+      expect(lantern_server).to receive(:update).with(domain: nil)
+      expect(lantern_server.strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(lantern_server.strand).to receive(:modified!).with(:stack)
+      expect(lantern_server.strand).to receive(:save_changes)
+      expect(lantern_server).to receive(:incr_add_domain)
+      expect(lantern_server).to receive(:destroy_domain)
+      expect(other).to receive(:domain).and_return("test")
+      expect(other).to receive(:update).with(domain: nil)
+      expect { lantern_server.swap_dns(other) }.not_to raise_error
+    end
+
+    it "swaps domains with another server" do
+      frame = {}
+      other = instance_double(described_class)
+      strand = instance_double(Strand)
+      expect(lantern_server).to receive(:strand).and_return(strand).at_least(:once)
+      expect(lantern_server.strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(lantern_server.strand).to receive(:modified!).with(:stack)
+      expect(lantern_server.strand).to receive(:save_changes)
+      expect(lantern_server).to receive(:incr_add_domain)
+      expect(other).to receive(:domain).and_return("test")
+      expect(other).to receive(:update).with(domain: nil)
+      expect { lantern_server.swap_dns(other) }.not_to raise_error
+    end
+  end
+
+  describe "#is_dns_correct?" do
+    it "returns true if host matches ip" do
+      expect(lantern_server).to receive(:domain).and_return("test-domain").at_least(:once)
+      expect(vm.sshable).to receive(:host).and_return("127.0.0.1").at_least(:once)
+      expect(Resolv).to receive(:getaddress).with("test-domain").and_return("127.0.0.1").at_least(:once)
+      expect(lantern_server.is_dns_correct?).to be(true)
+    end
+
+    it "returns false if host does not match the ip" do
+      expect(lantern_server).to receive(:domain).and_return("test-domain").at_least(:once)
+      expect(vm.sshable).to receive(:host).and_return("127.0.0.1").at_least(:once)
+      expect(Resolv).to receive(:getaddress).with("test-domain").and_return("127.0.1.1").at_least(:once)
+      expect(lantern_server.is_dns_correct?).to be(false)
+    end
+  end
+
+  describe "#stop_container" do
+    it "stops docker container" do
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f #{Config.compose_file} down -t 60 || true")
+      expect { lantern_server.stop_container }.not_to raise_error
+    end
+  end
+
+  describe "#start_container" do
+    it "starts docker container" do
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f #{Config.compose_file} up -d")
+      expect { lantern_server.start_container }.not_to raise_error
+    end
+  end
+
+  describe "#destroy_domain" do
+    it "destroys domain" do
+      cf_client = instance_double(Dns::Cloudflare)
+      expect(Dns::Cloudflare).to receive(:new).and_return(cf_client)
+      expect(lantern_server).to receive(:domain).and_return("example.com")
+      expect(cf_client).to receive(:delete_dns_record).with("example.com")
+      lantern_server.destroy_domain
+    end
+  end
+
+  describe "#add_domain_to_stack" do
+    it "adds domain to current frame" do
+      domain = "db.lantern.dev"
+      frame = {}
+      strand = instance_double(Strand)
+      expect(lantern_server).to receive(:strand).and_return(strand).at_least(:once)
+      expect(strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(frame).to receive(:[]=).with("domain", domain)
+      expect(strand).to receive(:modified!).with(:stack)
+      expect(strand).to receive(:save_changes)
+      expect { lantern_server.add_domain_to_stack(domain) }.not_to raise_error
+    end
+
+    it "adds domain to current frame of specified strand" do
+      domain = "db.lantern.dev"
+      frame = {}
+      strand = instance_double(Strand)
+      expect(strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(frame).to receive(:[]=).with("domain", domain)
+      expect(strand).to receive(:modified!).with(:stack)
+      expect(strand).to receive(:save_changes)
+      expect { lantern_server.add_domain_to_stack(domain, strand) }.not_to raise_error
+    end
+  end
+
+  describe "#remove_domain_from_stack" do
+    it "removes domain from current frame" do
+      domain = "db.lantern.dev"
+      frame = {"domain" => domain}
+      strand = instance_double(Strand)
+      expect(lantern_server).to receive(:strand).and_return(strand).at_least(:once)
+      expect(strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(frame).to receive(:delete).with("domain")
+      expect(strand).to receive(:modified!).with(:stack)
+      expect(strand).to receive(:save_changes)
+      expect { lantern_server.remove_domain_from_stack }.not_to raise_error
+    end
+
+    it "removes domain from current frame of specified strand" do
+      domain = "db.lantern.dev"
+      frame = {"domain" => domain}
+      strand = instance_double(Strand)
+      expect(strand).to receive(:stack).and_return([frame]).at_least(:once)
+      expect(frame).to receive(:delete).with("domain")
+      expect(strand).to receive(:modified!).with(:stack)
+      expect(strand).to receive(:save_changes)
+      expect { lantern_server.remove_domain_from_stack(strand) }.not_to raise_error
     end
   end
 end
