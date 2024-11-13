@@ -9,7 +9,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   extend Forwardable
   def_delegators :lantern_resource, :servers, :representative_server
 
-  semaphore :destroy, :swap_leaders_with_parent, :switchover_with_parent
+  semaphore :destroy, :swap_leaders_with_parent, :switchover_with_parent, :rollback_switchover
 
   def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, ubid: LanternResource.generate_ubid, ha_type: LanternResource::HaType::NONE, parent_id: nil, restore_target: nil, recovery_target_lsn: nil,
     org_id: nil, db_name: "postgres", db_user: "postgres", db_user_password: nil, superuser_password: nil, repl_password: nil, app_env: Config.rack_env,
@@ -206,6 +206,10 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
       lantern_resource.update(display_state: nil)
     end
 
+    when_rollback_switchover_set? do
+      hop_rollback_switchover
+    end
+
     when_swap_leaders_with_parent_set? do
       if lantern_resource.parent.nil?
         decr_swap_leaders_with_parent
@@ -270,6 +274,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   end
 
   label def rollback_switchover
+    decr_rollback_switchover
     lantern_resource.rollback_switchover
     hop_wait_rollback_switchover
   end

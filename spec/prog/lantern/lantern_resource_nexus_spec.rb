@@ -282,6 +282,14 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(lantern_resource).to receive(:update).with(display_state: "failover")
       expect { nx.wait }.to hop("switchover_with_parent")
     end
+
+    it "hops to rollback_switchover" do
+      expect(lantern_resource).to receive(:required_standby_count).and_return(0)
+      expect(lantern_resource).to receive(:display_state).and_return(nil)
+      expect(lantern_resource).to receive(:servers).and_return([instance_double(LanternServer, strand: instance_double(Strand, label: "wait"))]).at_least(:once)
+      expect(nx).to receive(:when_rollback_switchover_set?).and_yield
+      expect { nx.wait }.to hop("rollback_switchover")
+    end
   end
 
   describe "#destroy" do
