@@ -263,4 +263,14 @@ class Prog::GcpVm::Nexus < Prog::Base
     end
     pop "gcp vm deleted"
   end
+
+  def before_run
+    when_destroy_set? do
+      if strand.label != "destroy"
+        hop_destroy
+      elsif strand.stack.count > 1
+        pop "operation is cancelled due to the destruction of vm"
+      end
+    end
+  end
 end

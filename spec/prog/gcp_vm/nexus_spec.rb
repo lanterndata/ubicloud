@@ -325,4 +325,26 @@ RSpec.describe Prog::GcpVm::Nexus do
       expect(nx.host).to eq("1.1.1.1")
     end
   end
+
+  describe "#before_run" do
+    it "hops to destroy" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect { nx.before_run }.to hop("destroy")
+    end
+
+    it "pops if already in the destroy state and has stack items" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("destroy").at_least(:once)
+      frame = {"link" => ["GcpVm::Nexus", "wait"]}
+      expect(nx).to receive(:frame).and_return(frame)
+      expect(nx.strand).to receive(:stack).and_return([JSON.generate(frame), JSON.generate(frame)]).at_least(:once)
+      expect { nx.before_run }.to hop("wait", "GcpVm::Nexus")
+    end
+
+    it "does not hop to destroy if already in the destroy state" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("destroy").at_least(:once)
+      expect { nx.before_run }.not_to hop("destroy")
+    end
+  end
 end

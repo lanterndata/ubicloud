@@ -130,12 +130,14 @@ class CloverApi
       end
 
       r.get "backups" do
+        Authorization.authorize(@current_user.id, "Postgres:view", pg.id)
         pg.timeline.backups_with_metadata
           .sort_by { |hsh| hsh[:last_modified] }
           .map { |hsh| {time: hsh[:last_modified], label: pg.timeline.get_backup_label(hsh[:key]), compressed_size: hsh[:compressed_size], uncompressed_size: hsh[:uncompressed_size]} }
       end
 
       r.post "push-backup" do
+        Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
         pg.timeline.take_manual_backup
         response.status = 200
         r.halt
@@ -150,7 +152,50 @@ class CloverApi
       end
 
       r.post "dissociate-forks" do
+        Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
         pg.dissociate_forks
+        response.status = 200
+        r.halt
+      end
+
+      r.post "logical-replica" do
+        Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
+        Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
+        lantern_version = (r.params["lantern_version"] && r.params["lantern_version"].empty?) ? nil : r.params["lantern_version"]
+        extras_version = (r.params["extras_version"] && r.params["extras_version"].empty?) ? nil : r.params["extras_version"]
+        minor_version = (r.params["minor_version"] && r.params["minor_version"].empty?) ? nil : r.params["minor_version"]
+        pg_upgrade = (r.params["pg_upgrade"] && r.params["pg_upgrade"].empty?) ? nil : r.params["pg_upgrade"]
+        st = pg.create_logical_replica(
+          lantern_version: lantern_version,
+          extras_version: extras_version,
+          minor_version: minor_version,
+          pg_upgrade: pg_upgrade
+        )
+        replica = LanternResource[st.id]
+        serialize(replica, :detailed)
+      end
+
+      r.post "switchover" do
+        Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
+
+        if pg.parent.nil? || !pg.logical_replication
+          fail CloverError.new(400, "Invalid request", "Database does not have parent or is not in logical replication state")
+        end
+
+        pg.incr_switchover_with_parent
+        response.status = 200
+        r.halt
+      end
+
+      r.post "rollback-switchover" do
+        Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
+        Validation.validate_rollback_request(pg)
+        current_resource = LanternResource[pg.rollback_target]
+        if current_resource.nil?
+          fail CloverError.new(404, "Not Found", "rollback_target not found")
+        end
+
+        pg.incr_rollback_switchover
         response.status = 200
         r.halt
       end

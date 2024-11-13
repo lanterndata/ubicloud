@@ -336,4 +336,33 @@ RSpec.describe LanternResource do
       expect(lantern_resource.get_logical_replication_lag("test_slot")).to be(0)
     end
   end
+
+  describe "#rollback_switchover" do
+    it "performs a rollback switchover successfully" do
+      current_representative_server = instance_double(LanternServer, domain: "example.com", vm: instance_double(GcpVm, sshable: instance_double(Sshable, host: "127.0.0.1")))
+      old_representative_server = instance_double(LanternServer, domain: nil, vm: instance_double(GcpVm, sshable: instance_double(Sshable, host: "127.0.0.2")))
+      current_resource = instance_double(described_class, representative_server: current_representative_server)
+      expect(lantern_resource).to receive(:rollback_target).and_return("test-target").at_least(:once)
+      expect(lantern_resource).to receive(:representative_server).and_return(old_representative_server).at_least(:once)
+      allow(described_class).to receive(:[]).with(lantern_resource.rollback_target).and_return(current_resource)
+
+      expect(current_resource.representative_server).to receive(:stop_container).with(1).and_return(true).at_least(:once)
+
+      expect(old_representative_server).to receive(:start_container)
+
+      cf_client = instance_double(Dns::Cloudflare)
+      allow(Dns::Cloudflare).to receive(:new).and_return(cf_client)
+      expect(cf_client).to receive(:upsert_dns_record).with(
+        current_resource.representative_server.domain,
+        old_representative_server.vm.sshable.host
+      )
+
+      expect(old_representative_server).to receive(:update).with(domain: current_resource.representative_server.domain)
+      expect(current_resource.representative_server).to receive(:update).with(domain: nil)
+
+      expect(lantern_resource).to receive(:update).with(rollback_target: nil)
+
+      expect { lantern_resource.rollback_switchover }.not_to raise_error
+    end
+  end
 end

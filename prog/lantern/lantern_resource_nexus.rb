@@ -9,7 +9,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   extend Forwardable
   def_delegators :lantern_resource, :servers, :representative_server
 
-  semaphore :destroy, :swap_leaders_with_parent, :switchover_with_parent
+  semaphore :destroy, :swap_leaders_with_parent, :switchover_with_parent, :rollback_switchover
 
   def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, ubid: LanternResource.generate_ubid, ha_type: LanternResource::HaType::NONE, parent_id: nil, restore_target: nil, recovery_target_lsn: nil,
     org_id: nil, db_name: "postgres", db_user: "postgres", db_user_password: nil, superuser_password: nil, repl_password: nil, app_env: Config.rack_env,
@@ -70,6 +70,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
           lantern_version = parent.representative_server.lantern_version
           extras_version = parent.representative_server.extras_version
           minor_version = parent.representative_server.minor_version
+          pg_version = parent.pg_version
         end
 
         target_storage_size_gib = parent.representative_server.target_storage_size_gib
@@ -205,6 +206,10 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
       lantern_resource.update(display_state: nil)
     end
 
+    when_rollback_switchover_set? do
+      hop_rollback_switchover
+    end
+
     when_swap_leaders_with_parent_set? do
       if lantern_resource.parent.nil?
         decr_swap_leaders_with_parent
@@ -233,11 +238,12 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   label def finish_take_over
     # update display_states
     lantern_resource.update(display_state: nil)
-    lantern_resource.parent.update(display_state: nil)
+    lantern_resource.parent.update(display_state: nil, rollback_target: lantern_resource.id)
 
     # remove fork association so parent can be deleted
     lantern_resource.update(parent_id: nil)
     lantern_resource.timeline.update(parent_id: nil)
+
     hop_wait
   end
 
@@ -265,6 +271,24 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
     else
       nap 5
     end
+  end
+
+  label def rollback_switchover
+    decr_rollback_switchover
+    lantern_resource.rollback_switchover
+    hop_wait_rollback_switchover
+  end
+
+  label def wait_rollback_switchover
+    nap 10 if !lantern_resource.representative_server.is_dns_correct?
+    begin
+      connection = Sequel.connect(lantern_resource.connection_string)
+      connection["SELECT 1"].first
+      lantern_resource.set_to_readonly(status: "off")
+    rescue
+      nap 10
+    end
+    hop_wait_servers
   end
 
   label def swap_leaders_with_parent

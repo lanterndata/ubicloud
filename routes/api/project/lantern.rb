@@ -51,6 +51,7 @@ class CloverApi
         lantern_version: r.params["lantern_version"],
         extras_version: r.params["extras_version"],
         minor_version: r.params["minor_version"],
+        pg_version: Validation.validate_pg_version(r.params["pg_version"]),
         domain: domain,
         db_name: r.params["db_name"],
         db_user: r.params["db_user"],

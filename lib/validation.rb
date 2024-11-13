@@ -91,6 +91,21 @@ module Validation
     fail ValidationFailed.new({version: msg}) unless version && !version.to_s.strip.empty?
   end
 
+  def self.validate_pg_version(version)
+    if version.nil? || version.to_s.empty?
+      return 17
+    end
+
+    msg = "unsupported pg_version"
+    fail ValidationFailed.new({pg_version: msg}) unless [15, 17].include?(version.to_i)
+    version.to_i
+  end
+
+  def self.validate_rollback_request(pg)
+    msg = "database does not have rollback_target"
+    fail ValidationFailed.new({rollback_target: msg}) unless !pg.rollback_target.nil?
+  end
+
   def self.validate_storage_volumes(storage_volumes, boot_disk_index)
     allowed_keys = [:encrypted, :size_gib, :boot, :skip_sync]
     fail ValidationFailed.new({storage_volumes: "At least one storage volume is required."}) if storage_volumes.empty?
