@@ -22,7 +22,7 @@ class LanternResource < Sequel::Model
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
 
-  semaphore :destroy, :swap_leaders_with_parent, :switchover_with_parent
+  semaphore :destroy, :swap_leaders_with_parent, :switchover_with_parent, :rollback_switchover
 
   plugin :column_encryption do |enc|
     enc.column :superuser_password
@@ -292,5 +292,24 @@ SQL
     NONE = "none"
     ASYNC = "async"
     SYNC = "sync"
+  end
+
+  def rollback_switchover
+    current_resource = LanternResource[rollback_target]
+    # stop current one and start old one
+    begin
+      current_resource.representative_server.stop_container(1)
+    rescue
+    end
+
+    representative_server.start_container
+
+    # update dns
+    cf_client = Dns::Cloudflare.new
+    cf_client.upsert_dns_record(current_resource.representative_server.domain, representative_server.vm.sshable.host)
+    representative_server.update(domain: current_resource.representative_server.domain)
+    current_resource.representative_server.update(domain: nil)
+
+    update(rollback_target: nil)
   end
 end

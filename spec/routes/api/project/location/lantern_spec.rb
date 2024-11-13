@@ -323,7 +323,7 @@ RSpec.describe Clover, "lantern" do
       end
     end
 
-    describe "upgrade-with-replica" do
+    describe "logical-replica" do
       it "creates a new replica" do
         expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
         query_res = class_double(LanternResource, first: pg)
@@ -336,7 +336,7 @@ RSpec.describe Clover, "lantern" do
           pg_upgrade: nil
         ).and_return(instance_double(Strand, id: pg.id))
 
-        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/upgrade-with-replica", {lantern_version: "", extras_version: "", minor_version: "", pg_upgrade: ""}
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/logical-replica", {lantern_version: "", extras_version: "", minor_version: "", pg_upgrade: ""}
         expect(last_response.status).to eq(200)
       end
 
@@ -352,7 +352,7 @@ RSpec.describe Clover, "lantern" do
           pg_upgrade: {"lantern_version" => "0.6.0", "extras_version" => "0.6.0", "minor_version" => "1", "pg_version" => "17"}
         ).and_return(instance_double(Strand, id: pg.id))
 
-        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/upgrade-with-replica", {
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/logical-replica", {
           lantern_version: "0.5.0",
           extras_version: "0.5.0",
           minor_version: "1",
@@ -363,9 +363,33 @@ RSpec.describe Clover, "lantern" do
     end
 
     describe "switchover" do
-      it "performs a switchover" do
+      it "fails because no parent" do
         expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
         query_res = class_double(LanternResource, first: pg)
+        allow(query_res).to receive(:where).and_return(query_res)
+        expect(project).to receive(:lantern_resources_dataset).and_return(query_res)
+
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/switchover"
+        expect(last_response.status).to eq(400)
+      end
+
+      it "fails because not in logical replication mode" do
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        query_res = class_double(LanternResource, first: pg)
+        expect(pg).to receive(:parent).and_return(instance_double(LanternResource))
+        expect(pg).to receive(:logical_replication).and_return(false)
+        allow(query_res).to receive(:where).and_return(query_res)
+        expect(project).to receive(:lantern_resources_dataset).and_return(query_res)
+
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/switchover"
+        expect(last_response.status).to eq(400)
+      end
+
+      it "performs switchover" do
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        query_res = class_double(LanternResource, first: pg)
+        expect(pg).to receive(:parent).and_return(instance_double(LanternResource))
+        expect(pg).to receive(:logical_replication).and_return(true)
         allow(query_res).to receive(:where).and_return(query_res)
         expect(project).to receive(:lantern_resources_dataset).and_return(query_res)
         expect(pg).to receive(:incr_switchover_with_parent)
@@ -376,20 +400,39 @@ RSpec.describe Clover, "lantern" do
     end
 
     describe "rollback-switchover" do
-      it "rolls back a switchover" do
+      it "fails with 404" do
         expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        expect(Authorization).to receive(:authorize).with(user.id, "Postgres:edit", pg.id)
+
         query_res = class_double(LanternResource, first: pg)
+        target_id = LanternResource.generate_uuid
         allow(query_res).to receive(:where).and_return(query_res)
         expect(project).to receive(:lantern_resources_dataset).and_return(query_res)
-        parent_id = LanternResource.generate_uuid
-        parent_resource = instance_double(LanternResource, id: parent_id)
-        expect(Authorization).to receive(:authorize).with(user.id, "Postgres:edit", pg.id)
-        expect(Authorization).to receive(:authorize).with(user.id, "Postgres:edit", parent_resource.id)
-        allow(LanternResource).to receive(:[]).with(parent_id).and_return(parent_resource)
-        expect(Validation).to receive(:validate_rollback_request).with(parent_id)
-        expect(MiscOperations).to receive(:rollback_switchover).with(pg, parent_resource)
+        expect(pg).to receive(:rollback_target).and_return(target_id)
 
-        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/rollback-switchover", {parent_id: parent_id}
+        expect(Validation).to receive(:validate_rollback_request).with(pg)
+        allow(LanternResource).to receive(:[]).with(target_id).and_return(nil)
+
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/rollback-switchover"
+        expect(last_response.status).to eq(404)
+      end
+
+      it "rolls back a switchover" do
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        expect(Authorization).to receive(:authorize).with(user.id, "Postgres:edit", pg.id)
+
+        query_res = class_double(LanternResource, first: pg)
+        target_id = LanternResource.generate_uuid
+        allow(query_res).to receive(:where).and_return(query_res)
+        expect(project).to receive(:lantern_resources_dataset).and_return(query_res)
+        expect(pg).to receive(:rollback_target).and_return(target_id)
+
+        expect(Validation).to receive(:validate_rollback_request).with(pg)
+        allow(LanternResource).to receive(:[]).with(target_id).and_return(instance_double(LanternResource))
+
+        expect(pg).to receive(:incr_rollback_switchover)
+
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/rollback-switchover"
         expect(last_response.status).to eq(200)
       end
     end

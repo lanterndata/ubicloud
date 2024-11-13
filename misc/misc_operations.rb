@@ -240,29 +240,4 @@ SH
     puts "Image created"
     vm.incr_destroy
   end
-
-  def self.rollback_switchover(current_resource, old_resource)
-    # stop current one and start old one
-    begin
-      current_resource.representative_server.stop_container(1)
-    rescue
-    end
-
-    old_resource.representative_server.start_container
-
-    # update dns
-    cf_client = Dns::Cloudflare.new
-    cf_client.upsert_dns_record(current_resource.representative_server.domain, old_resource.representative_server.vm.sshable.host)
-    old_resource.representative_server.update(domain: current_resource.representative_server.domain)
-    current_resource.representative_server.update(domain: nil)
-
-    # disable readonly as soon as it is started
-    loop do
-      old_resource.representative_server.run_query("SELECT 1")
-      old_resource.set_to_readonly(status: "off")
-      break
-    rescue
-      sleep 10
-    end
-  end
 end

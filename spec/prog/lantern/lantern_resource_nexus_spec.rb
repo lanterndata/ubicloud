@@ -401,7 +401,7 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)
 
       expect(lantern_resource).to receive(:update).with(display_state: nil)
-      expect(parent).to receive(:update).with(display_state: nil)
+      expect(parent).to receive(:update).with(display_state: nil, rollback_target: lantern_resource.id)
 
       expect(lantern_resource).to receive(:update).with(parent_id: nil)
       expect(lantern_resource).to receive(:timeline).and_return(timeline)
@@ -498,6 +498,43 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
       expect(representative_server).to receive(:is_dns_correct?).and_return(true)
       expect { nx.wait_switch_dns }.to hop("finish_take_over")
+    end
+  end
+
+  describe "#rollback_switchover" do
+    it "rollbacks switchover and hops to wait_rollback_switchover" do
+      expect(lantern_resource).to receive(:rollback_switchover)
+      expect { nx.rollback_switchover }.to hop("wait_rollback_switchover")
+    end
+
+    it "waits for rollback switchover and naps if dns is not updated yet" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:is_dns_correct?).and_return(false)
+      expect { nx.wait_rollback_switchover }.to nap 10
+    end
+
+    it "waits for rollback switchover and naps if can not connnect" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(Sequel).to receive(:connect).and_return(DB)
+      expect(representative_server).to receive(:is_dns_correct?).and_return(true)
+      expect(DB).to receive(:[]).with("SELECT 1").and_raise
+      expect { nx.wait_rollback_switchover }.to nap 10
+    end
+
+    it "waits for rollback switchover and hops to wait server" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:is_dns_correct?).and_return(true)
+
+      expect(Sequel).to receive(:connect).and_return(DB)
+      res = instance_double(Sequel::Dataset)
+      expect(res).to receive(:first)
+      expect(DB).to receive(:[]).with("SELECT 1").and_return(res)
+
+      expect(lantern_resource).to receive(:set_to_readonly).with(status: "off")
+      expect { nx.wait_rollback_switchover }.to hop("wait_servers")
     end
   end
 end

@@ -172,11 +172,11 @@ RSpec.describe Validation do
 
     describe "#validate_rollback_request" do
       it "valid request" do
-        expect(described_class.validate_rollback_request("test-id")).to be_nil
+        expect(described_class.validate_rollback_request(instance_double(LanternResource, rollback_target: LanternResource.generate_uuid))).to be_nil
       end
 
       it "invalid version" do
-        expect { described_class.validate_rollback_request("") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_rollback_request(instance_double(LanternResource, rollback_target: nil)) }.to raise_error described_class::ValidationFailed
       end
     end
 

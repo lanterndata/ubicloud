@@ -91,9 +91,9 @@ module Validation
     fail ValidationFailed.new({version: msg}) unless version && !version.to_s.strip.empty?
   end
 
-  def self.validate_rollback_request(parent_id)
-    msg = "parent_id should not be empty"
-    fail ValidationFailed.new({parent_id: msg}) unless parent_id && !parent_id.to_s.strip.empty?
+  def self.validate_rollback_request(pg)
+    msg = "database does not have rollback_target"
+    fail ValidationFailed.new({rollback_target: msg}) unless !pg.rollback_target.nil?
   end
 
   def self.validate_storage_volumes(storage_volumes, boot_disk_index)

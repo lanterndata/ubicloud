@@ -158,7 +158,7 @@ class CloverApi
         r.halt
       end
 
-      r.post "upgrade-with-replica" do
+      r.post "logical-replica" do
         Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
         Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
         lantern_version = r.params["lantern_version"].empty? ? nil : r.params["lantern_version"]
@@ -177,6 +177,11 @@ class CloverApi
 
       r.post "switchover" do
         Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
+
+        if pg.parent.nil? || !pg.logical_replication
+          fail CloverError.new(400, "Invalid request", "Database does not have parent or is not in logical replication state")
+        end
+
         pg.incr_switchover_with_parent
         response.status = 200
         r.halt
@@ -184,10 +189,13 @@ class CloverApi
 
       r.post "rollback-switchover" do
         Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
-        parent = LanternResource[r.params["parent_id"]]
-        Authorization.authorize(@current_user.id, "Postgres:edit", parent.id)
-        Validation.validate_rollback_request(r.params["parent_id"])
-        MiscOperations.rollback_switchover(pg, parent)
+        Validation.validate_rollback_request(pg)
+        current_resource = LanternResource[pg.rollback_target]
+        if current_resource.nil?
+          fail CloverError.new(404, "Not Found", "rollback_target not found")
+        end
+
+        pg.incr_rollback_switchover
         response.status = 200
         r.halt
       end

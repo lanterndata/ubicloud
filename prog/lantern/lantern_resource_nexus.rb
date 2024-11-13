@@ -233,11 +233,12 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   label def finish_take_over
     # update display_states
     lantern_resource.update(display_state: nil)
-    lantern_resource.parent.update(display_state: nil)
+    lantern_resource.parent.update(display_state: nil, rollback_target: lantern_resource.id)
 
     # remove fork association so parent can be deleted
     lantern_resource.update(parent_id: nil)
     lantern_resource.timeline.update(parent_id: nil)
+
     hop_wait
   end
 
@@ -265,6 +266,23 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
     else
       nap 5
     end
+  end
+
+  label def rollback_switchover
+    lantern_resource.rollback_switchover
+    hop_wait_rollback_switchover
+  end
+
+  label def wait_rollback_switchover
+    nap 10 if !lantern_resource.representative_server.is_dns_correct?
+    begin
+      connection = Sequel.connect(lantern_resource.connection_string)
+      connection["SELECT 1"].first
+      lantern_resource.set_to_readonly(status: "off")
+    rescue
+      nap 10
+    end
+    hop_wait_servers
   end
 
   label def swap_leaders_with_parent
