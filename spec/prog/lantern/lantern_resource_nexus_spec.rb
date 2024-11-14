@@ -413,6 +413,7 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
 
       expect(lantern_resource).to receive(:update).with(parent_id: nil)
       expect(lantern_resource).to receive(:timeline).and_return(timeline)
+      expect(lantern_resource).to receive(:drop_ddl_log)
       expect(timeline).to receive(:update).with(parent_id: nil)
 
       expect { nx.finish_take_over }.to hop("wait")
