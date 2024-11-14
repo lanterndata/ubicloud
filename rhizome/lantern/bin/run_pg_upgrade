@@ -14,6 +14,12 @@ old_pg_version = $configure_hash["old_pg_version"]
 pg_version = $configure_hash["pg_version"]
 current_container_image = data["services"]["postgresql"]["image"]
 
+puts "Setting up directories..."
+puts "container_image -> #{container_image}"
+puts "old_pg_version -> #{old_pg_version}"
+puts "pg_version -> #{pg_version}"
+puts "current_container_image -> #{current_container_image}"
+
 r "sudo docker compose -f #{$compose_file} down -t 10"
 r "sudo mv #{$datadir}/data #{$datadir}/old-data-#{old_pg_version}"
 r "sudo docker rm -f tc 2>/dev/null || true"
@@ -23,6 +29,8 @@ r "sudo docker cp tc:/usr/lib/postgresql/#{old_pg_version}/bin #{$datadir}/old-b
 r "sudo docker cp tc:/usr/share/postgresql/#{old_pg_version} #{$datadir}/old-share-#{old_pg_version}"
 r "sudo docker rm tc"
 r "sudo chown -R 1001:1001 #{$datadir}"
+
+puts "Directory setup successfull."
 
 append_env([
   ["POSTGRESQL_RUN_PGUPGRADE", "yes"],
@@ -34,8 +42,11 @@ data["services"]["postgresql"]["user"] = "root"
 data["services"]["postgresql"]["deploy"].delete("restart_policy")
 File.open($compose_file, "w") { |f| YAML.dump(data, f) }
 
-r "sudo docker compose -f #{$compose_file} up"
+puts "Starting pg_upgrade..."
+puts r "sudo docker compose -f #{$compose_file} up"
+puts "pg_upgrade successfull."
 
+puts "Starting new cluster..."
 data = YAML.load_file $compose_file
 data["services"]["postgresql"].delete("user")
 data["services"]["postgresql"]["deploy"]["restart_policy"] = {"condition" => "on-failure"}
