@@ -337,6 +337,15 @@ RSpec.describe LanternResource do
     end
   end
 
+  describe "#drop_ddl_log" do
+    it "drops ddl log table and triggers" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:run_query_all).with(a_string_matching(/DROP .* ddl_log/m))
+      expect { lantern_resource.drop_ddl_log }.not_to raise_error
+    end
+  end
+
   describe "#rollback_switchover" do
     it "performs a rollback switchover successfully" do
       current_representative_server = instance_double(LanternServer, domain: "example.com", vm: instance_double(GcpVm, sshable: instance_double(Sshable, host: "127.0.0.1")))

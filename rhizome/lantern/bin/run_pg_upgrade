@@ -43,7 +43,7 @@ data["services"]["postgresql"]["deploy"].delete("restart_policy")
 File.open($compose_file, "w") { |f| YAML.dump(data, f) }
 
 puts "Starting pg_upgrade..."
-puts r "sudo docker compose -f #{$compose_file} up"
+r "sudo docker compose -f #{$compose_file} run --rm postgresql"
 puts "pg_upgrade successfull."
 
 puts "Starting new cluster..."

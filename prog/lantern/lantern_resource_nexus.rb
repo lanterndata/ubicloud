@@ -244,6 +244,9 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
     lantern_resource.update(parent_id: nil)
     lantern_resource.timeline.update(parent_id: nil)
 
+    # remove ddl_log
+    lantern_resource.drop_ddl_log
+
     hop_wait
   end
 

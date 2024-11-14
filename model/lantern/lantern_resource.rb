@@ -129,7 +129,8 @@ class LanternResource < Sequel::Model
       INSERT INTO ddl_log (object_tag, ddl_command, timestamp)
               VALUES (tg_tag, current_query(), current_timestamp);
     END;
-    $$ LANGUAGE plpgsql;
+    $$ LANGUAGE plpgsql
+    SECURITY DEFINER;
 
     DROP EVENT TRIGGER IF EXISTS log_ddl_trigger;
     CREATE EVENT TRIGGER log_ddl_trigger
@@ -166,6 +167,15 @@ SQL
    FOR EACH ROW
    EXECUTE FUNCTION execute_ddl_command();
    ALTER TABLE ddl_log ENABLE REPLICA TRIGGER execute_ddl_after_insert;
+SQL
+    representative_server.run_query_all(commands)
+  end
+
+  def drop_ddl_log
+    commands = <<SQL
+   DROP EVENT TRIGGER IF EXISTS log_ddl_trigger;
+   DROP TABLE IF EXISTS ddl_log;
+   DROP FUNCTION IF EXISTS execute_ddl_command();
 SQL
     representative_server.run_query_all(commands)
   end
