@@ -47,7 +47,10 @@ def setup_fs
   r "sudo mount /dev/sdb #{$datadir}"
   r "sudo su -c \"echo '/dev/sdb #{$datadir} ext4 defaults 0 0' >> /etc/fstab\""
 
-  r "sudo chown -R 1001:1001 #{$datadir}"
+  r "sudo addgroup --gid 1001 postgres"
+  r "sudo adduser -u 1001 --gid 100 --disabled-password --gecos '' postgres"
+
+  r "sudo chown -R postgres:postgres #{$datadir}"
 end
 
 def setup_env

@@ -14,7 +14,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, ubid: LanternResource.generate_ubid, ha_type: LanternResource::HaType::NONE, parent_id: nil, restore_target: nil, recovery_target_lsn: nil,
     org_id: nil, db_name: "postgres", db_user: "postgres", db_user_password: nil, superuser_password: nil, repl_password: nil, app_env: Config.rack_env,
     lantern_version: Config.lantern_default_version, extras_version: Config.lantern_extras_default_version, minor_version: Config.lantern_minor_default_version, domain: nil, enable_debug: false,
-    label: "", version_upgrade: false, logical_replication: false, max_storage_autoresize_gib: 0, pg_version: 17, pg_upgrade: nil)
+    label: "", version_upgrade: false, logical_replication: false, max_storage_autoresize_gib: 0, pg_version: Config.pg_default_version, pg_upgrade: nil)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -283,14 +283,24 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   end
 
   label def wait_rollback_switchover
+    # first try to set readonly to off as soon as possible
+    begin
+      lantern_resource.set_to_readonly(status: "off")
+    rescue
+      nap 5
+    end
+
+    # then check if dns change is propogated
     nap 10 if !lantern_resource.representative_server.is_dns_correct?
+
+    # then try to check if external connections are working correctly
     begin
       connection = Sequel.connect(lantern_resource.connection_string)
       connection["SELECT 1"].first
-      lantern_resource.set_to_readonly(status: "off")
     rescue
       nap 10
     end
+
     hop_wait_servers
   end
 

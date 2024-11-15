@@ -94,7 +94,6 @@ class LanternResource < Sequel::Model
     representative_server.run_query("
       ALTER SYSTEM SET default_transaction_read_only TO #{status};
       SELECT pg_reload_conf();
-      SHOW default_transaction_read_only;
     ")
   end
 

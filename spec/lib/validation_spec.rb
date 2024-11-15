@@ -174,13 +174,13 @@ RSpec.describe Validation do
       it "valid version" do
         expect(described_class.validate_pg_version("17")).to be(17)
         expect(described_class.validate_pg_version("15")).to be(15)
-        expect(described_class.validate_pg_version("")).to be(17)
-        expect(described_class.validate_pg_version(nil)).to be(17)
+        expect(described_class.validate_pg_version("")).to be(Config.pg_default_version)
+        expect(described_class.validate_pg_version(nil)).to be(Config.pg_default_version)
       end
 
       it "invalid version" do
         expect { described_class.validate_pg_version("as") }.to raise_error described_class::ValidationFailed
-        expect { described_class.validate_pg_version("16") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_pg_version("14") }.to raise_error described_class::ValidationFailed
       end
     end
 

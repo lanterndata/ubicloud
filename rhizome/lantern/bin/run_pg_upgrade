@@ -28,7 +28,7 @@ r "sudo docker cp tc:/usr/lib/postgresql/#{old_pg_version}/lib #{$datadir}/old-l
 r "sudo docker cp tc:/usr/lib/postgresql/#{old_pg_version}/bin #{$datadir}/old-bin-#{old_pg_version}"
 r "sudo docker cp tc:/usr/share/postgresql/#{old_pg_version} #{$datadir}/old-share-#{old_pg_version}"
 r "sudo docker rm tc"
-r "sudo chown -R 1001:1001 #{$datadir}"
+r "sudo chown -R postgres:postgres #{$datadir}"
 
 puts "Directory setup successfull."
 
@@ -51,7 +51,7 @@ data = YAML.load_file $compose_file
 data["services"]["postgresql"].delete("user")
 data["services"]["postgresql"]["deploy"]["restart_policy"] = {"condition" => "on-failure"}
 r "sudo rm -rf #{$datadir}/old-lib-#{old_pg_version} #{$datadir}/old-bin-#{old_pg_version} #{$datadir}/old-share-#{old_pg_version}"
-r "sudo chown -R 1001:1001 #{$datadir}"
+r "sudo chown -R postgres:postgres #{$datadir}"
 File.open($compose_file, "w") { |f| YAML.dump(data, f) }
 
 append_env([
