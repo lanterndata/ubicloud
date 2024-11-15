@@ -245,9 +245,8 @@ class Hosting::GcpApis
     wait_for_operation(zone, data["id"])
   end
 
-  def list_objects(bucket, pattern)
+  def list_objects(bucket, pattern, query = {matchGlob: pattern, delimiter: "/"})
     connection = Excon.new("https://storage.googleapis.com", headers: @host[:headers])
-    query = {matchGlob: pattern, delimiter: "/"}
 
     response = connection.get(path: "/storage/v1/b/#{bucket}/o", query: query, expects: [200, 400])
     Hosting::GcpApis.check_errors(response)
@@ -499,6 +498,22 @@ class Hosting::GcpApis
         matchesPrefix: [prefix]
       }
     }
+
+    # Delete rules that are already applied
+    if data["lifecycle"]
+      existing_rules = data["lifecycle"]["rule"]
+
+      existing_rules.each do |rule|
+        rule_prefixes = rule.dig("condition", "matchesPrefix") || []
+        applied_prefixes = rule_prefixes.select do |rule_prefix|
+          list_objects(bucket, rule_prefix, {prefix: rule_prefix, maxResults: 1}).any?
+        end
+
+        if applied_prefixes.empty?
+          data["lifecycle"]["rule"].delete(rule)
+        end
+      end
+    end
 
     if data.empty?
       data = {"lifecycle" => {"rule" => [lifecycle_rule]}}
