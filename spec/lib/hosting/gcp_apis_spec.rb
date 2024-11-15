@@ -549,6 +549,18 @@ RSpec.describe Hosting::GcpApis do
           .with(body: JSON.dump({"lifecycle" => {"rule" => [{"action" => {"type" => "Delete"}, "condition" => {age: 0, matchesPrefix: ["test-ubid2"]}}, {"action" => {"type" => "Delete"}, "condition" => {age: 0, matchesPrefix: ["test-ubid"]}}]}}))
           .to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
         api = described_class.new
+        expect(api).to receive(:list_objects).and_return([1]).at_least(:once)
+        expect { api.add_delete_lifecycle_rule("test", "test-ubid") }.not_to raise_error
+      end
+
+      it "adds lifecycle rule and deletes already applied rules" do
+        stub_request(:post, "https://oauth2.googleapis.com/token").to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        stub_request(:get, "https://storage.googleapis.com/storage/v1/b/test?fields=lifecycle").to_return(status: 200, body: JSON.dump({"lifecycle" => {"rule" => [{"action" => {"type" => "Delete"}, "condition" => {age: 0, matchesPrefix: ["test-ubid2"]}}]}}), headers: {"Content-Type" => "application/json"})
+        stub_request(:patch, "https://storage.googleapis.com/storage/v1/b/test?fields=lifecycle")
+          .with(body: JSON.dump({"lifecycle" => {"rule" => [{"action" => {"type" => "Delete"}, "condition" => {age: 0, matchesPrefix: ["test-ubid"]}}]}}))
+          .to_return(status: 200, body: JSON.dump({}), headers: {"Content-Type" => "application/json"})
+        api = described_class.new
+        expect(api).to receive(:list_objects).and_return([]).at_least(:once)
         expect { api.add_delete_lifecycle_rule("test", "test-ubid") }.not_to raise_error
       end
     end
