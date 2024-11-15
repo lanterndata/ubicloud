@@ -327,6 +327,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   label def switch_dns_with_parent
     lantern_resource.parent.representative_server.stop_container(1)
     lantern_resource.update(logical_replication: false)
+    lantern_resource.parent.representative_server.incr_container_stopped
 
     if lantern_resource.parent.representative_server.domain.nil?
       hop_finish_take_over

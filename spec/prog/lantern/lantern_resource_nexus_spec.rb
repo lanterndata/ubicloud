@@ -468,6 +468,7 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       parent = instance_double(LanternResource, representative_server: instance_double(LanternServer, domain: nil))
       expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)
       expect(lantern_resource.parent.representative_server).to receive(:stop_container)
+      expect(lantern_resource.parent.representative_server).to receive(:incr_container_stopped)
       expect { nx.switch_dns_with_parent }.to hop("finish_take_over")
     end
 
@@ -475,6 +476,7 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       parent = instance_double(LanternResource, representative_server: instance_double(LanternServer, domain: "test-domain"))
       expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)
       expect(lantern_resource.parent.representative_server).to receive(:stop_container)
+      expect(lantern_resource.parent.representative_server).to receive(:incr_container_stopped)
       expect(lantern_resource.representative_server).to receive(:swap_dns).with(parent.representative_server)
       expect(lantern_resource).to receive(:update).with(logical_replication: false)
       expect { nx.switch_dns_with_parent }.to hop("wait_switch_dns")

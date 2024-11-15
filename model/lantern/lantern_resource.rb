@@ -311,8 +311,9 @@ SQL
       current_resource.representative_server.stop_container(1)
     rescue
     end
+    current_resource.representative_server.incr_container_stopped
 
-    representative_server.start_container
+    representative_server.incr_take_over
 
     # update dns
     cf_client = Dns::Cloudflare.new
