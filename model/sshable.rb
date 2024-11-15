@@ -30,16 +30,17 @@ class Sshable < Sequel::Model
     }
   end
 
-  def cmd(cmd, stdin: nil, log: true)
+  def cmd(command, stdin: nil, log: true)
     start = Time.now
     stdout = StringIO.new
     stderr = StringIO.new
     exit_code = nil
     exit_signal = nil
 
+    has_cached_session = !Thread.current[:clover_ssh_cache].nil? && !Thread.current[:clover_ssh_cache][[host, unix_user]].nil?
     begin
       connect.open_channel do |ch|
-        ch.exec(cmd) do |ch, success|
+        ch.exec(command) do |ch, success|
           ch.on_data do |ch, data|
             $stderr.write(data) if REPL
             stdout.write(data)
@@ -64,6 +65,12 @@ class Sshable < Sequel::Model
       end.wait
     rescue
       invalidate_cache_entry
+
+      if has_cached_session
+        # if the session was cached previously
+        # we will retry command as ssh session may be closed
+        return cmd(command, stdin: stdin, log: log)
+      end
       raise
     end
 
@@ -74,7 +81,7 @@ class Sshable < Sequel::Model
       Clog.emit("ssh cmd execution") do
         finish = Time.now
         embed = {start: start, finish: finish, duration: finish - start,
-                 cmd: cmd,
+                 cmd: command,
                  exit_code: exit_code, exit_signal: exit_signal}
 
         # Suppress large outputs to avoid annoyance in duplication
@@ -92,7 +99,7 @@ class Sshable < Sequel::Model
       end
     end
 
-    fail SshError.new(cmd, stdout_str, stderr.string.freeze, exit_code, exit_signal) unless exit_code.zero?
+    fail SshError.new(command, stdout_str, stderr.string.freeze, exit_code, exit_signal) unless exit_code.zero?
     stdout_str
   end
 

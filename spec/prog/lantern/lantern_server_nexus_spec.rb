@@ -1051,12 +1051,12 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
   describe "#container_stopped" do
     it "hops to take_over" do
       nx.incr_take_over
-      expect(lantern_server.vm.sshable).to receive(:cmd)
+      expect(lantern_server).to receive(:start_container)
       expect { nx.container_stopped }.to hop("take_over")
     end
 
-    it "naps 15" do
-      expect { nx.container_stopped }.to nap(15)
+    it "naps 10" do
+      expect { nx.container_stopped }.to nap(10)
     end
   end
 

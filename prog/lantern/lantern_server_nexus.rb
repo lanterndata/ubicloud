@@ -523,11 +523,11 @@ SQL
   label def container_stopped
     decr_container_stopped
     when_take_over_set? do
-      vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} up -d")
+      lantern_server.start_container
       hop_take_over
     end
 
-    nap 15
+    nap 10
   end
 
   label def promote_server

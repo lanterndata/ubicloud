@@ -157,5 +157,15 @@ RSpec.describe Sshable do
       expect(sa).to receive(:invalidate_cache_entry)
       expect { sa.cmd("irrelevant") }.to raise_error err
     end
+
+    it "invalidates the cache if the session retries and raises on second try" do
+      err = IOError.new("the party is over")
+      expect(session).to receive(:open_channel).and_raise(err).at_least(:once)
+      cache = instance_double(Hash)
+      expect(Thread.current).to receive(:[]).with(:clover_ssh_cache).and_return(cache).at_least(:once)
+      expect(cache).to receive(:[]).with(["test.localhost", "testuser"]).and_return(session, nil).at_least(:once)
+      expect(sa).to receive(:invalidate_cache_entry).at_least(:once)
+      expect { sa.cmd("irrelevant") }.to raise_error err
+    end
   end
 end

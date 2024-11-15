@@ -357,7 +357,7 @@ RSpec.describe LanternResource do
 
       expect(current_resource.representative_server).to receive(:stop_container).with(1).and_return(true).at_least(:once)
 
-      expect(old_representative_server).to receive(:start_container)
+      expect(old_representative_server).to receive(:incr_take_over)
 
       cf_client = instance_double(Dns::Cloudflare)
       allow(Dns::Cloudflare).to receive(:new).and_return(cf_client)
@@ -368,6 +368,7 @@ RSpec.describe LanternResource do
 
       expect(old_representative_server).to receive(:update).with(domain: current_resource.representative_server.domain)
       expect(current_resource.representative_server).to receive(:update).with(domain: nil)
+      expect(current_resource.representative_server).to receive(:incr_container_stopped)
 
       expect(lantern_resource).to receive(:update).with(rollback_target: nil)
 
