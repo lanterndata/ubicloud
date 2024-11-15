@@ -47,8 +47,8 @@ def setup_fs
   r "sudo mount /dev/sdb #{$datadir}"
   r "sudo su -c \"echo '/dev/sdb #{$datadir} ext4 defaults 0 0' >> /etc/fstab\""
 
-  r "sudo addgroup --gid 1001 postgres"
-  r "sudo adduser -u 1001 --system --quiet --home /var/lib/postgresql --no-create-home --shell /bin/bash --gid 1001 --gecos 'PostgreSQL administrator' postgres"
+  r "sudo addgroup --gid 1111 postgres"
+  r "sudo adduser -u 1111 --system --quiet --home /var/lib/postgresql --no-create-home --shell /bin/bash --gid 1111 --gecos 'PostgreSQL administrator' postgres"
   r "sudo chown -R postgres:postgres #{$datadir}"
 end
 
