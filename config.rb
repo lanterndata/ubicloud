@@ -146,9 +146,10 @@ module Config
   # Lantern
   override :lantern_top_domain, "db.lantern.dev", string
   override :lantern_dns_email, "varik@lantern.dev", string
-  override :lantern_default_version, "0.4.0", string
-  override :lantern_extras_default_version, "0.4.0", string
+  override :lantern_default_version, "0.5.0", string
+  override :lantern_extras_default_version, "0.5.0", string
   override :lantern_minor_default_version, "1", string
+  override :pg_default_version, 16, int
   override :lantern_backup_bucket, "walg-dev-backups"
   override :e2e_test, "0"
   override :backup_retention_days, 7, int

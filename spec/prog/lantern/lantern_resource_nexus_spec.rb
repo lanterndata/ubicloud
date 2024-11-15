@@ -525,6 +525,11 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect { nx.wait_rollback_switchover }.to nap 10
     end
 
+    it "waits for rollback switchover and naps if can not query" do
+      expect(lantern_resource).to receive(:set_to_readonly).and_raise
+      expect { nx.wait_rollback_switchover }.to nap 5
+    end
+
     it "waits for rollback switchover and naps if can not connnect" do
       representative_server = instance_double(LanternServer)
       expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
