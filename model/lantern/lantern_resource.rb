@@ -120,13 +120,14 @@ class LanternResource < Sequel::Model
         id SERIAL PRIMARY KEY,
         object_tag TEXT,
         ddl_command TEXT,
-        timestamp TIMESTAMP
+        timestamp TIMESTAMP,
+        "session_user" TEXT
     );
     CREATE OR REPLACE FUNCTION log_ddl_changes()
     RETURNS event_trigger AS $$
     BEGIN
-      INSERT INTO ddl_log (object_tag, ddl_command, timestamp)
-              VALUES (tg_tag, current_query(), current_timestamp);
+      INSERT INTO ddl_log (object_tag, ddl_command, timestamp, "session_user")
+              VALUES (tg_tag, current_query(), current_timestamp, session_user);
     END;
     $$ LANGUAGE plpgsql
     SECURITY DEFINER;
@@ -155,7 +156,9 @@ SQL
    RETURNS TRIGGER AS $$
    BEGIN
        SET search_path TO public;
+       EXECUTE format('SET ROLE %I', NEW.session_user);
        EXECUTE NEW.ddl_command;
+       RESET ROLE;
        RETURN NEW;
    END;
    $$ LANGUAGE plpgsql;
