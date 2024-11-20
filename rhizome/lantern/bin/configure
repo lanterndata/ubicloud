@@ -49,7 +49,7 @@ def setup_fs
 
   r "sudo addgroup --gid 1111 postgres"
   r "sudo adduser -u 1111 --system --quiet --home /var/lib/postgresql --no-create-home --shell /bin/bash --gid 1111 --gecos 'PostgreSQL administrator' postgres"
-  r "sudo chown -R postgres:postgres #{$datadir}"
+  chown_with_daemon_user $datadir, $configure_hash["pg_version"]
 end
 
 def setup_env

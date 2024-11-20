@@ -37,6 +37,11 @@ def wait_for_pg
   end
 end
 
+def chown_with_daemon_user(path, pg_version)
+  user = (pg_version == 15) ? "1001:1001" : "postgres:postgres"
+  r "sudo chown -R #{user} #{path}"
+end
+
 def run_database(container_image, pg_version)
   # Run database
   volume_mount = "#{$pg_mount_path}:/usr/lib/postgresql/#{pg_version}"
@@ -49,7 +54,7 @@ def run_database(container_image, pg_version)
   r "sudo docker create --name tc #{container_image}"
   r "sudo docker cp tc:/usr/lib/postgresql/#{pg_version} #{$pg_mount_path}"
   r "sudo docker rm tc"
-  r "sudo chown -R postgres:postgres #{$pg_mount_path}"
+  chown_with_daemon_user $pg_mount_path, pg_version
   # Mount extension dir, so we can make automatic updates from host
   data["services"]["postgresql"]["volumes"].push(volume_mount)
   File.open($compose_file, "w") { |f| YAML.dump(data, f) }
@@ -102,8 +107,8 @@ def configure_tls(domain, email, dns_token, dns_zone_id, provider)
     r "#{env} /root/.acme.sh/acme.sh --server letsencrypt --issue --dns #{provider} -d #{domain}"
     reload_cmd = "sudo docker compose -f #{$compose_file} exec postgresql psql -U postgres -c 'SELECT pg_reload_conf()' && sudo docker compose -f #{$compose_file} exec postgresql psql -p6432 -U postgres pgbouncer -c RELOAD"
     r "/root/.acme.sh/acme.sh --install-cert -d #{domain} --key-file #{$datadir}/server.key  --fullchain-file #{$datadir}/server.crt --reloadcmd \"#{reload_cmd}\""
-    r "sudo chown postgres:postgres #{$datadir}/server.key"
-    r "sudo chown postgres:postgres #{$datadir}/server.crt"
+    chown_with_daemon_user "#{$datadir}/server.key", pg_version
+    chown_with_daemon_user "#{$datadir}/server.crt", pg_version
     r "sudo chmod 600 #{$datadir}/server.key"
   end
 
