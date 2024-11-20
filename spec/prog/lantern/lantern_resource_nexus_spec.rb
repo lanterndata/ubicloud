@@ -348,7 +348,33 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
     it "enables logical replication" do
       expect(lantern_resource).to receive(:listen_ddl_log)
       expect(lantern_resource).to receive(:create_and_enable_subscription)
+      expect(nx).to receive(:bud).with(described_class, {"subscription" => "sub_#{lantern_resource.ubid}"}, "watch_logical_replication")
       expect { nx.enable_logical_replication }.to hop("wait")
+    end
+  end
+
+  describe "#watch_logical_replication" do
+    it "pops if not in logical replication" do
+      expect(lantern_resource).to receive(:logical_replication).and_return(false)
+      expect { nx.watch_logical_replication }.to exit({"msg" => "logical replication disabled"})
+    end
+
+    it "pops if subscription is deleted" do
+      expect(lantern_resource).to receive(:logical_replication).and_return(true)
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:run_query).and_return("")
+      expect { nx.watch_logical_replication }.to exit({"msg" => "subscription deleted"})
+    end
+
+    it "refreshes subscription" do
+      expect(lantern_resource).to receive(:logical_replication).and_return(true)
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:run_query).and_return("sub")
+      expect(nx).to receive("frame").and_return({"subscription" => "test_sub"})
+      expect(representative_server).to receive(:run_query).with("ALTER SUBSCRIPTION test_sub REFRESH PUBLICATION")
+      expect { nx.watch_logical_replication }.to nap 20
     end
   end
 

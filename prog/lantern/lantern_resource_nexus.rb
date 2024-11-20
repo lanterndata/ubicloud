@@ -184,7 +184,25 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   label def enable_logical_replication
     lantern_resource.listen_ddl_log
     lantern_resource.create_and_enable_subscription
+    bud Prog::Lantern::LanternResourceNexus, {"subscription" => "sub_#{lantern_resource.ubid}"}, "watch_logical_replication"
     hop_wait
+  end
+
+  label def watch_logical_replication
+    if !lantern_resource.logical_replication
+      pop "logical replication disabled"
+    end
+
+    sub = frame["subscription"]
+    subscription_exists = !lantern_resource.representative_server.run_query("SELECT subname FROM pg_subscription WHERE subname='#{sub}'").empty?
+
+    if !subscription_exists
+      pop "subscription deleted"
+    end
+
+    lantern_resource.representative_server.run_query("ALTER SUBSCRIPTION #{sub} REFRESH PUBLICATION")
+
+    nap 20
   end
 
   label def wait
@@ -231,6 +249,8 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
         hop_switchover_with_parent
       end
     end
+
+    reap
 
     nap 30
   end
