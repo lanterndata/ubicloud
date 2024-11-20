@@ -440,6 +440,7 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(lantern_resource).to receive(:update).with(parent_id: nil)
       expect(lantern_resource).to receive(:timeline).and_return(timeline)
       expect(lantern_resource).to receive(:drop_ddl_log)
+      expect(lantern_resource).to receive(:mark_switchover_finish)
       expect(timeline).to receive(:update).with(parent_id: nil)
 
       expect { nx.finish_take_over }.to hop("wait")
@@ -450,6 +451,7 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
     it "sets parent to readonly and hop" do
       parent = instance_double(LanternResource)
       expect(lantern_resource).to receive(:parent).and_return(parent)
+      expect(lantern_resource).to receive(:mark_switchover_start)
       expect(parent).to receive(:set_to_readonly)
       expect(nx).to receive(:decr_switchover_with_parent)
 
