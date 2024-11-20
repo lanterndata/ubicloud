@@ -313,6 +313,10 @@ SQL
       {name: "application_name", type: "STRING", mode: "NULLABLE"}
     ]
     api.create_big_query_table(Config.lantern_log_dataset, big_query_table, schema)
+  end
+
+  def allow_big_query_access
+    api = Hosting::GcpApis.new
     # Add metadata viewer access
     api.allow_access_to_big_query_dataset(service_account_name, Config.lantern_log_dataset)
     # Add access to only this table

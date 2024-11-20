@@ -113,14 +113,26 @@ RSpec.describe LanternResource do
       instance_double(LanternTimeline, ubid: "test")
       api = instance_double(Hosting::GcpApis)
       expect(lantern_resource).to receive(:big_query_table).and_return("test-table-name").at_least(:once)
-      expect(lantern_resource).to receive(:service_account_name).and_return("test-sa").at_least(:once)
 
       allow(Hosting::GcpApis).to receive(:new).and_return(api)
       allow(api).to receive(:create_big_query_table)
+
+      expect { lantern_resource.create_logging_table }.not_to raise_error
+    end
+  end
+
+  describe "#allow_big_query_access" do
+    it "gives access to big_query table" do
+      instance_double(LanternTimeline, ubid: "test")
+      api = instance_double(Hosting::GcpApis)
+      expect(lantern_resource).to receive(:big_query_table).and_return("test-table-name").at_least(:once)
+      expect(lantern_resource).to receive(:service_account_name).and_return("test-sa").at_least(:once)
+
+      allow(Hosting::GcpApis).to receive(:new).and_return(api)
       allow(api).to receive(:allow_access_to_big_query_dataset)
       allow(api).to receive(:allow_access_to_big_query_table)
 
-      expect { lantern_resource.create_logging_table }.not_to raise_error
+      expect { lantern_resource.allow_big_query_access }.not_to raise_error
     end
   end
 

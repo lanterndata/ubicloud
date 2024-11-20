@@ -140,6 +140,11 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
 
   label def create_logging_table
     lantern_resource.create_logging_table
+    hop_setup_big_query_access
+  end
+
+  label def setup_big_query_access
+    lantern_resource.allow_big_query_access
     hop_setup_timeline_access
   end
 
