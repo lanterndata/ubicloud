@@ -159,7 +159,6 @@ SQL
        EXECUTE format('SET ROLE %I', NEW.session_user);
        EXECUTE NEW.ddl_command;
        RESET ROLE;
-       ALTER SUBSCRIPTION sub_#{ubid} REFRESH PUBLICATION;
        RETURN NEW;
    END;
    $$ LANGUAGE plpgsql;
