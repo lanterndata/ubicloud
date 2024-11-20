@@ -156,9 +156,16 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
   end
 
   describe "#create_logging_table" do
-    it "hops to setup_timeline_access" do
+    it "hops to setup_big_query_access" do
       expect(lantern_resource).to receive(:create_logging_table)
-      expect { nx.create_logging_table }.to hop("setup_timeline_access")
+      expect { nx.create_logging_table }.to hop("setup_big_query_access")
+    end
+  end
+
+  describe "#setup_big_query_access" do
+    it "hops to setup_timeline_access" do
+      expect(lantern_resource).to receive(:allow_big_query_access)
+      expect { nx.setup_big_query_access }.to hop("setup_timeline_access")
     end
   end
 
