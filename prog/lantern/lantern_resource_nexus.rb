@@ -267,6 +267,8 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
     # remove ddl_log
     lantern_resource.drop_ddl_log
 
+    lantern_resource.mark_switchover_finish
+
     hop_wait
   end
 
@@ -336,6 +338,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   label def switchover_with_parent
     decr_switchover_with_parent
     lantern_resource.parent.set_to_readonly
+    lantern_resource.mark_switchover_start
     hop_wait_for_synchronization
   end
 

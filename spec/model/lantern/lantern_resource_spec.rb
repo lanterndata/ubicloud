@@ -375,4 +375,22 @@ RSpec.describe LanternResource do
       expect { lantern_resource.rollback_switchover }.not_to raise_error
     end
   end
+
+  describe "#mark_switchover_start" do
+    it "marks switchover start time" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(lantern_resource.representative_server).to receive(:run_query).with(a_string_matching(/_ldb_switchover_info/))
+      expect { lantern_resource.mark_switchover_start }.not_to raise_error
+    end
+  end
+
+  describe "#mark_switchover_finish" do
+    it "marks switchover finish time" do
+      representative_server = instance_double(LanternServer)
+      expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(lantern_resource.representative_server).to receive(:run_query).with(a_string_matching(/_ldb_switchover_info/))
+      expect { lantern_resource.mark_switchover_finish }.not_to raise_error
+    end
+  end
 end

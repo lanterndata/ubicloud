@@ -236,6 +236,25 @@ SQL
     representative_server.run_query_all("DROP SUBSCRIPTION IF EXISTS #{name}")
   end
 
+  def mark_switchover_start
+    commands = <<SQL
+   BEGIN;
+   DROP TABLE IF EXISTS _ldb_switchover_info;
+   CREATE TABLE _ldb_switchover_info(
+     id SERIAL PRIMARY KEY,
+     started_at TIMESTAMP NOT NULL DEFAULT NOW(),
+     finished_at TIMESTAMP
+   );
+   INSERT INTO _ldb_switchover_info(started_at) VALUES (NOW());
+   COMMIT;
+SQL
+    representative_server.run_query(commands)
+  end
+
+  def mark_switchover_finish
+    representative_server.run_query("UPDATE _ldb_switchover_info SET finished_at=NOW()")
+  end
+
   def create_logical_replica(lantern_version: nil, extras_version: nil, minor_version: nil, pg_upgrade: nil)
     # TODO::
     # 1. If new database will be created during logical replication it won't be added automatically
