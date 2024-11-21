@@ -238,7 +238,7 @@ RSpec.describe LanternResource do
     it "drops subscription" do
       representative_server = instance_double(LanternServer)
       expect(lantern_resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
-      expect(lantern_resource.representative_server).to receive(:run_query_all).with("DROP SUBSCRIPTION IF EXISTS test")
+      expect(lantern_resource.representative_server).to receive(:run_query_all).with(a_string_matching(/DROP SUBSCRIPTION test/m))
       expect { lantern_resource.delete_logical_subscription("test") }.not_to raise_error
     end
   end
@@ -286,7 +286,7 @@ RSpec.describe LanternResource do
         logical_replication: true,
         lantern_version: representative_server.lantern_version,
         extras_version: representative_server.extras_version,
-        minor_version: representative_server.minor_version,
+        minor_version: representative_server.minor_version
       ))
       expect { lantern_resource.create_logical_replica }.not_to raise_error
     end

@@ -233,7 +233,18 @@ SQL
   end
 
   def delete_logical_subscription(name)
-    representative_server.run_query_all("DROP SUBSCRIPTION IF EXISTS #{name}")
+    commands = <<SQL
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM pg_subscription WHERE subname='#{name}') THEN
+      ALTER SUBSCRIPTION #{name} DISABLE;
+      ALTER SUBSCRIPTION #{name} SET (slot_name=NONE);
+      DROP SUBSCRIPTION #{name};
+    END IF;
+END
+$$;
+SQL
+    representative_server.run_query_all(commands)
   end
 
   def mark_switchover_start
