@@ -227,10 +227,14 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
         incr_run_pg_upgrade
       end
 
-      if lantern_server.resource.logical_replication && !lantern_server.resource.parent.representative_server.domain.nil?
-        # prepare for fast switchover
-        lantern_server.add_domain_to_stack(lantern_server.resource.parent.representative_server.domain, strand)
-        incr_setup_ssl
+      if lantern_server.resource.logical_replication
+        lantern_server.resource.drop_ddl_log_trigger
+
+        if !lantern_server.resource.parent.representative_server.domain.nil?
+          # prepare for fast switchover
+          lantern_server.add_domain_to_stack(lantern_server.resource.parent.representative_server.domain, strand)
+          incr_setup_ssl
+        end
       end
 
       hop_wait_timeline_available
@@ -241,8 +245,8 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
 
   label def run_pg_upgrade
     decr_run_pg_upgrade
-    lantern_server.resource.drop_ddl_log_trigger
     pg_upgrade_info = strand.stack.first["pg_upgrade"]
+    lantern_server.prepare_database_for_upgrade
     vm.sshable.cmd(
       "common/bin/daemonizer 'sudo lantern/bin/run_pg_upgrade' pg_upgrade",
       stdin: JSON.generate({
@@ -402,7 +406,8 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
         dns_token: Config.cf_token,
         dns_zone_id: Config.cf_zone_id,
         dns_email: Config.lantern_dns_email,
-        domain: frame["domain"] || lantern_server.domain
+        domain: frame["domain"] || lantern_server.domain,
+        pg_version: lantern_server.resource.pg_version
       }))
     when "Failed"
       logs = JSON.parse(vm.sshable.cmd("common/bin/daemonizer --logs setup_ssl"))

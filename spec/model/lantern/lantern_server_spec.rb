@@ -691,7 +691,7 @@ SQL
 
   describe "#list_all_databases" do
     it "returns list of all databases" do
-      expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec postgresql psql -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'").and_return("postgres\ndb2\n")
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec postgresql psql -U postgres -t -c 'SELECT datname FROM pg_database WHERE datistemplate=FALSE'").and_return("postgres\ndb2\n")
       expect(lantern_server.list_all_databases).to eq(["postgres", "db2"])
     end
   end
@@ -904,6 +904,13 @@ SQL
       expect(strand).to receive(:modified!).with(:stack)
       expect(strand).to receive(:save_changes)
       expect { lantern_server.remove_domain_from_stack(strand) }.not_to raise_error
+    end
+  end
+
+  describe "#prepare_database_for_upgrade" do
+    it "cleans database before running pg_upgrade" do
+      expect(lantern_server).to receive(:run_query_all)
+      expect { lantern_server.prepare_database_for_upgrade }.not_to raise_error
     end
   end
 end

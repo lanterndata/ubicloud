@@ -242,7 +242,7 @@ SQL
   end
 
   def list_all_databases
-    vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} exec postgresql psql -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'")
+    vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} exec postgresql psql -U postgres -t -c 'SELECT datname FROM pg_database WHERE datistemplate=FALSE'")
       .chomp
       .strip
       .split("\n")
@@ -300,6 +300,38 @@ SQL
 
   def start_container
     vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} up -d")
+  end
+
+  def prepare_database_for_upgrade
+    # drop lantern_extras extension because it has breaking binary changes
+    # drop all indexes which does not have `dim` specified in params or are old external indexes
+    # which use _experimental_index_path param
+    commands = <<SQL
+DROP EXTENSION IF EXISTS lantern_extras;
+DO $$
+DECLARE
+    drop_query TEXT;
+BEGIN
+    FOR drop_query IN
+        SELECT 'DROP INDEX "' || i.relname || '";'
+        FROM pg_class t
+        JOIN pg_index ix ON t.oid = ix.indrelid
+        JOIN pg_class i ON i.oid = ix.indexrelid
+        JOIN pg_am a ON i.relam = a.oid
+        JOIN pg_namespace n ON n.oid = i.relnamespace
+        WHERE a.amname = 'lantern_hnsw'
+        AND (
+          lower(pg_get_indexdef(i.oid)) NOT SIMILAR TO '%"?dim"?=%'
+          OR
+          lower(pg_get_indexdef(i.oid)) SIMILAR TO '%"?_experimental_index_path"?=%'
+        )
+    LOOP
+        EXECUTE drop_query;
+    END LOOP;
+END
+$$;
+SQL
+    run_query_all(commands)
   end
 
   # def failover_target
