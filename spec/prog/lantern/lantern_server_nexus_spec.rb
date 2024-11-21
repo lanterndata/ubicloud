@@ -423,6 +423,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.resource).to receive(:parent).and_return(parent_reosurce).at_least(:once)
       expect(lantern_server.resource).to receive(:logical_replication).and_return(true)
       expect(lantern_server.resource).to receive(:allow_timeline_access_to_bucket)
+      expect(lantern_server.resource).to receive(:drop_ddl_log_trigger)
       expect(lantern_server).to receive(:run_query).and_return("f")
       expect(lantern_server).to receive(:timeline_id=)
       expect(lantern_server).to receive(:timeline_access=).with("push")
@@ -443,6 +444,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       expect(lantern_server.resource).to receive(:parent).and_return(parent_reosurce).at_least(:once)
       expect(lantern_server.resource).to receive(:logical_replication).and_return(true)
       expect(lantern_server.resource).to receive(:allow_timeline_access_to_bucket)
+      expect(lantern_server.resource).to receive(:drop_ddl_log_trigger)
       expect(lantern_server).to receive(:add_domain_to_stack).with(parent_reosurce.representative_server.domain, nx.strand)
       expect(nx).to receive(:incr_setup_ssl)
       expect(lantern_server).to receive(:run_query).and_return("f")
@@ -647,7 +649,8 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
         dns_token: Config.cf_token,
         dns_zone_id: Config.cf_zone_id,
         dns_email: Config.lantern_dns_email,
-        domain: "db.lantern.dev"
+        domain: "db.lantern.dev",
+        pg_version: lantern_server.resource.pg_version
       }))
       expect { nx.setup_ssl }.to nap(10)
     end
@@ -662,7 +665,8 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
         dns_token: Config.cf_token,
         dns_zone_id: Config.cf_zone_id,
         dns_email: Config.lantern_dns_email,
-        domain: lantern_server.domain
+        domain: lantern_server.domain,
+        pg_version: lantern_server.resource.pg_version
       }))
       expect { nx.setup_ssl }.to nap(10)
     end
@@ -1067,7 +1071,7 @@ RSpec.describe Prog::Lantern::LanternServerNexus do
       frame = {"pg_upgrade" => {"lantern_version" => "0.5.0", "extras_version" => "0.5.0", "minor_version" => "1", "pg_version" => 17}}
       expect(nx.strand).to receive(:stack).and_return([frame]).at_least(:once)
       expect(lantern_server).to receive(:container_image).and_return(image).at_least(:once)
-      expect(lantern_server.resource).to receive(:drop_ddl_log_trigger)
+      expect(lantern_server).to receive(:prepare_database_for_upgrade)
       expect(lantern_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo lantern/bin/run_pg_upgrade' pg_upgrade", stdin: JSON.generate(
         container_image: lantern_server.container_image,
         pg_version: 17,

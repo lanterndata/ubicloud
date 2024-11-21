@@ -16,7 +16,7 @@ def configure_gcr(container_image)
 end
 
 def update_extensions_in_sql
-  all_dbs = (r "docker compose -f #{$compose_file} exec postgresql psql -U postgres -P \"footer=off\" -c 'SELECT datname from pg_database' | tail -n +3 | grep -v 'template0' | grep -v 'template1'").strip!.split("\n")
+  all_dbs = (r "docker compose -f #{$compose_file} exec postgresql psql -U postgres -t -c 'SELECT datname FROM pg_database WHERE datistemplate=FALSE'").strip!.split("\n")
   tmp_cmd = ""
   all_dbs.each do |db|
     tmp_cmd += "docker compose -f #{$compose_file} exec postgresql psql -U postgres -f /lantern-init.sql #{db} \n"
@@ -93,7 +93,7 @@ def tls_already_configured?(domain)
   !r("(test -f #{$datadir}/server.key && test -f #{$datadir}/server.crt && echo 1) || echo ''").chomp.empty?
 end
 
-def configure_tls(domain, email, dns_token, dns_zone_id, provider)
+def configure_tls(domain, email, dns_token, dns_zone_id, provider, pg_version)
   puts "Configuring TLS for domain #{domain}"
 
   if !tls_already_configured?(domain)
@@ -107,10 +107,11 @@ def configure_tls(domain, email, dns_token, dns_zone_id, provider)
     r "#{env} /root/.acme.sh/acme.sh --server letsencrypt --issue --dns #{provider} -d #{domain}"
     reload_cmd = "sudo docker compose -f #{$compose_file} exec postgresql psql -U postgres -c 'SELECT pg_reload_conf()' && sudo docker compose -f #{$compose_file} exec postgresql psql -p6432 -U postgres pgbouncer -c RELOAD"
     r "/root/.acme.sh/acme.sh --install-cert -d #{domain} --key-file #{$datadir}/server.key  --fullchain-file #{$datadir}/server.crt --reloadcmd \"#{reload_cmd}\""
-    chown_with_daemon_user "#{$datadir}/server.key", pg_version
-    chown_with_daemon_user "#{$datadir}/server.crt", pg_version
-    r "sudo chmod 600 #{$datadir}/server.key"
   end
+
+  chown_with_daemon_user "#{$datadir}/server.key", pg_version
+  chown_with_daemon_user "#{$datadir}/server.crt", pg_version
+  r "sudo chmod 600 #{$datadir}/server.key"
 
   append_env([
     ["POSTGRESQL_ENABLE_TLS", "yes"],
