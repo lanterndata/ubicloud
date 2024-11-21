@@ -286,7 +286,7 @@ RSpec.describe LanternResource do
         logical_replication: true,
         lantern_version: representative_server.lantern_version,
         extras_version: representative_server.extras_version,
-        minor_version: representative_server.minor_version
+        minor_version: representative_server.minor_version,
       ))
       expect { lantern_resource.create_logical_replica }.not_to raise_error
     end
@@ -308,9 +308,10 @@ RSpec.describe LanternResource do
         logical_replication: true,
         lantern_version: "0.3.0",
         extras_version: "0.2.6",
-        minor_version: "1"
+        minor_version: "1",
+        name: "test"
       ))
-      expect { lantern_resource.create_logical_replica(lantern_version: "0.3.0", extras_version: "0.2.6", minor_version: "1") }.not_to raise_error
+      expect { lantern_resource.create_logical_replica(resource_name: "test", lantern_version: "0.3.0", extras_version: "0.2.6", minor_version: "1") }.not_to raise_error
     end
   end
 

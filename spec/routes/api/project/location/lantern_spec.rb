@@ -333,10 +333,11 @@ RSpec.describe Clover, "lantern" do
           lantern_version: nil,
           extras_version: nil,
           minor_version: nil,
-          pg_upgrade: nil
+          pg_upgrade: nil,
+          resource_name: nil
         ).and_return(instance_double(Strand, id: pg.id))
 
-        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/logical-replica", {lantern_version: "", extras_version: "", minor_version: "", pg_upgrade: ""}
+        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/logical-replica", {lantern_version: "", extras_version: "", minor_version: "", pg_upgrade: "", name: ""}
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["id"]).to eq(pg.id)
         expect(JSON.parse(last_response.body)["name"]).to eq(pg.name)
@@ -351,6 +352,7 @@ RSpec.describe Clover, "lantern" do
           lantern_version: "0.5.0",
           extras_version: "0.5.0",
           minor_version: "1",
+          resource_name: "test",
           pg_upgrade: {"lantern_version" => "0.6.0", "extras_version" => "0.6.0", "minor_version" => "1", "pg_version" => "17"}
         ).and_return(instance_double(Strand, id: pg.id))
 
@@ -358,7 +360,8 @@ RSpec.describe Clover, "lantern" do
           lantern_version: "0.5.0",
           extras_version: "0.5.0",
           minor_version: "1",
-          pg_upgrade: {"lantern_version" => "0.6.0", "extras_version" => "0.6.0", "minor_version" => "1", "pg_version" => 17}
+          pg_upgrade: {"lantern_version" => "0.6.0", "extras_version" => "0.6.0", "minor_version" => "1", "pg_version" => 17},
+          name: "test"
         }
         expect(last_response.status).to eq(200)
       end

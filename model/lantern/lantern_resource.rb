@@ -255,7 +255,7 @@ SQL
     representative_server.run_query("UPDATE _ldb_switchover_info SET finished_at=NOW()")
   end
 
-  def create_logical_replica(lantern_version: nil, extras_version: nil, minor_version: nil, pg_upgrade: nil)
+  def create_logical_replica(resource_name: nil, lantern_version: nil, extras_version: nil, minor_version: nil, pg_upgrade: nil)
     # TODO::
     # 1. If new database will be created during logical replication it won't be added automatically
     ubid = LanternResource.generate_ubid
@@ -265,7 +265,7 @@ SQL
     Prog::Lantern::LanternResourceNexus.assemble(
       project_id: project_id,
       location: location,
-      name: "#{name}-#{Time.now.to_i}",
+      name: resource_name || "#{name}-#{Time.now.to_i}",
       label: "#{label}-logical",
       ubid: ubid,
       target_vm_size: representative_server.target_vm_size,
