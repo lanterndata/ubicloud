@@ -436,12 +436,12 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
 
   describe "#finish_take_over" do
     it "updates display states, and removes fork association" do
-      parent = instance_double(LanternResource)
+      parent = instance_double(LanternResource, label: "test")
       timeline = instance_double(LanternTimeline)
 
       expect(lantern_resource).to receive(:parent).and_return(parent).at_least(:once)
 
-      expect(lantern_resource).to receive(:update).with(display_state: nil)
+      expect(lantern_resource).to receive(:update).with(display_state: nil, label: parent.label)
       expect(parent).to receive(:update).with(display_state: nil, rollback_target: lantern_resource.id)
 
       expect(lantern_resource).to receive(:update).with(parent_id: nil)

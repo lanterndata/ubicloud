@@ -165,11 +165,13 @@ class CloverApi
         extras_version = (r.params["extras_version"] && r.params["extras_version"].empty?) ? nil : r.params["extras_version"]
         minor_version = (r.params["minor_version"] && r.params["minor_version"].empty?) ? nil : r.params["minor_version"]
         pg_upgrade = (r.params["pg_upgrade"] && r.params["pg_upgrade"].empty?) ? nil : r.params["pg_upgrade"]
+        resource_name = (r.params["name"] && r.params["name"].empty?) ? nil : r.params["name"]
         st = pg.create_logical_replica(
           lantern_version: lantern_version,
           extras_version: extras_version,
           minor_version: minor_version,
-          pg_upgrade: pg_upgrade
+          pg_upgrade: pg_upgrade,
+          resource_name: resource_name
         )
         replica = LanternResource[st.id]
         serialize(replica, :detailed)

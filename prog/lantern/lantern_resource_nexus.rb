@@ -262,7 +262,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
 
   label def finish_take_over
     # update display_states
-    lantern_resource.update(display_state: nil)
+    lantern_resource.update(display_state: nil, label: lantern_resource.parent.label)
     lantern_resource.parent.update(display_state: nil, rollback_target: lantern_resource.id)
 
     # remove fork association so parent can be deleted
