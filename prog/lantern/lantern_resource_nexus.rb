@@ -274,6 +274,11 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
 
     lantern_resource.mark_switchover_finish
 
+    current_frame = strand.stack.first
+    current_frame.delete("force_switchover")
+    strand.modified!(:stack)
+    strand.save_changes
+
     hop_wait
   end
 
@@ -348,7 +353,7 @@ class Prog::Lantern::LanternResourceNexus < Prog::Base
   end
 
   label def wait_for_synchronization
-    nap 5 if lantern_resource.parent.get_logical_replication_lag("slot_#{lantern_resource.ubid}") != 0
+    nap 5 if !frame["force_switchover"] && lantern_resource.parent.get_logical_replication_lag("slot_#{lantern_resource.ubid}") != 0
     hop_delete_logical_subscription
   end
 

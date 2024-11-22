@@ -373,31 +373,20 @@ RSpec.describe Clover, "lantern" do
         query_res = class_double(LanternResource, first: pg)
         allow(query_res).to receive(:where).and_return(query_res)
         expect(project).to receive(:lantern_resources_dataset).and_return(query_res)
+        err = "Database does not have parent or is not in logical replication state"
+        expect(pg).to receive(:prepare_switchover).and_raise err
 
         post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/switchover"
-        expect(last_response.status).to eq(400)
-      end
-
-      it "fails because not in logical replication mode" do
-        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
-        query_res = class_double(LanternResource, first: pg)
-        expect(pg).to receive(:parent).and_return(instance_double(LanternResource))
-        expect(pg).to receive(:logical_replication).and_return(false)
-        allow(query_res).to receive(:where).and_return(query_res)
-        expect(project).to receive(:lantern_resources_dataset).and_return(query_res)
-
-        post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/switchover"
-        expect(last_response.status).to eq(400)
+        expect(last_response.status).to eq(422)
+        expect(JSON.parse(last_response.body)["error"]).to eq(err)
       end
 
       it "performs switchover" do
         expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
         query_res = class_double(LanternResource, first: pg)
-        expect(pg).to receive(:parent).and_return(instance_double(LanternResource))
-        expect(pg).to receive(:logical_replication).and_return(true)
         allow(query_res).to receive(:where).and_return(query_res)
         expect(project).to receive(:lantern_resources_dataset).and_return(query_res)
-        expect(pg).to receive(:incr_switchover_with_parent)
+        expect(pg).to receive(:prepare_switchover)
 
         post "/api/project/#{project.ubid}/location/#{pg.location}/lantern/instance-1/switchover"
         expect(last_response.status).to eq(200)

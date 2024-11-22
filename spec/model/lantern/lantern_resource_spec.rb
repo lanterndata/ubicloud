@@ -406,4 +406,101 @@ RSpec.describe LanternResource do
       expect { lantern_resource.mark_switchover_finish }.not_to raise_error
     end
   end
+
+  describe "#prepare_switchover" do
+    it "fails if no parent" do
+      expect(lantern_resource).to receive(:parent).and_return(nil)
+      expect { lantern_resource.prepare_switchover }.to raise_error "Database does not have parent or is not in logical replication state"
+    end
+
+    it "fails if not in logical replication" do
+      parent = instance_double(described_class)
+      expect(lantern_resource).to receive(:parent).and_return(parent)
+      expect(lantern_resource).to receive(:logical_replication).and_return(false)
+      expect { lantern_resource.prepare_switchover }.to raise_error "Database does not have parent or is not in logical replication state"
+    end
+
+    it "success if force" do
+      parent = instance_double(described_class)
+      expect(lantern_resource).to receive(:parent).and_return(parent)
+      expect(lantern_resource).to receive(:logical_replication).and_return(true)
+      expect(lantern_resource).to receive(:incr_switchover_with_parent)
+      frame = instance_double(Hash)
+      strand = instance_double(Strand, stack: [frame])
+      expect(frame).to receive(:[]=).with("force_switchover", true)
+      expect(strand).to receive(:modified!)
+      expect(strand).to receive(:save_changes)
+      expect(lantern_resource).to receive(:strand).and_return(strand).at_least(:once)
+      expect { lantern_resource.prepare_switchover(true) }.not_to raise_error
+    end
+
+    it "fails if db list differs" do
+      representative_server = instance_double(LanternServer)
+      parent_representative_server = instance_double(LanternServer)
+      parent = instance_double(described_class, representative_server: parent_representative_server)
+      parent_databases = ["db1", "db2", "db3"]
+      replica_databases = ["db1"]
+
+      allow(lantern_resource).to receive_messages(representative_server: representative_server, parent: parent)
+      expect(lantern_resource).to receive(:logical_replication).and_return(true)
+
+      allow(parent_representative_server).to receive_messages(list_all_databases: parent_databases, list_all_roles: [], run_query: "0")
+      allow(representative_server).to receive_messages(list_all_databases: replica_databases, list_all_roles: [], run_query: "0")
+
+      err = "The following databases were not synced to replica: db2,db3\n"
+      expect { lantern_resource.prepare_switchover }.to raise_error "Inconsistencies found between parent and replica databases.\nPlease synchronize databases manually or create new replica or pass force=true if you are sure you want to switchover\n#{err}"
+    end
+
+    it "fails if role list differs" do
+      representative_server = instance_double(LanternServer)
+      parent_representative_server = instance_double(LanternServer)
+      parent = instance_double(described_class, representative_server: parent_representative_server)
+      parent_databases = ["db1", "db2", "db3"]
+      replica_databases = ["db1", "db2", "db3"]
+
+      allow(lantern_resource).to receive_messages(representative_server: representative_server, parent: parent)
+      expect(lantern_resource).to receive(:logical_replication).and_return(true)
+
+      allow(parent_representative_server).to receive_messages(list_all_databases: parent_databases, list_all_roles: ["postgres", "role2"], run_query: "0")
+      allow(representative_server).to receive_messages(list_all_databases: replica_databases, list_all_roles: ["postgres"], run_query: "0")
+
+      err = "The following roles were not synced to replica: role2\n"
+      expect { lantern_resource.prepare_switchover }.to raise_error "Inconsistencies found between parent and replica databases.\nPlease synchronize databases manually or create new replica or pass force=true if you are sure you want to switchover\n#{err}"
+    end
+
+    it "fails if large object count differs" do
+      representative_server = instance_double(LanternServer)
+      parent_representative_server = instance_double(LanternServer)
+      parent = instance_double(described_class, representative_server: parent_representative_server)
+      parent_databases = ["db1", "db2", "db3"]
+      replica_databases = ["db1"]
+
+      allow(lantern_resource).to receive_messages(representative_server: representative_server, parent: parent)
+      expect(lantern_resource).to receive(:logical_replication).and_return(true)
+
+      allow(parent_representative_server).to receive_messages(list_all_databases: parent_databases, list_all_roles: ["postgres", "role2"], run_query: "5")
+      allow(representative_server).to receive_messages(list_all_databases: replica_databases, list_all_roles: ["postgres"], run_query: "0")
+
+      err = "The following databases were not synced to replica: db2,db3\nThe following roles were not synced to replica: role2\nParent database has 5 more large objects than replica\n"
+      expect { lantern_resource.prepare_switchover }.to raise_error "Inconsistencies found between parent and replica databases.\nPlease synchronize databases manually or create new replica or pass force=true if you are sure you want to switchover\n#{err}"
+    end
+
+    it "success if all conditions pass" do
+      representative_server = instance_double(LanternServer)
+      parent_representative_server = instance_double(LanternServer)
+      parent = instance_double(described_class, representative_server: parent_representative_server)
+      parent_databases = ["db1", "db2", "db3"]
+      replica_databases = ["db1", "db2", "db3"]
+
+      allow(lantern_resource).to receive_messages(representative_server: representative_server, parent: parent)
+      expect(lantern_resource).to receive(:logical_replication).and_return(true)
+
+      allow(parent_representative_server).to receive_messages(list_all_databases: parent_databases, list_all_roles: ["postgres"], run_query: "5")
+      allow(representative_server).to receive_messages(list_all_databases: replica_databases, list_all_roles: ["postgres"], run_query: "5")
+
+      allow(lantern_resource).to receive(:incr_switchover_with_parent)
+
+      expect { lantern_resource.prepare_switchover }.not_to raise_error
+    end
+  end
 end
