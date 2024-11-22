@@ -450,6 +450,13 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       expect(lantern_resource).to receive(:mark_switchover_finish)
       expect(timeline).to receive(:update).with(parent_id: nil)
 
+      frame = instance_double(Hash)
+      strand = instance_double(Strand, stack: [frame])
+      expect(frame).to receive(:delete).with("force_switchover")
+      expect(strand).to receive(:modified!)
+      expect(strand).to receive(:save_changes)
+      expect(nx).to receive(:strand).and_return(strand).at_least(:once)
+
       expect { nx.finish_take_over }.to hop("wait")
     end
   end
@@ -471,12 +478,19 @@ RSpec.describe Prog::Lantern::LanternResourceNexus do
       parent = instance_double(LanternResource)
       expect(lantern_resource).to receive(:parent).and_return(parent)
       expect(parent).to receive(:get_logical_replication_lag).with("slot_#{lantern_resource.ubid}").and_return(5)
+      expect(nx).to receive(:frame).and_return({"force_switchover" => false})
 
       expect { nx.wait_for_synchronization }.to nap(5)
     end
 
+    it "hops to delete_logical_subscription if force_switchover" do
+      expect(nx).to receive(:frame).and_return({"force_switchover" => true})
+      expect { nx.wait_for_synchronization }.to hop("delete_logical_subscription")
+    end
+
     it "hops to delete_logical_subscription" do
       parent = instance_double(LanternResource)
+      expect(nx).to receive(:frame).and_return({"force_switchover" => false})
       expect(lantern_resource).to receive(:parent).and_return(parent)
       expect(parent).to receive(:get_logical_replication_lag).with("slot_#{lantern_resource.ubid}").and_return(0)
 

@@ -340,6 +340,51 @@ SQL
     SYNC = "sync"
   end
 
+  def prepare_switchover(force = false)
+    if parent.nil? || !logical_replication
+      fail "Database does not have parent or is not in logical replication state"
+    end
+
+    if !force
+      err = ""
+      replica_dbs = representative_server.list_all_databases
+      parent_dbs = parent.representative_server.list_all_databases
+      db_diff = parent_dbs - replica_dbs
+
+      if db_diff.any?
+        err = "The following databases were not synced to replica: #{db_diff.join(",")}\n"
+      end
+
+      replica_roles = representative_server.list_all_roles
+      parent_roles = parent.representative_server.list_all_roles
+      roles_diff = parent_roles - replica_roles
+
+      if roles_diff.any?
+        err = "#{err}The following roles were not synced to replica: #{roles_diff.join(",")}\n"
+      end
+
+      lo_count_replica = representative_server.run_query("SELECT COUNT(*) FROM pg_largeobject_metadata")
+      lo_count_parent = parent.representative_server.run_query("SELECT COUNT(*) FROM pg_largeobject_metadata")
+      lo_diff = lo_count_parent.to_i - lo_count_replica.to_i
+
+      if lo_diff > 0
+        err = "#{err}Parent database has #{lo_diff} more large objects than replica\n"
+      end
+
+      if !err.empty?
+        err = "Inconsistencies found between parent and replica databases.\nPlease synchronize databases manually or create new replica or pass force=true if you are sure you want to switchover\n#{err}"
+        fail err
+      end
+    else
+      current_frame = strand.stack.first
+      current_frame["force_switchover"] = true
+      strand.modified!(:stack)
+      strand.save_changes
+    end
+
+    incr_switchover_with_parent
+  end
+
   def rollback_switchover
     current_resource = LanternResource[rollback_target]
     # stop current one and start old one

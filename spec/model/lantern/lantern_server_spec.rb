@@ -285,6 +285,7 @@ RSpec.describe LanternServer do
       expect(lantern_server).to receive(:extras_version).and_return("0.1.4").at_least(:once)
       expect(lantern_server).to receive(:minor_version).and_return("1").at_least(:once)
       expect(vm).to receive(:boot_image).and_return(Config.gcp_default_image).at_least(:once)
+      expect(vm).to receive(:cores).and_return(2)
 
       walg_conf = timeline.generate_walg_config
       expected_conf = JSON.generate({
@@ -354,6 +355,7 @@ RSpec.describe LanternServer do
       expect(lantern_server).to receive(:extras_version).and_return("0.1.4").at_least(:once)
       expect(lantern_server).to receive(:minor_version).and_return("1").at_least(:once)
       expect(vm).to receive(:boot_image).and_return("custom-image").at_least(:once)
+      expect(vm).to receive(:cores).and_return(2)
 
       walg_conf = timeline.generate_walg_config
       expected_conf = JSON.generate({
@@ -421,6 +423,7 @@ RSpec.describe LanternServer do
       expect(lantern_server).to receive(:extras_version).and_return("0.1.4").at_least(:once)
       expect(lantern_server).to receive(:minor_version).and_return("1").at_least(:once)
       expect(vm).to receive(:boot_image).and_return("custom-image").at_least(:once)
+      expect(vm).to receive(:cores).and_return(1)
 
       walg_conf = timeline.generate_walg_config
       expected_conf = JSON.generate({
@@ -451,7 +454,7 @@ RSpec.describe LanternServer do
         gcp_creds_walg_b64: walg_conf[:gcp_creds_b64],
         walg_gs_prefix: walg_conf[:walg_gs_prefix],
         gcp_creds_big_query_b64: resource.gcp_creds_b64,
-        big_query_dataset: Config.lantern_log_dataset,
+        big_query_dataset: "",
         pg_version: 17
       })
       expect(lantern_server.configure_hash).to eq(expected_conf)
@@ -489,6 +492,7 @@ RSpec.describe LanternServer do
       expect(lantern_server).to receive(:extras_version).and_return("0.1.4").at_least(:once)
       expect(lantern_server).to receive(:minor_version).and_return("1").at_least(:once)
       expect(vm).to receive(:boot_image).and_return("custom-image").at_least(:once)
+      expect(vm).to receive(:cores).and_return(2)
 
       walg_conf = timeline.generate_walg_config
       expected_conf = JSON.generate({
@@ -693,6 +697,18 @@ SQL
     it "returns list of all databases" do
       expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec postgresql psql -U postgres -t -c 'SELECT datname FROM pg_database WHERE datistemplate=FALSE'").and_return("postgres\ndb2\n")
       expect(lantern_server.list_all_databases).to eq(["postgres", "db2"])
+    end
+  end
+
+  describe "#list_all_roles" do
+    it "returns list of all roles which can login" do
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec postgresql psql -U postgres -t -c 'SELECT rolname FROM pg_roles WHERE rolcanlogin=TRUE'").and_return("postgres\nrole2\n")
+      expect(lantern_server.list_all_roles).to eq(["postgres", "role2"])
+    end
+
+    it "returns list of all roles" do
+      expect(lantern_server.vm.sshable).to receive(:cmd).with("sudo docker compose -f /var/lib/lantern/docker-compose.yaml exec postgresql psql -U postgres -t -c 'SELECT rolname FROM pg_roles '").and_return("postgres\nrole2\nrole3\n")
+      expect(lantern_server.list_all_roles(false)).to eq(["postgres", "role2", "role3"])
     end
   end
 

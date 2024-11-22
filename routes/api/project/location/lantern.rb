@@ -179,14 +179,12 @@ class CloverApi
 
       r.post "switchover" do
         Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
-
-        if pg.parent.nil? || !pg.logical_replication
-          fail CloverError.new(400, "Invalid request", "Database does not have parent or is not in logical replication state")
-        end
-
-        pg.incr_switchover_with_parent
+        pg.prepare_switchover(r.params["force"])
         response.status = 200
         r.halt
+      rescue => e
+        response.status = 422
+        return {"error" => e.message}
       end
 
       r.post "rollback-switchover" do

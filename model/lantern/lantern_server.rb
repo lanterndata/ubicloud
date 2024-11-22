@@ -125,6 +125,13 @@ class LanternServer < Sequel::Model
       postgresql_recovery_target_lsn = ""
     end
 
+    big_query_dataset = ""
+
+    if vm.cores > 1
+      # enable big query logs only if this is not the smallest instance
+      big_query_dataset = Config.lantern_log_dataset
+    end
+
     JSON.generate({
       enable_coredumps: true,
       skip_deps: vm.boot_image != Config.gcp_default_image,
@@ -153,7 +160,7 @@ class LanternServer < Sequel::Model
       gcp_creds_walg_b64: walg_config[:gcp_creds_b64],
       walg_gs_prefix: walg_config[:walg_gs_prefix],
       gcp_creds_big_query_b64: resource.gcp_creds_b64,
-      big_query_dataset: Config.lantern_log_dataset,
+      big_query_dataset: big_query_dataset,
       pg_version: resource.pg_version
     })
   end
@@ -243,6 +250,20 @@ SQL
 
   def list_all_databases
     vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} exec postgresql psql -U postgres -t -c 'SELECT datname FROM pg_database WHERE datistemplate=FALSE'")
+      .chomp
+      .strip
+      .split("\n")
+      .map { _1.strip }
+  end
+
+  def list_all_roles(login = true)
+    condition = if login
+      "WHERE rolcanlogin=TRUE"
+    else
+      ""
+    end
+
+    vm.sshable.cmd("sudo docker compose -f #{Config.compose_file} exec postgresql psql -U postgres -t -c 'SELECT rolname FROM pg_roles #{condition}'")
       .chomp
       .strip
       .split("\n")
