@@ -267,8 +267,6 @@ SQL
   end
 
   def create_logical_replica(resource_name: nil, lantern_version: nil, extras_version: nil, minor_version: nil, pg_upgrade: nil)
-    # TODO::
-    # 1. If new database will be created during logical replication it won't be added automatically
     ubid = LanternResource.generate_ubid
     create_ddl_log
     create_publication("pub_#{ubid}")
