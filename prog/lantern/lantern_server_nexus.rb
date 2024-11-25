@@ -229,6 +229,8 @@ class Prog::Lantern::LanternServerNexus < Prog::Base
 
       if lantern_server.resource.logical_replication
         lantern_server.resource.drop_ddl_log_trigger
+        # remove publications
+        lantern_server.resource.delete_publication("pub_#{lantern_server.resource.ubid}")
 
         if !lantern_server.resource.parent.representative_server.domain.nil?
           # prepare for fast switchover
